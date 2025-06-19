@@ -1,0 +1,55 @@
+ALTER TABLE Users 
+ALTER COLUMN user_id NVARCHAR(50) NOT NULL;
+
+
+
+
+UPDATE Users 
+SET user_id = 'chris1' 
+WHERE id = 28;
+
+UPDATE Users 
+SET user_id = 'gia' 
+WHERE id = 32;
+
+UPDATE Users 
+SET password = 'gia' 
+WHERE id = 32;
+
+UPDATE Users 
+SET user_id = 'nzacharo' 
+WHERE id = 7;
+
+UPDATE Users 
+SET password = 'nzacharo' 
+WHERE id = 7;
+
+ALTER TABLE Users 
+ADD CONSTRAINT PK_Users PRIMARY KEY (user_id);
+
+
+CREATE TABLE UserLocationAccess (
+    user_id NVARCHAR(50) NOT NULL,
+    location_id INT NOT NULL,
+    IsActive BIT DEFAULT 1,
+    
+    PRIMARY KEY (user_id, location_id),
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (location_id) REFERENCES Location(id) ON DELETE CASCADE
+);
+
+VALUES ('vas', 0, 1); 
+VALUES ('vas', 1, 1); 
+VALUES ('vas', 1, 1);
+VALUES ('vas', 2, 1);
+VALUES (vas, 3, 1);
+VALUES (vas, 4, 1);
+VALUES (vas, 5, 1);
+VALUES (vas, 6, 1);
+VALUES (vas, 7, 1);
+VALUES (vas, 8, 1);
+VALUES (vas, 9, 1);
+VALUES (vas, 10, 1);
+VALUES (vas, 11, 1);
+VALUES (vas, 12, 1);
+VALUES (vas, 13, 1);

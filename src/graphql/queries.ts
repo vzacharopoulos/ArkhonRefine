@@ -1,0 +1,276 @@
+
+
+
+
+
+import gql from "graphql-tag";
+
+
+{/*
+export const AvailableCoilsDocument = gql`
+  query AvailableCoils($filter: CoilsFilterInput, $limit: Int, $offset: Int) {
+    availableCoils(filter: $filter, limit: $limit, offset: $offset) {
+      nodes {
+        id
+        coilno
+        status {
+          name
+        }
+        loc
+        upDate
+        thickness
+        widthCoil
+        currWeight
+        openstatus
+        supplier
+        company
+      }
+      totalCount
+    }
+  }
+`;
+*/}
+
+export const GET_COIL = gql`
+query GetCoil($id: Int!) {
+  coil(id: $id) {
+    id
+    comments
+    thickness
+    loc
+  }
+}`
+
+
+
+
+
+export const UPDATE_COIL = gql`
+ mutation updateOneCoil($input: UpdateOneCoilInput!) {
+  updateOneCoil(input: $input) {
+    id
+    comments
+    thickness
+  }
+}
+`;
+
+
+export const AllLocations = gql`
+  query GetAllLocations{
+  locations {
+
+
+shortname
+whgroup
+atlaid
+atlaname
+comid
+
+}
+}
+  
+`;
+
+export const UserDocument = gql`
+  query User($userId: String!) {
+    user(userId: $userId) {
+      userId
+      role
+      name
+      id
+      password
+      email
+      phone
+      atlaname
+      name2
+    }
+  }
+`;
+
+export const GET_EXPECTED_COILS = gql`
+  query GetexpectedCoils(
+    $filter: CoilsFilterInput
+    $sorting: [CoilsSortInput!]
+    $limit: Int
+    $offset: Int
+  ) {
+    expectedCoils(
+      filter: $filter
+      sorting: $sorting
+      limit: $limit
+      offset: $offset
+    ) {
+      nodes {
+        id
+        coilno
+        comments
+        color
+        loc
+        upDate
+        thickness
+        widthCoil
+        currWeight
+        openstatus
+        supplier
+        company
+        status {
+          id
+          name
+        }
+      }
+      totalCount
+    }
+    
+  
+  }
+`;
+ 
+
+
+export const COILCOLORS = gql`
+ query coilColors{
+  
+    coilColors{
+      id
+    code
+    name
+    hexcode
+  
+  }
+}`
+
+export const GET_AVAILABLE_COILS = gql`
+  query GetAvailableCoils(
+    $filter: CoilsFilterInput
+    $sorting: [CoilsSortInput!]
+    $limit: Int
+    $offset: Int
+  ) {
+    availableCoils(
+      filter: $filter
+      sorting: $sorting
+      limit: $limit
+      offset: $offset
+    ) {
+      nodes {
+        id
+        coilno
+        comments
+        color
+        loc
+        upDate
+        thickness
+        widthCoil
+        currWeight
+        openstatus
+        supplier
+        company
+        status {
+          id
+          name
+        }
+      }
+      totalCount
+    }
+  
+  }
+`;
+
+
+
+export const CoilShowDocument = gql`
+    query CoilShow($id: Int!) {
+  coil(id: $id) {
+     id
+      coilno
+      color
+      sheetType
+      coating
+      coathick
+      paintType
+      steelGrade
+      createDate
+      delDate
+      upDate
+      gaugeThickness
+      thickness
+      widthCoil
+      initWeight
+      weight
+      currWeight
+      grossWeight
+      wastage
+      status {
+        name # Assuming StatusType has a 'name' field you want to fetch
+        # You can add other StatusType fields here if needed, e.g., id, nameGr
+      }
+      loc
+      currLength
+      comments
+      commentsPanel
+      supplier
+      openstatus
+      innerdiameter
+      quality
+      supcoilId
+      customer
+      orderDate
+      corderid
+      loadDate
+      tporderId
+      tporderSort
+      classification
+      painted
+      heatno
+      
+      cutWastage
+      nomthickness
+      price
+      
+      cutComment
+      surfaceType
+      loaderid
+      donkey
+      dateofDes34
+      dcustomer
+      prodDate
+      datediff
+      datediffnow
+      tempStatus
+      property
+      slitrange
+      slithick
+      locTrans
+      dateTrans
+      customs
+      currLengthAgr
+      currLengthPol
+      currLengthAlu
+      currLengthAlup
+      currLengthPap
+      currLengthAlue
+      currLengthBit
+      currLengthSto
+      anVcoated
+      prodComment
+      documents
+      vesselName
+      dischargePort
+      productCode
+      dcustomerName
+      cnomthickness
+      tnomthickness
+      ptradecode
+      clength
+      dateDiffDelNow
+      dateDiffCutNow
+      dateDiffCutProd
+      dateDiffCutSales
+      dateDiffDelPaint
+      dateDiffDelSales
+      dateDiffDelCut
+      company
+  }
+}
+    `;    

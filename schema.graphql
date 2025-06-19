@@ -1,0 +1,410 @@
+# Indicates exactly one field must be supplied and this field must not be `null`.
+directive @oneOf on INPUT_OBJECT
+
+directive @upper on FIELD_DEFINITION
+
+# recipe
+type Recipe {
+  id: ID!
+  description: String
+  creationDate: Date!
+  ingredients: [String!]!
+  title: String!
+}
+
+type Status {
+  id: Int!
+  name: String!
+  nameGr: String
+  selection1: Int
+  selection2: Int
+  selection3: Int
+  selection4: Int
+  selection5: Int
+  nameGr2: String
+  nameGrp: String
+  coils: [Coils!]!
+}
+
+type Coils {
+  id: Int!
+  coilno: String
+  color: String
+  sheetType: String
+  coating: String
+  coathick: String
+  paintType: String
+  steelGrade: String
+  createDate: Date
+  delDate: Date
+  upDate: Date
+  gaugeThickness: String
+  thickness: Float
+  widthCoil: Float
+  initWeight: Float
+  weight: Float
+  currWeight: Float
+  grossWeight: Float
+  wastage: Float
+  loc: Int
+  currLength: Float
+  comments: String
+  commentsPanel: String
+  supplier: String
+  openstatus: openstatus!
+  innerdiameter: Int
+  quality: Int
+  supcoilId: String
+  customer: String
+  orderDate: Date
+  corderid: String
+  loadDate: Date
+  tporderId: String
+  tporderSort: Int
+  classification: String
+  painted: String!
+  heatno: String
+  cutDate: Date
+  cutWastage: Float
+  nomthickness: String
+  price: Float
+  paintDate: Date
+  cutComment: String
+  surfaceType: String
+  loaderid: String
+  donkey: Int
+  dateofDes34: Date
+  dcustomer: String
+  prodDate: Date
+  datediff: Int
+  datediffnow: Int
+  tempStatus: Int
+  property: Int
+  slitrange: String!
+  slithick: String!
+  locTrans: Int
+  dateTrans: Date
+  customs: Int
+  currLengthAgr: Float
+  currLengthPol: Float
+  currLengthAlu: Float
+  currLengthAlup: Float
+  currLengthPap: Float
+  currLengthAlue: Float
+  currLengthBit: Float
+  currLengthSto: Float
+  anVcoated: Int
+  prodComment: String
+  documents: String
+  vesselName: String
+  dischargePort: String
+  productCode: String
+  dcustomerName: String
+  cnomthickness: String
+  tnomthickness: String
+  ptradecode: String
+  clength: Float
+  dateDiffDelNow: Int
+  dateDiffCutNow: Int
+  dateDiffCutProd: Int
+  dateDiffCutSales: Int
+  dateDiffDelPaint: Int
+  dateDiffDelSales: Int
+  dateDiffDelCut: Int
+  company: String
+  locationAccess: [UsersLocationAccess!]!
+  status: Status
+}
+
+# The status of a coil (Open or Closed).
+enum openstatus {
+  OPEN
+  CLOSED
+}
+
+type Location {
+  locationId: Int!
+  name: String
+  shortname: String
+  whgroup: String
+  atlaid: Int
+  atlaname: String
+  comid: Int
+  coils: [Coils!]
+  usersLocationAccess: [UsersLocationAccess!]
+}
+
+type UsersLocationAccess {
+  userId: String!
+  locationId: Int!
+  isActive: Boolean!
+  location: Location
+  user: Users!
+}
+
+type Users {
+  userId: String!
+  id: Int
+  role: String
+  name: String
+  email: String
+  phone: String
+  atlaname: String
+  name2: String
+  allowedLocations: [Location!]
+  password: String!
+  usersLocationAccess: [UsersLocationAccess!]!
+}
+
+type CoilsResponse {
+  nodes: [Coil!]!
+  totalCount: Int!
+}
+
+type StatusType {
+  id: Int!
+  name: String!
+  nameGr: String
+  nameGr2: String
+  nameGrp: String
+  selection1: Int
+  selection2: Int
+  selection3: Int
+  selection4: Int
+  selection5: Int
+}
+
+type Coil {
+  id: Int!
+  coilno: String
+  color: String
+  sheetType: String
+  coating: String
+  coathick: String
+  paintType: String
+  steelGrade: String
+  createDate: Date
+  delDate: Date
+  upDate: Date
+  gaugeThickness: String
+  thickness: Float
+  widthCoil: Float
+  initWeight: Float
+  weight: Float
+  currWeight: Float
+  grossWeight: Float
+  wastage: Float
+  status: StatusType!
+  loc: Float
+  currLength: Float
+  comments: String
+  commentsPanel: String
+  supplier: String
+  openstatus: String
+  innerdiameter: Float
+  quality: Float
+  supcoilId: String
+  customer: String
+  orderDate: Date
+  corderid: String
+  loadDate: Date
+  tporderId: String
+  tporderSort: Float
+  classification: String
+  painted: String
+  heatno: String
+  cutDate: Date
+  cutWastage: Float
+  nomthickness: String
+  price: Float
+  paintDate: Date
+  cutComment: String
+  surfaceType: String
+  loaderid: String
+  donkey: Float
+  dateofDes34: Date
+  dcustomer: String
+  prodDate: Date
+  datediff: Float
+  datediffnow: Float
+  tempStatus: Float
+  property: Float
+  slitrange: String
+  slithick: String
+  locTrans: Float
+  dateTrans: Date
+  customs: Float
+  currLengthAgr: Float
+  currLengthPol: Float
+  currLengthAlu: Float
+  currLengthAlup: Float
+  currLengthPap: Float
+  currLengthAlue: Float
+  currLengthBit: Float
+  currLengthSto: Float
+  anVcoated: Float
+  prodComment: String
+  documents: String
+  vesselName: String
+  dischargePort: String
+  productCode: String
+  dcustomerName: String
+  cnomthickness: String
+  tnomthickness: String
+  ptradecode: String
+  clength: Float
+  dateDiffDelNow: Float
+  dateDiffCutNow: Float
+  dateDiffCutProd: Float
+  dateDiffCutSales: Float
+  dateDiffDelPaint: Float
+  dateDiffDelSales: Float
+  dateDiffDelCut: Float
+  company: String
+  locationAccess: [UsersLocationAccess!]!
+}
+
+type LoginResponse {
+  accessToken: String!
+}
+
+type CoilColorType {
+  id: Int!
+  code: String!
+  name: String
+  description: String
+  hexcode: String
+  priority: Int
+  groupid: Int
+  isActive: Int
+  isPvc: Int
+}
+
+# Date custom scalar type
+scalar Date
+
+type Query {
+  recipe(id: String!): Recipe!
+  recipes(skip: Int! = 0, take: Int! = 25): [Recipe!]!
+  users: [Users!]!
+  user(userId: String!): Users
+  coils(filter: CoilsFilterInput, limit: Int, offset: Int): CoilsResponse!
+  availableCoils(
+    filter: CoilsFilterInput
+    sorting: [CoilsSortInput!]
+    limit: Int
+    offset: Int
+  ): CoilsResponse!
+  expectedCoils(
+    filter: CoilsFilterInput
+    sorting: [CoilsSortInput!]
+    limit: Int
+    offset: Int
+  ): CoilsResponse!
+  coil(id: String!): Coil
+  statuses: [StatusType!]!
+  status(id: Int!): StatusType
+  statusByName(name: String!): StatusType
+  coilColors: [CoilColorType!]!
+  coilColor(id: Int!): CoilColorType
+  allowedLocations(userId: String!): [Location!]!
+  locations: [Location!]!
+  location(locationId: Int!): Location
+  me: Users!
+}
+
+input CoilsFilterInput {
+  status: Int
+  coilno: StringFilterInput
+  loc: IntInInput
+  loc_in: IntInInput
+  color: StringFilterInput
+  upDateFrom: DateTime
+  upDateTo: DateTime
+  currWeightFrom: StringFilterInput
+  currWeight: StringFilterInput
+  currWeightTo: StringFilterInput
+  openstatus: openstatusFilterInput
+  thickness: StringFilterInput
+  widthCoil: StringFilterInput
+}
+
+input StringFilterInput {
+  eq: String
+  iLike: String
+  contains: String
+}
+
+input IntInInput {
+  in: [Int!]
+}
+
+# A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+scalar DateTime
+
+input openstatusFilterInput {
+  eq: openstatus
+  in: [openstatus!]
+}
+
+input CoilsSortInput {
+  field: CoilSortField!
+  direction: SortOrder!
+}
+
+# Fields by which coils can be sorted
+enum CoilSortField {
+  id
+  coilno
+  currWeight
+  upDate
+  thickness
+  WIDTH
+  widthCoil
+  openstatus
+  color
+}
+
+# Specify ascending or descending order
+enum SortOrder {
+  ASC
+  DESC
+}
+
+type Mutation {
+  addRecipe(newRecipeData: NewRecipeInput!): Recipe!
+  removeRecipe(id: String!): Boolean!
+  updateCoil(updateCoilInput: UpdateCoilInput!): Coil!
+  login(loginInput: LoginInput!): LoginResponse!
+}
+
+input NewRecipeInput {
+  title: String!
+  description: String
+  ingredients: [String!]!
+}
+
+input UpdateCoilInput {
+  coilno: String
+  comments: String
+  color: String
+  loc: Int
+  upDate: Date
+  thickness: Float
+  widthCoil: Float
+  currWeight: Float
+  openstatus: String
+  supplier: String
+  company: String
+  statusId: Int
+  id: Int!
+}
+
+input LoginInput {
+  userId: String!
+  password: String!
+}
+
+type Subscription {
+  recipeAdded: Recipe!
+}
