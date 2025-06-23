@@ -31,20 +31,27 @@ const PanelMachineDashboard: React.FC<{
 resource: "pporders",
 optionLabel:"PPORDERNO",
 optionValue:"PPORDERNO",
+
 filters: [
       {
         field: "status", // Filter column
-        operator: "eq",
-        value: 1,
+        operator: "in",
+        value: 4,
     }],
-meta:{
+metaData:{
+    pagination:"off",
 fields:["PPORDERNO","status"],
-operation:"pporders",
 
+gqlQuery: GET_PPORDERS
 }
     
   })
+console.log(query?.data?.nodes)
+console.log(query?.data)
 
+
+console.log(query?.nodes)
+console.log(query)
  if (query.isLoading) return <div>Loading users...</div>;
   if (query.isError) return <div>Error loading users</div>;
 return (
