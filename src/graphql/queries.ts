@@ -5,31 +5,23 @@
 
 import gql from "graphql-tag";
 
-
-{/*
-export const AvailableCoilsDocument = gql`
-  query AvailableCoils($filter: CoilsFilterInput, $limit: Int, $offset: Int) {
-    availableCoils(filter: $filter, limit: $limit, offset: $offset) {
-      nodes {
-        id
-        coilno
-        status {
-          name
-        }
-        loc
-        upDate
-        thickness
-        widthCoil
-        currWeight
-        openstatus
-        supplier
-        company
-      }
-      totalCount
-    }
+export const GET_PPORDERS = gql`
+query GetPpOrders($filter: PpordersFilterInput) {
+  pporders(filter: $filter) {
+    id
+    pporderno
+    panelcode
+    status
+    startDate
+    finishDate
+    estDateOfProd
+    createDate
+    quantity
+    timeSum
+    
+    
   }
-`;
-*/}
+}`;
 
 export const GET_COIL = gql`
 query GetCoil($id: Int!) {
@@ -38,6 +30,9 @@ query GetCoil($id: Int!) {
     comments
     thickness
     loc
+    cutComment
+   commentsPanel
+    prodComment
   }
 }`
 
@@ -125,7 +120,7 @@ export const GET_EXPECTED_COILS = gql`
   
   }
 `;
- 
+
 
 
 export const COILCOLORS = gql`

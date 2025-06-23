@@ -34,9 +34,11 @@ import { Register } from "./pages/register";
 import { Layout } from "./components/layout";
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import TestingList, { CoilList } from "./pages/coillist/CoilList";
-import { ShopOutlined } from "@mui/icons-material";
+import { CalendarMonthOutlined, ShopOutlined } from "@mui/icons-material";
 import {CoilShow} from "./pages/coillist/Coilshow";
 import { CoilEdit } from "./pages/coillist/CoilEdit";
+import { Calendar } from "antd";
+import { ProductionCalendar } from "./pages/ProductionPlanning/calendarpage";
 
 
 function App() {
@@ -71,6 +73,16 @@ function App() {
                       icon: <FormatListBulletedIcon />,
                     },
                   },
+                  {
+                    name: "pporders",
+                    list:"/pporders",
+
+
+
+
+                        icon:<CalendarMonthOutlined/>
+                  }
+
                 ]}
                 options={{
                   syncWithLocation: true,
@@ -88,7 +100,8 @@ function App() {
                    <Route path="/coil/show/:id" element={<CoilShow />} />
                       <Route path="/coil/edit/:id" element={< CoilEdit />} />         
 
-                     <Route index element={<NavigateToResource resource="coil" />} />
+                     <Route index element={<NavigateToResource resource="pporders" />} />
+                     <Route path= '/pporders' element ={<ProductionCalendar/>}/>
                       
                     
                   </Route>

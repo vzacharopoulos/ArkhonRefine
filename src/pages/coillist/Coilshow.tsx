@@ -19,7 +19,7 @@ const {id}=useNumericResourceParams()
 
  const { query: queryResult } = useShow<Coil>({
     resource:"coil",
-     id: Number(id),
+    id,
   metaData: {
     gqlQuery: CoilShowDocument,
   },

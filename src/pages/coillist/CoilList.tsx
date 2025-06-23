@@ -234,7 +234,7 @@ export const CoilList: React.FC<CoilListProps> = ({
               <FilterDropdown {...props}>
                 <Input
                   placeholder='Αναζήτηση χρώμα'
-                  type="number"
+                  type={colorMap}
                   step="0.01"
                 />
               </FilterDropdown>
