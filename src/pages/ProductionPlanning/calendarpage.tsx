@@ -10,9 +10,10 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
 import { INITIAL_EVENTS, createEventId } from './event-utils'
-import { Button, Card, Checkbox, Divider,Typography, List, Space } from "antd";
-const { Title, Text } = Typography;
+import { Button, Card, Checkbox, Divider,Typography, List, Space,Layout  } from "antd";
 
+const { Title, Text } = Typography;
+const { Sider, Content } = Layout;
 
 export interface PPOrder {
   id: number;
@@ -64,84 +65,88 @@ export const ProductionCalendar: React.FC = () => {
     setCurrentEvents(events);
  };
 
+  
+interface SidebarProps {
+  weekendsVisible: boolean;
+  onToggleWeekends: () => void;
+  currentEvents: EventInput[];
+}
+
+const Sidebar: React.FC<SidebarProps> = ({
+  weekendsVisible,
+  onToggleWeekends,
+  currentEvents,
+}) => {
   const renderSidebarEvent = (event: EventInput) => (
-    <List.Item>
-      <Space>
-        <Text strong>
-          {event.start && new Date(event.start).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+    <List.Item key={event.id}>
+      <Text strong>
+        {event.start &&
+          formatDate(event.start as Date, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
           })}
-        </Text>
-        <Text italic>{event.title}</Text>
-       
-      </Space>
+      </Text>
+      <Text> {event.title}</Text>
     </List.Item>
   );
 
-  const renderSidebar = () => (
-    <Card 
-      style={{ 
-        width: 300,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.09)',
-        border: '1px solid #f0f0f0'
-      }}
-    >
-      <Card.Grid style={{ width: '100%', boxShadow: 'none' }}>
-        <Title level={4} style={{ marginBottom: 16 }}>Instructions</Title>
-        <List size="small">
-          <List.Item>Select dates to create new events</List.Item>
-          <List.Item>Drag, drop, and resize events</List.Item>
-          <List.Item>Click an event to delete it</List.Item>
-        </List>
-      </Card.Grid>
-      
-      <Card.Grid style={{ width: '100%', boxShadow: 'none' }}>
-        <Checkbox
-          checked={weekendsVisible}
-          onChange={handleWeekendsToggle}
-        >
-          Toggle weekends
-        </Checkbox>
-      </Card.Grid>
-      
-      <Card.Grid style={{ width: '100%', boxShadow: 'none' }}>
-        <Title level={4} style={{ marginBottom: 16 }}>
-          All Events ({currentEvents.length})
-        </Title>
+  return (
+    <Sider width={300} style={{ background: "#fff", padding: 16 }}>
+      <div className="demo-app-sidebar-section">
+        <Title level={4}>Instructions</Title>
         <List
           size="small"
-          dataSource={currentEvents}
-          renderItem={renderSidebarEvent}
-          style={{ maxHeight: 400, overflowY: 'auto' }}
+          dataSource={[
+            "Select dates and you will be prompted to create a new event",
+            "Drag, drop, and resize events",
+            "Click an event to delete it",
+          ]}
+          renderItem={(item) => (
+            <List.Item>
+              <Text>{item}</Text>
+            </List.Item>
+          )}
         />
-      </Card.Grid>
-    </Card>
+      </div>
+
+      <Divider />
+
+      <div className="demo-app-sidebar-section">
+        <Checkbox checked={weekendsVisible} onChange={onToggleWeekends}>
+          Toggle weekends
+        </Checkbox>
+      </div>
+
+      <Divider />
+
+      <div className="demo-app-sidebar-section">
+        <Title level={4}>All Events ({currentEvents.length})</Title>
+        <List size="small" dataSource={currentEvents} renderItem={renderSidebarEvent} />
+      </div>
+    </Sider>
   );
+};
+
 
 
   return (
-     <div style={{ padding: 24, display: "flex", gap: "24px" }}>
-      {renderSidebar()}
-      <div style={{ display: "flex", justifyContent: "flex-end",marginBottom: 16 }}>
-       
-      </div>
-       <div style={{ flex: 1, minHeight: "80vh" }}>
-      <FullCalendar
-        plugins={[
-          dayGridPlugin,
-          timeGridPlugin,
-          interactionPlugin,
-        ]}
-        initialView="dayGridMonth"
-        events={events}
-        weekends={weekendsVisible}
-        editable={true}
-        selectable={true}
-        height="100%"
-      />
-    </div>
-    </div>
+        <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
+      <Sider width={300} style={{ background: "#fff", padding: 24 }}>
+        {renderSidebar()}
+      </Sider>
+      <Content style={{ flex: 1, minHeight: "80vh" }}>
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          events={events}
+          weekends={weekendsVisible}
+          editable={true}
+          selectable={true}
+          height="100%"
+        />
+      </Content>
+    </Layout>
   );
 
 
