@@ -21,3 +21,12 @@ export const getDateColor = (args: {
   // ?? is the nullish coalescing operator. It returns the right-hand side operand when the left-hand side is null or undefined.
   return args.defaultColor ?? "default";
 };
+
+
+
+export const getlast80days = () =>{
+ 
+  const today = dayjs();
+ const  recentDate=today.subtract(80, 'day')
+return recentDate
+}

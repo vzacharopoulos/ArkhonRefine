@@ -34,11 +34,12 @@ import { Register } from "./pages/register";
 import { Layout } from "./components/layout";
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import TestingList, { CoilList } from "./pages/coillist/CoilList";
-import { CalendarMonthOutlined, ShopOutlined } from "@mui/icons-material";
+import { CalendarMonthOutlined, ShopOutlined, ScienceOutlined } from "@mui/icons-material";
 import {CoilShow} from "./pages/coillist/Coilshow";
 import { CoilEdit } from "./pages/coillist/CoilEdit";
 import { Calendar } from "antd";
 import { ProductionCalendar } from "./pages/ProductionPlanning/calendarpage";
+import PanelMachineDashboard from "./pages/panelmachine/panelmachinedashboard";
 
 
 function App() {
@@ -58,9 +59,14 @@ function App() {
                 authProvider={authProvider}
                 resources={[
                   {
-                    name: "Coil_List",
-                    list: "/Coil_List",
-                   icon: <ShopOutlined />,
+                    name: "PanelMachine",
+                    list: "/PanelMachine",
+                   
+                   meta:{
+                   label:'Μηχανή Πάνελ',
+                   icon: <ScienceOutlined />,
+
+                   }
                   },
                   {
                     name: "coil",
@@ -103,6 +109,8 @@ function App() {
                      <Route index element={<NavigateToResource resource="pporders" />} />
                      <Route path= '/pporders' element ={<ProductionCalendar/>}/>
                       
+                      <Route index element={<NavigateToResource resource="PanelMachine" />} />
+                      <Route path= '/PanelMachine' element ={<PanelMachineDashboard/>}/>
                     
                   </Route>
 
