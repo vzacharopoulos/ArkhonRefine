@@ -10,7 +10,9 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
 import { INITIAL_EVENTS, createEventId } from './event-utils'
-import { Button } from "antd";
+import { Button, Card, Checkbox, Divider,Typography, List, Space } from "antd";
+const { Title, Text } = Typography;
+
 
 export interface PPOrder {
   id: number;
@@ -54,41 +56,67 @@ export const ProductionCalendar: React.FC = () => {
   }));
 
     // Toggle function
-  const handleWeekendsToggle = () => {
+    const handleWeekendsToggle = () => {
     setWeekendsVisible(!weekendsVisible);
   };
 
- const handleEvents = (events) => {
-    setCurrentEvents(events)
-    }
-  }
-   
+ const handleEvents = (events: EventInput[]) => {
+    setCurrentEvents(events);
+ };
 
-    const renderSidebar = () => (
-    <div className="demo-app-sidebar">
-      <div className="demo-app-sidebar-section">
-        <h2>Instructions</h2>
-        <ul>
-          <li>Select dates and you will be prompted to create a new event</li>
-          <li>Drag, drop, and resize events</li>
-          <li>Click an event to delete it</li>
-        </ul>
-      </div>
-      <div className="demo-app-sidebar-section">
-        <label>
-          <input
-            type="checkbox"
-            checked={weekendsVisible}
-            onChange={handleWeekendsToggle}
-          />
-          toggle weekends
-        </label>
-      </div>
-      <div className="demo-app-sidebar-section">
-        <h2>All Events ({currentEvents.length})</h2>
-        <ul>{currentEvents.map(renderSidebarEvent)}</ul>
-      </div>
-    </div>
+  const renderSidebarEvent = (event: EventInput) => (
+    <List.Item>
+      <Space>
+        <Text strong>
+          {event.start && new Date(event.start).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })}
+        </Text>
+        <Text italic>{event.title}</Text>
+       
+      </Space>
+    </List.Item>
+  );
+
+  const renderSidebar = () => (
+    <Card 
+      style={{ 
+        width: 300,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.09)',
+        border: '1px solid #f0f0f0'
+      }}
+    >
+      <Card.Grid style={{ width: '100%', boxShadow: 'none' }}>
+        <Title level={4} style={{ marginBottom: 16 }}>Instructions</Title>
+        <List size="small">
+          <List.Item>Select dates to create new events</List.Item>
+          <List.Item>Drag, drop, and resize events</List.Item>
+          <List.Item>Click an event to delete it</List.Item>
+        </List>
+      </Card.Grid>
+      
+      <Card.Grid style={{ width: '100%', boxShadow: 'none' }}>
+        <Checkbox
+          checked={weekendsVisible}
+          onChange={handleWeekendsToggle}
+        >
+          Toggle weekends
+        </Checkbox>
+      </Card.Grid>
+      
+      <Card.Grid style={{ width: '100%', boxShadow: 'none' }}>
+        <Title level={4} style={{ marginBottom: 16 }}>
+          All Events ({currentEvents.length})
+        </Title>
+        <List
+          size="small"
+          dataSource={currentEvents}
+          renderItem={renderSidebarEvent}
+          style={{ maxHeight: 400, overflowY: 'auto' }}
+        />
+      </Card.Grid>
+    </Card>
   );
 
 
@@ -96,25 +124,23 @@ export const ProductionCalendar: React.FC = () => {
      <div style={{ padding: 24, display: "flex", gap: "24px" }}>
       {renderSidebar()}
       <div style={{ display: "flex", justifyContent: "flex-end",marginBottom: 16 }}>
-        <Button type="primary" onClick={handleWeekendsToggle} >
-          {weekendsVisible ? "Εμφάνιση  εργάσιμων" : "Εμφάνιση ολων"}
-        </Button>
+       
       </div>
+       <div style={{ flex: 1, minHeight: "80vh" }}>
       <FullCalendar
-         plugins={[
-              adaptivePlugin,
-              dayGridPlugin,
-              timeGridPlugin,
-              interactionPlugin,
-              resourceTimelinePlugin,
-            ]}
+        plugins={[
+          dayGridPlugin,
+          timeGridPlugin,
+          interactionPlugin,
+        ]}
         initialView="dayGridMonth"
         events={events}
-        weekends={weekendsVisible} // Pass the state to FullCalendar
+        weekends={weekendsVisible}
         editable={true}
-            selectable={true}
-
+        selectable={true}
+        height="100%"
       />
+    </div>
     </div>
   );
 
