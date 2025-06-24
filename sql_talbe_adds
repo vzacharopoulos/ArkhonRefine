@@ -1,0 +1,14 @@
+for 
+ ,[start_date_datetime]
+	  ,[finish_date_datetime]
+	  ,[est_date_of_prod_datetime]
+
+
+
+
+ALTER TABLE [PanelMESDB_testing].[dbo].[PPORDERS]
+ADD [start_datetime] DATETIME;
+
+UPDATE [PanelMESDB_testing].[dbo].[PPORDERS]
+SET [start_datetime] = CAST([start_date] AS DATETIME);
+

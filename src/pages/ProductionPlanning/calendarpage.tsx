@@ -22,8 +22,8 @@ export interface PPOrder {
   pporderno?: string;
   panelcode?: string;
   status?: number;
-  startDate?: string;
-  finishDate?: string;
+  startDateDatetime?: string;
+  finishDateDatetime?: string;
   estDateOfProd?: string;
   createDate?: string;
   quantity?: number;
@@ -48,9 +48,9 @@ export const ProductionCalendar: React.FC = () => {
   const events: EventInput[] = orders.map((order) => ({
     id: String(order.id),
     title: `${order.pporderno} - ${order.panelcode}`,
-    start: order.startDate ? new Date(order.startDate) : undefined,
-    end: order.finishDate ? new Date(order.finishDate) : undefined,
-    color: order.status === 4 ? "green": order.status === 1? "red": undefined,
+    start: order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
+    end: order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
+    color: order.status === 4 ? "green": order.status === 1? "orange": undefined,
     extendedProps:{
       status: order.status           }
   }));
@@ -60,15 +60,20 @@ export const ProductionCalendar: React.FC = () => {
     setWeekendsVisible(!weekendsVisible);
   };
 
+   const handleCurrentEventToggle = () => {
+    setWeekendsVisible(!weekendsVisible);
+  };
+
+
 const handleEvents = (events: EventInput[]) => {
   const last80Days = getlast80days(); // assumed to return a Date
 
   const filteredEvents = events.filter((event) => {
     const status = event.extendedProps?.status;
-    const startDate = event.start ? dayjs(event.start instanceof Date ? event.start
+    const startDateDatetime = event.start ? dayjs(event.start instanceof Date ? event.start
        : new Date(event.start)) : null
 
-    return status !== 4 && startDate && startDate.isBefore(last80Days);
+    return status !== 4 && startDateDatetime && startDateDatetime.isBefore(last80Days);
   });
 
   setCurrentEvents(filteredEvents);
@@ -130,7 +135,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
       <div className="demo-app-sidebar-section">
         <Checkbox checked={weekendsVisible} onChange={onToggleCurrentEvents}>
-          Toggle weekends
+          Toggle recent masters
         </Checkbox>
       </div>
 

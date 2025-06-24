@@ -12,8 +12,8 @@ query GetPpOrders($filter: PpordersFilterInput) {
     pporderno
     panelcode
     status
-    startDate
-    finishDate
+    startDateDatetime
+    finishDateDatetime
     estDateOfProd
     createDate
     quantity
