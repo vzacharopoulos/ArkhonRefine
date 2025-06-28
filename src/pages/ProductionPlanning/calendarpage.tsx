@@ -22,12 +22,11 @@ export interface PPOrder {
   pporderno?: string;
   panelcode?: string;
   status?: number;
-  startDateDatetime?: string;
-  finishDateDatetime?: string;
-  estDateOfProd?: string;
-  createDate?: string;
-  quantity?: number;
-  timeSum?: number;
+  startDateDatetime?: Date;
+  finishDateDatetime?: Date;
+  estDateOfProd?: Date;
+  createDate?: Date;
+  
 }
 
 export const ProductionCalendar: React.FC = () => {
@@ -45,12 +44,20 @@ export const ProductionCalendar: React.FC = () => {
 
   const orders = data?.data?.pporders ?? [];
 
-  const events: EventInput[] = orders.map((order) => ({
+  const recentOrders = orders.filter((order) => {
+    if (!!order.startDateDatetime && !order.finishDateDatetime) {
+      const start = dayjs(order.startDateDatetime)
+      return start.isAfter(dayjs().subtract(1, "month"))
+    }
+    return true
+  })
+
+  const events: EventInput[] = recentOrders.map((order) => ({
     id: String(order.id),
     title: `${order.pporderno} - ${order.panelcode}`,
-    start: order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
-    end: order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
-    color: order.status === 4 ? "green": order.status === 1? "orange": undefined,
+    start: !!order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
+    end: !!order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
+    color: order.status === 4 ? "green": order.status === 1? "yellow": undefined,
     extendedProps:{
       status: order.status           }
   }));
@@ -108,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <Sider width={300} style={{ background: "#fff", padding: 16 }}>
+    <Sider width={300} style={{ background: "#fff", padding: 3 }}>
       <div className="demo-app-sidebar-section">
         <Title level={4}>Instructions</Title>
         <List
@@ -174,7 +181,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           initialView="dayGridMonth"
           events={events}
           weekends={weekendsVisible}
+             selectMirror={true} 
+
           editable={true}
+          eventOverlap={false}
           selectable={true}
           height="100%"
         />

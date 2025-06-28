@@ -33,6 +33,17 @@ const UPDATE_PPORDER = gql`
   }
 `;
 
+
+type PPOrder = {
+  id: number;
+  pporderno: string;
+  panelcode: string;
+  status: string;
+  startDateDatetime?: string;
+  finishDateDatetime?: string;
+};
+
+
 const PanelMachineDashboard: React.FC<{
   value?: string;
   onChange?: (value: string) => void;
@@ -41,16 +52,11 @@ const PanelMachineDashboard: React.FC<{
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedPporderno, setSelectedPporderno] = useState<string | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useCustom<{ 
-    pporders: { 
-      id: number; 
-      pporderno: string; 
-      panelcode: string;
-      status: string;
-      startDateDatetime?: string;
-      finishDateDatetime?: string;
-    }[] 
+  const { data, isLoading, isError, refetch } = useCustom<{
+    pporders: 
+     PPOrder[]
   }>({
     url: "",
     method: "get",
@@ -58,15 +64,20 @@ const PanelMachineDashboard: React.FC<{
       gqlQuery: GET_PPORDERS,
       variables: {
         filter: {
-          status: [1,2,3,4],
+          status: [1, 2, 3, 4],
           lastDays: 100,
         },
       },
     },
   });
-
+// 1  created     ΔΗΜΙΟΥΡΓΗΘΗΚΕ  
+// 2  processing  ΣΕ ΕΠΕΞΕΡΓΑΣΙΑ
+// 3  onhold      ΣΕ ΠΑΥΣΗ
+// 4  finished    ΟΛΟΚΛΗΡΩΜΕΝΗ ΕΠΕΞΕΡΓΑΣΙΑ 
+// 14             προγραμματισμος παραγωγης                                                                                                                                         
   // Create a map of pporderno to order ID
   const ordersMap = React.useMemo(() => {
+    console.log(data?.data?.pporders)
     const map = new Map<string, number>();
     data?.data?.pporders?.forEach(order => {
       map.set(order.pporderno, order.id);
@@ -76,7 +87,7 @@ const PanelMachineDashboard: React.FC<{
 
   // Create a map of order ID to full order object
   const ordersById = React.useMemo(() => {
-    const map = new Map<number, typeof data.data.pporders[0]>();
+    const map = new Map<number, PPOrder>();
     data?.data?.pporders?.forEach(order => {
       map.set(order.id, order);
     });
@@ -98,7 +109,7 @@ const PanelMachineDashboard: React.FC<{
           status: 2, // Set status to "In Progress"
         },
       });
-      
+
       messageApi.success("Η εντολή ξεκίνησε!");
       refetch();
     } catch (error) {
@@ -134,7 +145,7 @@ const PanelMachineDashboard: React.FC<{
           status: 4, // Set status to "Completed"
         },
       });
-      
+
       messageApi.success("Η εντολή ολοκληρώθηκε!");
       refetch();
     } catch (error) {
@@ -160,10 +171,10 @@ const PanelMachineDashboard: React.FC<{
     if (onChange) {
       onChange(pporderno);
     }
-    
+
     // Update local state
     setSelectedPporderno(pporderno);
-    
+
     // Find and set the corresponding ID
     const id = ordersMap.get(pporderno);
     if (id) {
@@ -210,8 +221,8 @@ const PanelMachineDashboard: React.FC<{
   return (
     <>
       {contextHolder}
-      <Form.Item 
-        label="Εντολή Παραγωγής" 
+      <Form.Item
+        label="Εντολή Παραγωγής"
         style={{ marginBottom: 16, width: '100%' }}
       >
         <Select
@@ -220,36 +231,41 @@ const PanelMachineDashboard: React.FC<{
           placeholder={placeholder}
           showSearch
           optionFilterProp="children"
-          
           style={{ width: '60%' }}
           loading={isLoading}
           size="large"
+          onDropdownVisibleChange={(open) => setDropdownOpen(open)} // Track dropdown open state
+          dropdownRender={(menu) => (
+            <div>
+              {menu}
+              {/* You can add additional elements here that will appear at the bottom of the dropdown */}
+            </div>
+          )}
         >
           {options.map((option) => (
-            <Select.Option 
-              key={option.value} 
+            <Select.Option
+              key={option.value}
               value={option.value}
               label={option.label}
-              disabled={option.finished} // Disable finished orders
+              disabled={option.finished}
             >
-
-                {!value && (
               <div>
                 <div>{option.label}</div>
-                <div style={{ fontSize: 12, color: '#666' }}>
-                  {option.finished 
-                    ? '✅ Ολοκληρωμένη' 
-                    : option.started 
-                      ? '🚧 Σε επεξεργασια' 
-                      : '⏱️ Προγραμματισμένη'}
-                </div>
+                {dropdownOpen && ( // Only show status when dropdown is open
+                  <div style={{ fontSize: 12, color: '#666' }}>
+                    {option.finished
+                      ? '✅ Ολοκληρωμένη'
+                      : option.started
+                        ? '🚧 Σε επεξεργασια'
+                        : '⏱️ Προγραμματισμένη'}
+                  </div>
+                )}
               </div>
-
-                  )}
             </Select.Option>
           ))}
         </Select>
-        
+
+        {/* Rest of your code remains the same */}
         <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
           Βρέθηκαν {options.length} εντολές παραγωγής
           {currentOrder && (
@@ -258,24 +274,21 @@ const PanelMachineDashboard: React.FC<{
             </div>
           )}
         </div>
-        
+
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             onClick={handleStartOrder}
             style={{ flex: 1 }}
-            disabled={!selectedId || isStarted || isFinished}
-            backgroundcolor="green"
+            disabled={!selectedId || !!isStarted || !!isFinished}
           >
             {isStarted ? 'Έχει Ξεκινήσει' : 'Έναρξη Εντολής'}
           </Button>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             onClick={handleFinishOrder}
             style={{ flex: 1 }}
-            disabled={!selectedId || !isStarted || isFinished}
-            backgroundcolor="red"
-          
+            disabled={!selectedId || !isStarted || !!isFinished}
           >
             {isFinished ? 'Έχει Ολοκληρωθεί' : 'Ολοκλήρωση Εντολής'}
           </Button>
