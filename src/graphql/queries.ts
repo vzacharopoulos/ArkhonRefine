@@ -39,6 +39,33 @@ query GetMasterlength($filter:MasterlengthFilterInput)  {
     
 }
 }`
+export const GET_PPORDERLINES_OF_PPORDER = gql`
+query GetPpOrderLINESTOPPORDER($filter: Pporderlines2FilterInput) {
+  pporderlines2(filter: $filter) {
+    id
+    pporderno
+    panelcode
+    status
+    custporderno
+upDate
+    status
+    prodOrdersView{
+      isCanceled
+      time
+      speed
+      ttm
+    }
+ 
+    pporders{
+      pporderno
+      panelcode
+      startDate
+      startDateDatetime
+      finishDateDatetime
+      
+    }
+  }
+}`
 
 export const GET_COIL = gql`
 query GetCoil($id: Int!) {
