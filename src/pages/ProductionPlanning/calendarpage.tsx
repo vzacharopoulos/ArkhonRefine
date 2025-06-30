@@ -13,6 +13,8 @@ import { INITIAL_EVENTS, createEventId } from './event-utils'
 import { Button, Card, Checkbox, Divider,Typography, List, Space,Layout, Menu  } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
+import { useRef, useEffect } from "react";
+import { CalendarApi } from "@fullcalendar/core";
 
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
@@ -65,7 +67,7 @@ const {
  const [weekendsVisible, setWeekendsVisible] = useState(true);
   const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
 const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-
+const calendarRef = useRef<FullCalendar | null>(null);
 
 const finished = finishedData?.data?.finished ?? [];
 
@@ -83,7 +85,21 @@ const initialEvents: EventInput[] = finished.map((order) => ({
 }));
 
 
+useEffect(() => {
+  if (!finishedLoading && finished.length > 0) {
+    const calendarApi: CalendarApi | undefined = calendarRef.current?.getApi?.();
 
+    if (calendarApi) {
+      // clear old events if needed
+      calendarApi.removeAllEvents();
+
+      // add finished events
+      initialEvents.forEach(event => {
+        calendarApi.addEvent(event);
+      });
+    }
+  }
+}, [finishedLoading, finished]);
 
 
 
@@ -243,6 +259,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </Sider>
       <Content style={{ flex: 1, minHeight: "80vh" }}>
         <FullCalendar
+        ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           headerToolbar={{
           left: 'prev,next today',
@@ -250,7 +267,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           right: 'dayGridMonth,timeGridWeek,timeGridDay',
         }}
           initialView="dayGridMonth"
-          initialEvents={initialEvents} 
+            events={[events]} 
           weekends={weekendsVisible}
              selectMirror={true}            //this makes draggable events also drag the visual        
               //initialEvents={INITIAL_EVENTS}         *
