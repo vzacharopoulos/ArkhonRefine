@@ -8,20 +8,37 @@ import gql from "graphql-tag";
 export const GET_PPORDERS = gql`
 query GetPpOrders($filter: PpordersFilterInput) {
   pporders(filter: $filter) {
+    
     id
     pporderno
     panelcode
     status
+    
     startDateDatetime
     finishDateDatetime
-    estDateOfProd
-    createDate
-    quantity
-    timeSum
     
+    estDateOfProdDatetime
+    createDate
+    
+  
     
   }
 }`;
+
+export const GET_FINISHED_PPORDERS = gql`
+query GetMasterlength($filter:MasterlengthFilterInput)  {
+   masterlengths(filter: $filter){
+  pporderno
+    id
+    code
+    startDateDatetime
+    finishDateDatetime
+    totalMeter
+    status
+    time
+    
+}
+}`
 
 export const GET_COIL = gql`
 query GetCoil($id: Int!) {

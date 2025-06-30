@@ -12,3 +12,21 @@ ADD [start_datetime] DATETIME;
 UPDATE [PanelMESDB_testing].[dbo].[PPORDERS]
 SET [start_datetime] = CAST([start_date] AS DATETIME);
 
+CREATE VIEW dbo.Masterlength AS
+SELECT 
+    po.id,
+    pl.PPORDERNO AS PPORDERNO, 
+    ppe.code AS code, 
+    SUM(ppe.ttm) AS totalMeter,
+    po.start_date_datetime,
+    po.finish_date_datetime,
+	po.create_date,
+	po.status
+	
+FROM dbo.PPORDERLINES2 pl
+INNER JOIN [192.168.10.167].panel.dbo.PanelProductionOrdersExt ppe
+    ON ppe.ProdOrder = pl.CUSTPORDERNO   COLLATE SQL_Latin1_General_CP1_CI_AS
+
+INNER JOIN dbo.PPORDERS po
+    ON po.PPORDERNO = pl.PPORDERNO
+GROUP BY pl.PPORDERNO,ppe.code, po.finish_date_datetime, po.start_date_datetime,po.create_date,po.status,po.id;

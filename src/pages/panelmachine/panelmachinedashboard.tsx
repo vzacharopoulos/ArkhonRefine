@@ -15,8 +15,7 @@ const GET_PPORDERS = gql`
       finishDateDatetime
       estDateOfProd
       createDate
-      quantity
-      timeSum
+      
     }
   }
 `;
