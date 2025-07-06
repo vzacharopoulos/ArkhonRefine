@@ -4,22 +4,17 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { EventInput } from "@fullcalendar/core";
 import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS } from "@/graphql/queries";
-import { formatDate } from '@fullcalendar/core'
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
-import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
-import {  calculateTotalTime, isWithinWorkingHours } from './event-utils'
+import {  calculateTotalTime, EventTooltip, isWithinWorkingHours } from './event-utils'
 import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
-import { useRef, useEffect } from "react";
-import { CalendarApi } from "@fullcalendar/core";
+
 import { STATUS_MAP, StatusTag } from "@/utilities/map-status-id-to-name";
 import duration from "dayjs/plugin/duration";
 import { finishedPporders, PPOrder, PPOrderLine  } from "./productioncalendartypes";
-import { OrderlinesList } from "@/components/productionplanning/OrderlinesList";
-import { OrderList } from "@/components/productionplanning/UnscheduledPpordersList";
 import { Sidebar } from "./sidebar";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
@@ -160,6 +155,7 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
           orderLines={orderLines}
           orderLinesLoading={orderLinesLoading}
             totalTime={totalTime}
+            
         />
       </Sider>
       <Content style={{ flex: 1, minHeight: "80vh" }}>
@@ -183,10 +179,13 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
           selectable={true}
 
           height="100%"
-          eventDidMount={(info) => {
-            // Attach the full event title to the element as a native HTML tooltip
-            info.el.setAttribute("title", info.event.extendedProps.tooltip);
-          }}
+                    eventContent={(args) => (
+            <EventTooltip tooltip={args.event.extendedProps.tooltip || args.event.title}>
+              <div>
+                {args.timeText && <b>{args.timeText}</b>} {args.event.title}
+              </div>
+            </EventTooltip>
+          )}
           businessHours={{
             // Monday–Friday, 08:00–16:00
             daysOfWeek: [1, 2, 3, 4, 5],
