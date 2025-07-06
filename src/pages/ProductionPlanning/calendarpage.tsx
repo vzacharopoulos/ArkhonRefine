@@ -180,11 +180,17 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
           height="100%"
                     eventContent={(args) => (
-            <EventTooltip tooltip={args.event.extendedProps.tooltip || args.event.title}>
-              <div>
-                {args.timeText && <b>{args.timeText}</b>} {args.event.title}
-              </div>
-            </EventTooltip>
+    <EventTooltip tooltip={args.event.extendedProps.tooltip || args.event.title}>
+      <div style={{
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        width: '100%',
+        padding: '2px'
+      }}>
+        {args.timeText && <b>{args.timeText}</b>} {args.event.title}
+      </div>
+    </EventTooltip>
           )}
           businessHours={{
             // Monday–Friday, 08:00–16:00

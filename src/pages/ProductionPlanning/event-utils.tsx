@@ -11,9 +11,21 @@ interface EventTooltipProps {
   children: React.ReactElement;
 }
 
+// In your event-utils.ts
 export const EventTooltip: React.FC<EventTooltipProps> = ({ tooltip, children }) => (
-  <Tooltip title={<span style={{ whiteSpace: "pre-line" }}>{tooltip}</span>}>
-    {children}
+  <Tooltip 
+    title={<span style={{ whiteSpace: "pre-line" }}>{tooltip}</span>}
+    
+    styles={{ root: { maxWidth: 600 } }}
+  >
+    <div style={{
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      width: '100%'
+    }}>
+      {children}
+    </div>
   </Tooltip>
 );
 
