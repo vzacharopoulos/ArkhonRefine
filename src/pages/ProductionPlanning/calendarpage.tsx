@@ -7,8 +7,8 @@ import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS } from
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
-import {  calculateTotalTime, EventTooltip, isWithinWorkingHours, splitIntoWorkingHourEvents } from './event-utils'
-import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip } from "antd";
+import {  addWorkingMinutes, calculateTotalTime, EventTooltip, isWithinWorkingHours} from './event-utils'
+import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip, TimePicker, Modal } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
 
@@ -61,7 +61,13 @@ export const ProductionCalendar: React.FC = () => {
   const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedPporderno, setSelectedPporderno] = useState<string | null>(null);
-
+  const [workingHoursModalOpen, setWorkingHoursModalOpen] = useState(false);
+const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+const [workingHours, setWorkingHours] = useState({
+  startHour: 6,
+  endHour: 22,
+  workingDays: [1, 2, 3, 4, 5],
+});
   const finished = finishedData?.data?.masterlengths ?? [];
 
 
@@ -173,11 +179,14 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
           selectMirror={true}            //this makes draggable events also drag the visual        
           //initialEvents={INITIAL_EVENTS}         *
           editable={true}
-
+   
           eventOverlap={false}
           droppable={true}
           selectable={true}
-
+          dateClick={(info) => {
+  setSelectedDate(dayjs(info.date));
+  setWorkingHoursModalOpen(true);
+}}
           height="100%"
                     eventContent={(args) => (
   <EventTooltip
@@ -200,6 +209,10 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
             startTime: '06:00',
             endTime: '22:00',
           }}
+         selectConstraint="businessHours"
+  eventConstraint="businessHours"
+  slotMinTime="06:00:00"
+  slotMaxTime="22:00:00"
          drop={(info) => {
   const date = dayjs(info.date);
 
@@ -209,32 +222,79 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
   }
 
   const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
-  const theoreticalTime = totalTime.formatted;
-
-    const durationMinutes = totalTime.hours * 60 + totalTime.minutes;
-  const segments = splitIntoWorkingHourEvents(date, durationMinutes);
   
- setCurrentEvents((prev) => [
+
+  const startDate = dayjs(info.date);
+const durationInMinutes = totalTime.hours * 60 + totalTime.minutes;
+ const endDate = addWorkingMinutes(date, durationInMinutes, workingHours);
+
+  setCurrentEvents((prev) => [
     ...prev,
-    ...segments.map((seg) => ({
+    {
       ...draggedEvent,
-      title: `${draggedEvent.title} - θεωρητικός χρόνος ${theoreticalTime}`,
-      start: seg.start,
-      end: seg.end,
-       extendedProps: {
-        ...(draggedEvent.extendedProps ?? {}),
-        tooltip:
-          `${draggedEvent.extendedProps?.tooltip ?? draggedEvent.title ?? ''}\nΘεωρητικός χρόνος: ${theoreticalTime}`,
-        theoreticalTime,
-      },
-    })),
+      start: startDate.toDate(),
+      end: endDate.toDate(),
+    },
   ]);
 }}
 
-  
-
+          eventAllow={(dropInfo) => {
+            const start = dayjs(dropInfo.start);
+            const end = dayjs(dropInfo.end ?? dropInfo.start);
+            const startDay = start.day();
+            return (
+              startDay >= 1 &&
+              startDay <= 5 &&
+              start.hour() >= 6 &&
+              end.hour() <= 22 &&
+              start.isSame(end, 'day')
+            );
+          }}
         />
       </Content>
+
+      <Modal
+  title={`Set Working Hours for ${selectedDate?.format("YYYY-MM-DD")}`}
+  open={workingHoursModalOpen}
+  onCancel={() => setWorkingHoursModalOpen(false)}
+  onOk={() => {
+    // Apply changes (see below)
+    setWorkingHoursModalOpen(false);
+  }}
+>
+  <div style={{ display: "flex", gap: 12 }}>
+    <div>
+      <Text>Start Time:</Text>
+      <TimePicker
+        defaultValue={dayjs().hour(workingHours.startHour).minute(0)}
+        format="HH:mm"
+        onChange={(time) => {
+          if (time) {
+            setWorkingHours((prev) => ({
+              ...prev,
+              startHour: time.hour(),
+            }));
+          }
+        }}
+      />
+    </div>
+    <div>
+      <Text>End Time:</Text>
+      <TimePicker
+        defaultValue={dayjs().hour(workingHours.endHour).minute(0)}
+        format="HH:mm"
+        onChange={(time) => {
+          if (time) {
+            setWorkingHours((prev) => ({
+              ...prev,
+              endHour: time.hour(),
+            }));
+          }
+        }}
+      />
+    </div>
+  </div>
+</Modal>
     </Layout>
   );
 

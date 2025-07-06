@@ -3,7 +3,7 @@ import dayjs, { Dayjs } from "dayjs";
 import { PPOrderLine } from './productioncalendartypes';
 
 
-import React from "react";
+import React, { useState } from "react";
 import { Tooltip } from "antd";
 
 
@@ -151,3 +151,53 @@ export const splitIntoWorkingHourEvents = (
 
   return segments;
 };
+
+
+
+interface WorkingHoursConfig {
+  startHour: number;
+  endHour: number;
+  workingDays: number[]; // 0 = Sunday, 6 = Saturday
+}
+
+export function addWorkingMinutes(
+  start: Dayjs,
+  minutesToAdd: number,
+  config: WorkingHoursConfig
+): Dayjs {
+  let current = start.clone();
+  let remaining = minutesToAdd;
+
+  while (remaining > 0) {
+    const day = current.day();
+
+    // Skip non-working days
+    if (!config.workingDays.includes(day)) {
+      current = current.add(1, "day").hour(config.startHour).minute(0).second(0);
+      continue;
+    }
+
+    const hour = current.hour();
+
+    // Before work hours
+    if (hour < config.startHour) {
+      current = current.hour(config.startHour).minute(0).second(0);
+    }
+
+    // After work hours
+    if (hour >= config.endHour) {
+      current = current.add(1, "day").hour(config.startHour).minute(0).second(0);
+      continue;
+    }
+
+    const endOfWork = current.clone().hour(config.endHour).minute(0).second(0);
+    const availableMinutes = endOfWork.diff(current, "minute");
+
+    const chunk = Math.min(availableMinutes, remaining);
+    current = current.add(chunk, "minute");
+    remaining -= chunk;
+  }
+
+  return current;
+}
+
