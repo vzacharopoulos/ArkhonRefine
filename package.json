@@ -30,6 +30,8 @@
     "@refinedev/react-hook-form": "^4.8.14",
     "@refinedev/react-router": "^1.0.0",
     "antd": "^5.26.0",
+    "dayjs": "^1.11.13",
+    "dayjs-plugin-duration": "^0.0.1-security",
     "fullcalendar": "^6.1.17",
     "graphql": "^16.11.0",
     "graphql-tag": "^2.12.6",

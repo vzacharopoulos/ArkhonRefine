@@ -9,45 +9,27 @@ import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
-import { INITIAL_EVENTS, createEventId } from './event-utils'
+import {  calculateTotalTime, isWithinWorkingHours } from './event-utils'
 import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
 import { useRef, useEffect } from "react";
 import { CalendarApi } from "@fullcalendar/core";
 import { STATUS_MAP, StatusTag } from "@/utilities/map-status-id-to-name";
-
+import duration from "dayjs/plugin/duration";
+import { finishedPporders, PPOrder, PPOrderLine  } from "./productioncalendartypes";
+import { OrderlinesList } from "@/components/productionplanning/OrderlinesList";
+import { OrderList } from "@/components/productionplanning/UnscheduledPpordersList";
+import { Sidebar } from "./sidebar";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
-
-export interface PPOrder {
-  id: number;
-  pporderno?: string;
-  panelcode?: string;
-  status?: number;
-  startDateDatetime?: Date;
-  finishDateDatetime?: Date;
-  estDateOfProd?: Date;
-  createDate?: Date;
+dayjs.extend(duration);
 
 
-}
 
-export interface PPOrderLine {
-  id: number;
-  pporderno?: string;
-  panelcode?: string;
-  status?: number;
-  custporderno?: string;
-  upDate?: Date;
-}
 
-export interface finishedPporders extends Omit<PPOrder, 'estDateOfProd' | 'panelcode'> {
-  totalMeter?: number;
-  speed?: number;
-  code: string;
-  time?: number;
-}
+
+
 
 export const ProductionCalendar: React.FC = () => {
   const {
@@ -90,11 +72,14 @@ export const ProductionCalendar: React.FC = () => {
 
   const finishedEvents: EventInput[] = finished.map((order) => {
     // Calculate theoretical time safely
-    const theoreticalTime = order.time != null ? (order.time / 60).toFixed(2) : "0.00";
+   const theoreticalTime =
+  order.time != null
+    ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
+    : "0h 0m";
 
     return {
       id: String(order.id),
-      title: ` ${order.code} - - θεωρητικός χρόνος ${theoreticalTime} h`,
+      title: ` ${order.code} - - θεωρητικός χρόνος ${theoreticalTime} `,
       start: order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
       end: order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
       color: "lightgreen",
@@ -103,7 +88,7 @@ export const ProductionCalendar: React.FC = () => {
         totalMeter: order.totalMeter,
         speed: order.speed,
         tooltip: `${order.pporderno} - ${order.code} - μήκος παραγγελίας: ${order.totalMeter || 0}m\n` +
-          `Θεωρητικός χρόνος: ${theoreticalTime} h\n` +
+          `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
           `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"}` +
           `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"}` +
           `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
@@ -138,31 +123,8 @@ export const ProductionCalendar: React.FC = () => {
     const recentThreshold = getlast80days();
     return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
   });
-  const recentOrders = orders.filter((order) => {
-    if (!!order.startDateDatetime && !order.finishDateDatetime) {
-      const start = dayjs(order.startDateDatetime)
-      return start.isAfter(dayjs().subtract(1, "month"))
-    }
-    if (!!order.startDateDatetime && !!order.finishDateDatetime) {
-      const start = dayjs(order.startDateDatetime);
-      const finish = dayjs(order.finishDateDatetime);
-
-      // If the duration is more than 1 month, exclude it
-      return finish.diff(start, 'month', true) <= 1;
-    }
-    return true
-  })
-
-  const events: EventInput[] = recentOrders.map((order) => ({
-    id: String(order.id),
-    title: `${order.pporderno} - ${order.panelcode}`,
-    start: !!order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
-    end: !!order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
-    color: order.status === 4 ? "green" : order.status === 1 ? "yellow" : undefined,
-    extendedProps: {
-      status: order.status
-    }
-  }));
+  
+const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
   // Toggle function
   const handleWeekendsToggle = () => {
@@ -174,143 +136,9 @@ export const ProductionCalendar: React.FC = () => {
   };
 
 
-  const totalTimeInHours = useMemo(() => {
-    return orderLines.reduce((sum, line) => {
-      return sum + (line.prodOrdersView?.time ?? 0);
-    }, 0) / 60;
-  }, [orderLines]);
+
+
  
-
-
-  interface SidebarProps {
-    weekendsVisible: boolean;
-    onToggleWeekends: () => void;
-    currentEvents: EventInput[];
-    onToggleCurrentEvents: () => void;
-    unscheduledorders: PPOrder[];
-    selectedOrderId: number | null;
-    onSelectOrder: (id: number) => void;
-    orderLines: PPOrderLine[];
-    orderLinesLoading: boolean;
-  }
-
-  const Sidebar: React.FC<SidebarProps> = ({
-    weekendsVisible,
-    onToggleWeekends,
-    currentEvents,
-    onToggleCurrentEvents,
-    unscheduledorders,
-    selectedOrderId,
-    onSelectOrder,
-
-    orderLines,
-    orderLinesLoading
-
-
-  }) => {
-    const renderSidebarEvent = (event: EventInput) => (
-      <List.Item key={event.id}>
-        <Text strong>
-          {event.start &&
-            formatDate(event.start as Date, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
-        </Text>
-        <Text> {event.title}</Text>
-      </List.Item>
-    );
-    
-  
-
-    useEffect(() => {
-      let containerEl = document.getElementById("external-events");
-      if (containerEl) {
-        new Draggable(containerEl, {
-          itemSelector: ".fc-event",
-          eventData: function (eventEl) {
-            const data = eventEl.getAttribute("data-event");
-            return data ? JSON.parse(data) : {};
-          },
-        });
-      }
-    }, []);
-
-
-    return (
-      <Sider width={300} style={{ background: "#fff", padding: 2 }}>
-        <div className="demo-app-sidebar-section" id="external-events">
-          <Title level={4}>Προγραμματισμός Master</Title>
-          <Menu
-            mode="inline"
-            selectedKeys={selectedOrderId !== null ? [String(selectedOrderId)] : []}
-            onClick={({ key }) => onSelectOrder(Number(key))}
-            style={{
-              border: "none",
-              fontSize: 13,
-              overflowY: "auto",
-            }}
-          >
-            {unscheduledorders.map((order) => (
-              <Menu.Item key={order.id}>
-                <div className="fc-event"
-                  title={order.panelcode}
-                  style={{ whiteSpace: "normal", lineHeight: 1.4 }}
-                  data-event={JSON.stringify({
-                    id: String(order.id),
-                    title: `${order.pporderno} - ${order.panelcode}`,
-                  })}>
-                  {order.panelcode} {order.id === selectedOrderId && (
-                    <Text strong> - {totalTimeInHours.toFixed(2)} ώρες</Text>
-                  )}
-                  <div><StatusTag status={order.status} /></div>
-                </div>
-              </Menu.Item>
-            ))}
-          </Menu>
-        </div>
-
-        <Divider />
-
-        <div className="demo-app-sidebar-section">
-          <Checkbox checked={weekendsVisible} onChange={onToggleWeekends}>
-            Toggle weekends
-          </Checkbox>
-        </div>
-        <div className="demo-app-sidebar-section">
-          <Checkbox checked={weekendsVisible} onChange={onToggleCurrentEvents}>
-            Toggle recent masters
-          </Checkbox>
-        </div>
-
-
-        <Divider />
-
-        {selectedOrderId && (
-          <div className="demo-app-sidebar-section">
-            <Title level={5}>Κομμάτια Εντολής</Title>
-            <div style={{ maxHeight: 390, overflowY: "scroll", paddingRight: 8 }}>
-              {orderLinesLoading ? (
-                <span>Loading...</span>
-              ) : (
-                <List
-                  size="small"
-                  dataSource={orderLines}
-                  renderItem={(line) => (
-                    <List.Item key={line.id}>
-                      <span>{line.custporderno}-{line.prodOrdersView.time != null ? (line.prodOrdersView.time / 60).toFixed(2) : "0.00"}h</span>
-                      <StatusTag status={line.status} />
-                    </List.Item>
-                  )}
-                />
-              )}
-            </div>
-          </div>
-        )}
-      </Sider>
-    );
-  };
 
 
 
@@ -331,7 +159,7 @@ export const ProductionCalendar: React.FC = () => {
           }}
           orderLines={orderLines}
           orderLinesLoading={orderLinesLoading}
-
+            totalTime={totalTime}
         />
       </Sider>
       <Content style={{ flex: 1, minHeight: "80vh" }}>
@@ -343,56 +171,65 @@ export const ProductionCalendar: React.FC = () => {
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay',
           }}
-          initialView="dayGridMonth"
+          initialView="timeGridWeek"
           events={[...finishedEvents, ...currentEvents]}
           weekends={weekendsVisible}
           selectMirror={true}            //this makes draggable events also drag the visual        
           //initialEvents={INITIAL_EVENTS}         *
           editable={true}
-         
+
           eventOverlap={false}
           droppable={true}
           selectable={true}
-          
+
           height="100%"
           eventDidMount={(info) => {
             // Attach the full event title to the element as a native HTML tooltip
             info.el.setAttribute("title", info.event.extendedProps.tooltip);
           }}
-           businessHours={{
+          businessHours={{
             // Monday–Friday, 08:00–16:00
             daysOfWeek: [1, 2, 3, 4, 5],
             startTime: '06:00',
             endTime: '22:00',
           }}
-          drop={(info) => {
-            // Called when an external element is dropped
-            console.log("Dropped event:", info.draggedEl.dataset.event);
-            const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
-            const durationInHours = totalTimeInHours || 2;
+         drop={(info) => {
+  const date = dayjs(info.date);
 
-            // Compute the end time
-            const startDate = dayjs(info.date);
-            const endDate = startDate.add(durationInHours, "hour");
-            // Add to current events
-            setCurrentEvents((prev) => [
-              ...prev,
-              {
-                ...draggedEvent,
-                start: startDate.toDate(),
-                end: endDate.toDate(),
-              },
-            ]);
+  if (!isWithinWorkingHours(date)) {
+    alert("You can only drop events during working hours (Mon–Fri, 06:00–22:00)");
+    return;
+  }
+
+  const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
+  
+
+  const startDate = date;
+  const endDate = startDate.add(totalTime.hours, "hour") .add(totalTime.minutes, "minute");
+  
+
+  setCurrentEvents((prev) => [
+    ...prev,
+    {
+      ...draggedEvent,
+      start: startDate.toDate(),
+      end: endDate.toDate(),
+    },
+  ]);
+}}
+
+          eventAllow={(dropInfo) => {
+            const start = dayjs(dropInfo.start);
+            const end = dayjs(dropInfo.end ?? dropInfo.start);
+            const startDay = start.day();
+            return (
+              startDay >= 1 &&
+              startDay <= 5 &&
+              start.hour() >= 6 &&
+              end.hour() <= 22 &&
+              start.isSame(end, 'day')
+            );
           }}
-
-        dropAllow={(dropInfo) => {
-    const date = dayjs(dropInfo.date);
-    const day = date.day();
-    const hour = date.hour();
-    
-    // Monday-Friday between 6:00-22:00
-    return day >= 1 && day <= 5 && hour >= 6 && hour < 22;
-  }}
         />
       </Content>
     </Layout>
