@@ -7,7 +7,7 @@ import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS } from
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
-import {  calculateTotalTime, EventTooltip, isWithinWorkingHours } from './event-utils'
+import {  calculateTotalTime, EventTooltip, isWithinWorkingHours, splitIntoWorkingHourEvents } from './event-utils'
 import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
@@ -82,10 +82,10 @@ export const ProductionCalendar: React.FC = () => {
         status: order.status,
         totalMeter: order.totalMeter,
         speed: order.speed,
-        tooltip: `${order.pporderno} - ${order.code} - μήκος παραγγελίας: ${order.totalMeter || 0}m\n` +
+        tooltip: `${order.pporderno} - ${order.code}\n - μήκος παραγγελίας: ${(order.totalMeter??0).toFixed(2) || 0}m\n` +
           `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
-          `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"}` +
-          `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"}` +
+          `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+          `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
           `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
       },
     };
@@ -180,8 +180,10 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
           height="100%"
                     eventContent={(args) => (
-    <EventTooltip event={args.event}>
-      <div style={{
+  <EventTooltip
+      tooltip={String(args.event.extendedProps?.tooltip || "")}
+      status={args.event.extendedProps?.status}
+    >      <div style={{
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -207,34 +209,30 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
   }
 
   const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
-  
+  const theoreticalTime = totalTime.formatted;
 
-  const startDate = date;
-  const endDate = startDate.add(totalTime.hours, "hour") .add(totalTime.minutes, "minute");
+    const durationMinutes = totalTime.hours * 60 + totalTime.minutes;
+  const segments = splitIntoWorkingHourEvents(date, durationMinutes);
   
-
-  setCurrentEvents((prev) => [
+ setCurrentEvents((prev) => [
     ...prev,
-    {
+    ...segments.map((seg) => ({
       ...draggedEvent,
-      start: startDate.toDate(),
-      end: endDate.toDate(),
-    },
+      title: `${draggedEvent.title} - θεωρητικός χρόνος ${theoreticalTime}`,
+      start: seg.start,
+      end: seg.end,
+       extendedProps: {
+        ...(draggedEvent.extendedProps ?? {}),
+        tooltip:
+          `${draggedEvent.extendedProps?.tooltip ?? draggedEvent.title ?? ''}\nΘεωρητικός χρόνος: ${theoreticalTime}`,
+        theoreticalTime,
+      },
+    })),
   ]);
 }}
 
-          eventAllow={(dropInfo) => {
-            const start = dayjs(dropInfo.start);
-            const end = dayjs(dropInfo.end ?? dropInfo.start);
-            const startDay = start.day();
-            return (
-              startDay >= 1 &&
-              startDay <= 5 &&
-              start.hour() >= 6 &&
-              end.hour() <= 22 &&
-              start.isSame(end, 'day')
-            );
-          }}
+  
+
         />
       </Content>
     </Layout>

@@ -1,6 +1,6 @@
 import { calculateTotalTime, EventTooltip } from "@/pages/ProductionPlanning/event-utils";
 import { PPOrder } from "@/pages/ProductionPlanning/productioncalendartypes";
-import { StatusTag } from "@/utilities";
+import { STATUS_MAP, StatusTag } from "@/utilities";
 import { Menu, Typography } from "antd";
 import { useMemo } from "react";
 const { Title, Text } = Typography;
@@ -33,26 +33,32 @@ export const OrderList: React.FC<OrderListProps> = ({
               overflowY: "auto",
             }}
           >
-            {unscheduledorders.map((order) => (
-              <Menu.Item key={order.id}>
-            <EventTooltip event={args.event}>
-                  <div
-                    className="fc-event"
-                    style={{ whiteSpace: "normal", lineHeight: 1.4 }}
-                    data-event={JSON.stringify({
-                      id: String(order.id),
-                      title: `${order.pporderno} - ${order.panelcode}`,
-                    })}
-                  >
-                    {order.panelcode} {order.id === selectedOrderId && (
-                      <Text strong> - {totalTime.formatted}</Text>
-                    )}
-                    <div>
-                      <StatusTag status={order.status} />
-                    </div>
-                  </div>
-                </EventTooltip>
-              </Menu.Item>
-            ))}
-          </Menu>
+               {unscheduledorders.map((order) => {
+                const tooltip = `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\n` +
+                  `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`;
+                return (
+                  <Menu.Item key={order.id}>
+                    <EventTooltip tooltip={tooltip} status={order.status}>
+                      <div
+                        className="fc-event"
+                        style={{ whiteSpace: "normal", lineHeight: 1.4 }}
+                        data-event={JSON.stringify({
+                          id: String(order.id),
+                          title: `${order.pporderno} - ${order.panelcode}`,
+                          
+                          extendedProps: { tooltip, status: order.status },
+                        })}
+                      >
+                        {order.panelcode} {order.id === selectedOrderId && (
+                          <Text strong> - {totalTime.formatted}</Text>
+                        )}
+                        <div>
+                          <StatusTag status={order.status} />
+                        </div>
+                      </div>
+                    </EventTooltip>
+                  </Menu.Item>
+                );
+              })}
+            </Menu>
 );

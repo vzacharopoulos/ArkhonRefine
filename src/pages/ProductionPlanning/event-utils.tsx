@@ -10,39 +10,38 @@ import { Tooltip } from "antd";
 import { StatusTag } from "@/utilities/map-status-id-to-name";
 
 interface EventTooltipProps {
-  event: {
-    extendedProps: {
-      status?: number;
-      tooltip: string;
-    };
-  };
-  children: React.ReactElement;
+  tooltip: string;
+  status?: number;
+  children: React.ReactNode; 
 }
 
-export const EventTooltip: React.FC<EventTooltipProps> = ({ event, children }) => (
-  <Tooltip 
+export const EventTooltip: React.FC<EventTooltipProps> = ({ tooltip, status, children }) => (
+  <Tooltip
     title={
       <div style={{ whiteSpace: "pre-line" }}>
-        {event.extendedProps.tooltip}
-        {event.extendedProps.status && (
+        {tooltip}
+        {status !== undefined && (
           <div style={{ marginTop: 8 }}>
-            <StatusTag status={event.extendedProps.status} />
+            <StatusTag status={status} />
           </div>
         )}
       </div>
     }
     overlayStyle={{ maxWidth: 600 }}
   >
-    <div style={{
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-      width: '100%'
-    }}>
+    <div
+      style={{
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        width: "100%",
+      }}
+    >
       {children}
     </div>
   </Tooltip>
 );
+
 
 
 
@@ -68,34 +67,87 @@ const workingHoursOverrides: Record<string, { start: number; end: number }> = {
 };
 
 
-export const isWithinWorkingHours = (date: dayjs.Dayjs): boolean => {
+export const getWorkingHours = (date: dayjs.Dayjs) => {
   const dayOfWeek = date.day(); // 0 = Sunday, 6 = Saturday
-  const hour = date.hour();
   const dateStr = date.format("YYYY-MM-DD");
 
-  // Default working hours
   let startHour = 6;
   let endHour = 22;
- // Special Saturday hours (00:00-15:00)
+
   if (dayOfWeek === 6) {
     startHour = 0;
     endHour = 15;
   }
-   if (dayOfWeek === 5) {
+
+  if (dayOfWeek === 5) {
     startHour = 6;
     endHour = 24;
   }
 
-
-
-  // Check if there's a per-day override
   if (workingHoursOverrides[dateStr]) {
     startHour = workingHoursOverrides[dateStr].start;
     endHour = workingHoursOverrides[dateStr].end;
   }
 
   const isBusinessDay = dayOfWeek >= 1 && dayOfWeek <= 6;
+
+  // Check if there's a per-day override
+  
+  return { isBusinessDay, startHour, endHour };
+};
+
+export const isWithinWorkingHours = (date: dayjs.Dayjs): boolean => {
+  const { isBusinessDay, startHour, endHour } = getWorkingHours(date);
+  const hour = date.hour();
+
   const isBusinessHour = hour >= startHour && hour < endHour;
 
   return isBusinessDay && isBusinessHour;
+};
+
+export const splitIntoWorkingHourEvents = (
+  start: Dayjs,
+  durationMinutes: number,
+): { start: Date; end: Date }[] => {
+  let segments: { start: Date; end: Date }[] = [];
+  let remaining = durationMinutes;
+  let current = start.clone();
+
+  while (remaining > 0) {
+    const { isBusinessDay, startHour, endHour } = getWorkingHours(current);
+
+    if (!isBusinessDay) {
+      current = current.add(1, "day").startOf("day");
+      continue;
+    }
+
+    let segmentStart = current;
+
+    if (segmentStart.hour() < startHour) {
+      segmentStart = segmentStart.set("hour", startHour).set("minute", 0);
+    }
+
+    if (segmentStart.hour() >= endHour) {
+      current = current.add(1, "day").startOf("day");
+      continue;
+    }
+
+    const dayEnd = segmentStart.clone().set("hour", endHour).set("minute", 0);
+    let segmentEnd = segmentStart.add(remaining, "minute");
+
+    if (segmentEnd.isAfter(dayEnd)) {
+      segmentEnd = dayEnd;
+    }
+
+    segments.push({ start: segmentStart.toDate(), end: segmentEnd.toDate() });
+
+    remaining -= segmentEnd.diff(segmentStart, "minute");
+    current = segmentEnd;
+
+    if (remaining > 0) {
+      current = current.add(1, "minute").startOf("minute");
+    }
+  }
+
+  return segments;
 };
