@@ -35,7 +35,7 @@ export const OrderList: React.FC<OrderListProps> = ({
           >
             {unscheduledorders.map((order) => (
               <Menu.Item key={order.id}>
-             <EventTooltip tooltip={`${order.pporderno} - ${order.panelcode}`}>
+            <EventTooltip event={args.event}>
                   <div
                     className="fc-event"
                     style={{ whiteSpace: "normal", lineHeight: 1.4 }}

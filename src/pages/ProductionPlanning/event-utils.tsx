@@ -6,17 +6,32 @@ import { PPOrderLine } from './productioncalendartypes';
 import React from "react";
 import { Tooltip } from "antd";
 
+
+import { StatusTag } from "@/utilities/map-status-id-to-name";
+
 interface EventTooltipProps {
-  tooltip: string;
+  event: {
+    extendedProps: {
+      status?: number;
+      tooltip: string;
+    };
+  };
   children: React.ReactElement;
 }
 
-// In your event-utils.ts
-export const EventTooltip: React.FC<EventTooltipProps> = ({ tooltip, children }) => (
+export const EventTooltip: React.FC<EventTooltipProps> = ({ event, children }) => (
   <Tooltip 
-    title={<span style={{ whiteSpace: "pre-line" }}>{tooltip}</span>}
-    
-    styles={{ root: { maxWidth: 600 } }}
+    title={
+      <div style={{ whiteSpace: "pre-line" }}>
+        {event.extendedProps.tooltip}
+        {event.extendedProps.status && (
+          <div style={{ marginTop: 8 }}>
+            <StatusTag status={event.extendedProps.status} />
+          </div>
+        )}
+      </div>
+    }
+    overlayStyle={{ maxWidth: 600 }}
   >
     <div style={{
       overflow: 'hidden',

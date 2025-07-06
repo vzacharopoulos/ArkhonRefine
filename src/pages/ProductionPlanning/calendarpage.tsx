@@ -180,7 +180,7 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
           height="100%"
                     eventContent={(args) => (
-    <EventTooltip tooltip={args.event.extendedProps.tooltip || args.event.title}>
+    <EventTooltip event={args.event}>
       <div style={{
         overflow: 'hidden',
         textOverflow: 'ellipsis',
