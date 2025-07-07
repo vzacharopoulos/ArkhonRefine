@@ -7,24 +7,105 @@ import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS } from
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
-import {  addWorkingMinutes, calculateTotalTime, EventTooltip, isWithinWorkingHours} from './event-utils'
-import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip, TimePicker, Modal } from "antd";
+import { EventTooltip, calculateTotalTime, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from './event-utils'
+import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip, TimePicker, Modal, DatePicker } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
-
 import { STATUS_MAP, StatusTag } from "@/utilities/map-status-id-to-name";
 import duration from "dayjs/plugin/duration";
-import { finishedPporders, PPOrder, PPOrderLine  } from "./productioncalendartypes";
+import { finishedPporders, PPOrder, PPOrderLine } from "./productioncalendartypes";
 import { Sidebar } from "./sidebar";
+import { EditOutlined } from "@ant-design/icons";
+
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
 
+export interface WorkingHoursConfig {
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+  workingDays: number[]; // 0 = Sunday, 6 = Saturday
+}
+
+// Helper function to get working hours for a specific date
 
 
+ 
 
 
+// Helper function to get date range for background events
+function getDateRange(days: number): Dayjs[] {
+  const today = dayjs();
+  const start = today.subtract(days / 2, "day");
+  return Array.from({ length: days }, (_, i) => start.add(i, "day"));
+}
 
+// Helper function to generate non-working hour background events
+function generateNonWorkingHourBackgroundEvents(
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>
+): EventInput[] {
+  const allDays = getDateRange(60);
+  const events: EventInput[] = [];
+
+  for (const day of allDays) {
+    const dateStr = day.format("YYYY-MM-DD");
+    const dayOfWeek = day.day();
+    
+    // Get configuration for this specific day
+    const specificConfig = dailyWorkingHours[dateStr];
+    const config = specificConfig || defaultWorkingHours[dayOfWeek];
+    
+    if (!config) continue;
+
+    // If it's not a working day, block the full day
+    if (!config.workingDays.includes(dayOfWeek)) {
+      events.push({
+        start: `${dateStr}T00:00:00`,
+        end: `${dateStr}T23:59:59`,
+        display: 'background',
+        color: 'rgb(158, 128, 128)',
+        title: 'αργία',
+      });
+      continue;
+    }
+
+    // Format time strings with proper padding
+    const startTimeStr = `${String(config.startHour).padStart(2, '0')}:${String(config.startMinute).padStart(2, '0')}:00`;
+    const endTimeStr = `${String(config.endHour).padStart(2, '0')}:${String(config.endMinute).padStart(2, '0')}:00`;
+
+    // Before working hours - only if start time is after 00:00
+    if (config.startHour > 0 || config.startMinute > 0) {
+      events.push({
+        start: `${dateStr}T00:00:00`,
+        end: `${dateStr}T${startTimeStr}`,
+        display: 'background',
+        color: 'rgba(188, 99, 99, 0.51)',
+        title: 'πριν την έναρξη',
+      });
+    }
+
+    // After working hours - only if end time is before 24:00 (midnight)
+    if (config.endHour < 24) {
+      events.push({
+        start: `${dateStr}T${endTimeStr}`,
+        end: `${dateStr}T23:59:59`,
+        display: 'background',
+        color: 'rgba(188, 99, 99, 0.51)',
+        title: 'λήξη εργασίας',
+      });
+    } else if (config.endHour === 24 && config.endMinute > 0) {
+      // Handle cases where endHour is 24 but endMinute is not 0
+      // This shouldn't normally happen, but if it does, we treat it as ending at midnight
+      // No background event needed as it goes to the end of the day
+    }
+    // If endHour is 24 and endMinute is 0, working hours go to midnight, so no "after hours" event needed
+  }
+
+  return events;
+}
 
 export const ProductionCalendar: React.FC = () => {
   const {
@@ -56,48 +137,74 @@ export const ProductionCalendar: React.FC = () => {
     },
   });
 
-
   const [weekendsVisible, setWeekendsVisible] = useState(true);
   const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedPporderno, setSelectedPporderno] = useState<string | null>(null);
   const [workingHoursModalOpen, setWorkingHoursModalOpen] = useState(false);
-const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
-const [workingHours, setWorkingHours] = useState({
-  startHour: 6,
-  endHour: 22,
-  workingDays: [1, 2, 3, 4, 5],
+  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+  
+// Keep your current defaultWorkingHours structure
+const [defaultWorkingHours, setDefaultWorkingHours] = useState<Record<number, WorkingHoursConfig>>({
+  1: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] }, // Monday
+  2: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6]  }, // Tuesday
+  3: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6]  }, // Wednesday
+  4: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6]  }, // Thursday
+  5: { startHour: 6, startMinute: 0, endHour: 24, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6]  }, // Friday (ends at midnight)
+  6: { startHour: 0, startMinute: 0, endHour: 15, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6]  },//saturday
+  0: { startHour: 0, startMinute: 0, endHour: 0, endMinute: 0, workingDays: [] }, // Sunday is off
 });
-  const finished = finishedData?.data?.masterlengths ?? [];
 
+  // Daily working hours overrides
+  const [dailyWorkingHours, setDailyWorkingHours] = useState<Record<string, WorkingHoursConfig>>({});
 
-  const finishedEvents: EventInput[] = finished.map((order) => {
-    // Calculate theoretical time safely
-   const theoreticalTime =
-  order.time != null
-    ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
-    : "0h 0m";
-
-    return {
-      id: String(order.id),
-      title: ` ${order.code} - - θεωρητικός χρόνος ${theoreticalTime} `,
-      start: order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
-      end: order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
-      color: "lightgreen",
-      extendedProps: {
-        status: order.status,
-        totalMeter: order.totalMeter,
-        speed: order.speed,
-        tooltip: `${order.pporderno} - ${order.code}\n - μήκος παραγγελίας: ${(order.totalMeter??0).toFixed(2) || 0}m\n` +
-          `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
-          `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
-          `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
-          `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
-      },
-    };
+  // Temporary state for modal
+  const [tempWorkingHours, setTempWorkingHours] = useState<WorkingHoursConfig>({
+    startHour: 6,
+    startMinute: 0,
+    endHour: 22,
+    endMinute: 0,
+    workingDays: [1, 2, 3, 4, 5],
   });
 
+  const handleSaveWorkingHours = () => {
+    if (!selectedDate) return;
 
+    const dateKey = selectedDate.format("YYYY-MM-DD");
+    setDailyWorkingHours((prev) => ({
+      ...prev,
+      [dateKey]: { ...tempWorkingHours },
+    }));
+
+    setWorkingHoursModalOpen(false);
+  };
+
+  const handleDateSelect = (date: Dayjs) => {
+    setSelectedDate(date);
+    const dateKey = date.format("YYYY-MM-DD");
+    const existing = dailyWorkingHours[dateKey];
+    
+   if (existing) {
+    setTempWorkingHours({ ...existing });
+  } else {
+    const weekday = date.day(); // 0 (Sunday) to 6 (Saturday)
+    const defaultConfig = defaultWorkingHours[weekday];
+    
+    if (defaultConfig) {
+      setTempWorkingHours({ ...defaultConfig });
+    } else {
+      // fallback if no config exists for that weekday
+      setTempWorkingHours({
+        startHour: 6,
+        startMinute: 0,
+        endHour: 22,
+        endMinute: 0,
+        workingDays: [1, 2, 3, 4, 5],
+      });
+    }
+  }
+    setWorkingHoursModalOpen(true);
+  };
 
   const { data: orderLinesData, isLoading: orderLinesLoading } = useCustom<{ pporderlines2: PPOrderLine[] }>({
     url: "",
@@ -116,18 +223,46 @@ const [workingHours, setWorkingHours] = useState({
   });
 
   const orderLines = orderLinesData?.data?.pporderlines2 ?? [];
-
-
+  const finished = finishedData?.data?.masterlengths ?? [];
   const orders = ppordersData?.data?.pporders ?? [];
+  
   const unscheduledorders = orders.filter((order) => {
     if (order.status !== 1) return false;
     const recentThreshold = getlast80days();
     return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
   });
-  
-const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
-  // Toggle function
+  const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
+
+  const finishedEvents: EventInput[] = finished.map((order) => {
+    const theoreticalTime =
+      order.time != null
+        ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
+        : "0h 0m";
+
+    return {
+      id: String(order.id),
+      title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
+      start: order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
+      end: order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
+      color: "lightgreen",
+      extendedProps: {
+        status: order.status,
+        totalMeter: order.totalMeter,
+        speed: order.speed,
+        tooltip: `${order.pporderno} - ${order.code}\n - μήκος παραγγελίας: ${(order.totalMeter ?? 0).toFixed(2) || 0}m\n` +
+          `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
+          `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+          `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+          `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
+      },
+    };
+  });
+
+  const nonWorkingTimeBackgroundEvents = useMemo(() => {
+    return generateNonWorkingHourBackgroundEvents(dailyWorkingHours, defaultWorkingHours);
+  }, [dailyWorkingHours, defaultWorkingHours]);
+
   const handleWeekendsToggle = () => {
     setWeekendsVisible(!weekendsVisible);
   };
@@ -135,13 +270,6 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
   const handleCurrentEventToggle = () => {
     setWeekendsVisible(!weekendsVisible);
   };
-
-
-
-
- 
-
-
 
   return (
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
@@ -160,13 +288,25 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
           }}
           orderLines={orderLines}
           orderLinesLoading={orderLinesLoading}
-            totalTime={totalTime}
-            
+          totalTime={totalTime}
         />
+        
+        <Divider />
+        
+        <div style={{ marginBottom: 16 }}>
+          <Title level={5}>Configure Working Hours</Title>
+          <DatePicker
+            placeholder="Select date to configure"
+            onChange={(date) => {
+              if (date) handleDateSelect(date);
+            }}
+            style={{ width: "100%" }}
+          />
+        </div>
       </Sider>
+
       <Content style={{ flex: 1, minHeight: "80vh" }}>
         <FullCalendar
-
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           headerToolbar={{
             left: 'prev,next today',
@@ -174,134 +314,159 @@ const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
             right: 'dayGridMonth,timeGridWeek,timeGridDay',
           }}
           initialView="timeGridWeek"
-          events={[...finishedEvents, ...currentEvents]}
+          events={[...finishedEvents, ...currentEvents, ...nonWorkingTimeBackgroundEvents]}
           weekends={weekendsVisible}
-          selectMirror={true}            //this makes draggable events also drag the visual        
-          //initialEvents={INITIAL_EVENTS}         *
+          selectMirror={true}
           editable={true}
-   
           eventOverlap={false}
           droppable={true}
           selectable={true}
-          dateClick={(info) => {
-  setSelectedDate(dayjs(info.date));
-  setWorkingHoursModalOpen(true);
-}}
-          height="100%"
-                    eventContent={(args) => (
-  <EventTooltip
-      tooltip={String(args.event.extendedProps?.tooltip || "")}
-      status={args.event.extendedProps?.status}
-    >      <div style={{
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        width: '100%',
-        padding: '2px'
-      }}>
-        {args.timeText && <b>{args.timeText}</b>} {args.event.title}
-      </div>
-    </EventTooltip>
-          )}
-          businessHours={{
-            // Monday–Friday, 08:00–16:00
-            daysOfWeek: [1, 2, 3, 4, 5],
-            startTime: '06:00',
-            endTime: '22:00',
+           dayHeaderContent={(arg) => (
+    <div 
+      onClick={() => handleDateSelect(dayjs(arg.date))}
+      style={{ cursor: 'pointer', padding: '4px' }}
+    >
+      {arg.text}
+      <Tooltip title="ώρισε εργάσιμες ώρες">
+        <Button 
+          type="text" 
+          size="small" 
+          icon={<EditOutlined  />}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDateSelect(dayjs(arg.date));
           }}
-         selectConstraint="businessHours"
-  eventConstraint="businessHours"
-  slotMinTime="06:00:00"
-  slotMaxTime="22:00:00"
-         drop={(info) => {
-  const date = dayjs(info.date);
+        />
+      </Tooltip>
+    </div>
+  )}
+          height="100%"
+          eventContent={(args) => (
+            <EventTooltip
+              tooltip={String(args.event.extendedProps?.tooltip || "")}
+              status={args.event.extendedProps?.status}
+            >
+              <div style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%',
+                padding: '2px'
+              }}>
+                {args.timeText && <b>{args.timeText}</b>} {args.event.title}
+              </div>
+            </EventTooltip>
+          )}
+          drop={(info) => {
+            const dropDate = dayjs(info.date);
 
-  if (!isWithinWorkingHours(date)) {
-    alert("You can only drop events during working hours (Mon–Fri, 06:00–22:00)");
-    return;
-  }
+            if (!isWithinWorkingHours(dropDate, dailyWorkingHours, defaultWorkingHours)) {
+              alert("You can only drop events during working hours");
+              return;
+            }
 
-  const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
-  
+            const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
+            const durationInMinutes = totalTime.hours * 60 + totalTime.minutes;
 
-  const startDate = dayjs(info.date);
-const durationInMinutes = totalTime.hours * 60 + totalTime.minutes;
- const endDate = addWorkingMinutes(date, durationInMinutes, workingHours);
+            // Split the event into working hours segments
+            const eventSegments = splitEventIntoWorkingHours(
+              dropDate,
+              durationInMinutes,
+              dailyWorkingHours,
+              defaultWorkingHours,
+              draggedEvent
+            );
 
-  setCurrentEvents((prev) => [
-    ...prev,
-    {
-      ...draggedEvent,
-      start: startDate.toDate(),
-      end: endDate.toDate(),
-    },
-  ]);
-}}
-
+            setCurrentEvents((prev) => [...prev, ...eventSegments]);
+          }}
           eventAllow={(dropInfo) => {
             const start = dayjs(dropInfo.start);
             const end = dayjs(dropInfo.end ?? dropInfo.start);
-            const startDay = start.day();
-            return (
-              startDay >= 1 &&
-              startDay <= 5 &&
-              start.hour() >= 6 &&
-              end.hour() <= 22 &&
-              start.isSame(end, 'day')
-            );
+            const config = getWorkingHours(start, dailyWorkingHours, defaultWorkingHours);
+
+            if (!config.isBusinessDay) return false;
+
+            const isSameDay = start.isSame(end, 'day');
+            const startTime = start.hour() * 60 + start.minute();
+            const endTime = end.hour() * 60 + end.minute();
+            const configStartTime = config.startHour * 60 + config.startMinute;
+            const configEndTime = config.endHour * 60 + config.endMinute;
+
+            const isStartValid = startTime >= configStartTime;
+            const isEndValid = endTime <= configEndTime;
+
+            return isSameDay && isStartValid && isEndValid;
           }}
         />
       </Content>
 
       <Modal
-  title={`Set Working Hours for ${selectedDate?.format("YYYY-MM-DD")}`}
-  open={workingHoursModalOpen}
-  onCancel={() => setWorkingHoursModalOpen(false)}
-  onOk={() => {
-    // Apply changes (see below)
-    setWorkingHoursModalOpen(false);
-  }}
->
-  <div style={{ display: "flex", gap: 12 }}>
-    <div>
-      <Text>Start Time:</Text>
-      <TimePicker
-        defaultValue={dayjs().hour(workingHours.startHour).minute(0)}
-        format="HH:mm"
-        onChange={(time) => {
-          if (time) {
-            setWorkingHours((prev) => ({
-              ...prev,
-              startHour: time.hour(),
-            }));
-          }
-        }}
-      />
-    </div>
-    <div>
-      <Text>End Time:</Text>
-      <TimePicker
-        defaultValue={dayjs().hour(workingHours.endHour).minute(0)}
-        format="HH:mm"
-        onChange={(time) => {
-          if (time) {
-            setWorkingHours((prev) => ({
-              ...prev,
-              endHour: time.hour(),
-            }));
-          }
-        }}
-      />
-    </div>
-  </div>
-</Modal>
+        title={`Set Working Hours for ${selectedDate?.format("YYYY-MM-DD")}`}
+        open={workingHoursModalOpen}
+        onCancel={() => setWorkingHoursModalOpen(false)}
+        onOk={handleSaveWorkingHours}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div>
+              <Text>Start Time:</Text>
+              <TimePicker
+                value={dayjs().hour(tempWorkingHours.startHour).minute(tempWorkingHours.startMinute)}
+                format="HH:mm"
+                onChange={(time) => {
+                  if (time) {
+                    setTempWorkingHours((prev) => ({
+                      ...prev,
+                      startHour: time.hour(),
+                      startMinute: time.minute(),
+                    }));
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <Text>End Time:</Text>
+              <TimePicker
+                value={dayjs().hour(tempWorkingHours.endHour).minute(tempWorkingHours.endMinute)}
+                format="HH:mm"
+                onChange={(time) => {
+                  if (time) {
+                    setTempWorkingHours((prev) => ({
+                      ...prev,
+                      endHour: time.hour(),
+                      endMinute: time.minute(),
+                    }));
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Text>Working Days:</Text>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                <Checkbox
+                  key={index}
+                  checked={tempWorkingHours.workingDays.includes(index)}
+                  onChange={(e) => {
+                    setTempWorkingHours((prev) => ({
+                      ...prev,
+                      workingDays: e.target.checked
+                        ? [...prev.workingDays, index]
+                        : prev.workingDays.filter((d) => d !== index),
+                    }));
+                  }}
+                >
+                  {day}
+                </Checkbox>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   );
-
-
 };
-
-
-
 
 export default ProductionCalendar;
