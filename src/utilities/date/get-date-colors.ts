@@ -32,16 +32,3 @@ return recentDate
 }
 
 
-export const getworkinghours = (start) =>{
- const date = dayjs(info.date);
-  const day = date.day();
-  const hour = date.hour();
-
-  const isBusinessDay = day >= 1 && day <= 5;
-  const isBusinessHour = hour >= 6 && hour < 22;
-
-  if (!isBusinessDay || !isBusinessHour) {
-    alert("You can only drop events during working hours (Mon–Fri, 06:00–22:00)");
-    return;
-  }
-}

@@ -422,67 +422,81 @@ export const ProductionCalendar: React.FC = () => {
               </div>
             </EventTooltip>
           )}
-drop={(info) => {
-  const dropDate = dayjs(info.date);
-  const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
-  const durationInMinutes = totalTime.hours * 60 + totalTime.minutes;
+          drop={(info) => {
+            const dropDate = dayjs(info.date);
+            const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
+            const durationInMinutes = totalTime.hours * 60 + totalTime.minutes;
 
-  // Find the last event's end time - this should include offtime events
-  const lastEventEndTime = findLastEventEndTime([...currentEvents, ...finishedEvents]);
+            // Find the last event's end time - this should include offtime events
+            const lastEventEndTime = findLastEventEndTime([...currentEvents, ...finishedEvents]);
 
-  // Determine the actual start time for the new event
-  let actualStartTime: Dayjs;
+            // Determine the actual start time for the new event
+            let actualStartTime: Dayjs;
 
-  if (lastEventEndTime) {
-    // The new event should start immediately after the last event ends
-    // No need to check working hours here - just start right after
-    actualStartTime = lastEventEndTime;
-  } else {
-    // If no existing events, use the drop date but ensure it's within working hours
-    if (isWithinWorkingHours(dropDate, dailyWorkingHours, defaultWorkingHours)) {
-      actualStartTime = dropDate;
-    } else {
-      // Find the next available working time from the drop date
-      actualStartTime = findNextWorkingTime(dropDate, dailyWorkingHours, defaultWorkingHours);
-    }
-  }
+            if (lastEventEndTime) {
+              // Start immediately after the last event (no additional buffer needed since offtime already provides spacing)
+              const proposedStartTime = lastEventEndTime;
 
-  // Split the event into working hours segments using the actual start time
-  const eventSegments = splitEventIntoWorkingHours(
-    actualStartTime,
-    durationInMinutes,
-    dailyWorkingHours,
-    defaultWorkingHours,
-    draggedEvent
-  );
+              // Check if the proposed start time is within working hours
+              if (isWithinWorkingHours(proposedStartTime, dailyWorkingHours, defaultWorkingHours)) {
+                actualStartTime = proposedStartTime;
+              } else {
+                // If not within working hours, find the next available working time
+                actualStartTime = findNextWorkingTime(proposedStartTime, dailyWorkingHours, defaultWorkingHours);
+              }
+            } else {
+              // If no existing events, use the drop date but ensure it's within working hours
+              if (isWithinWorkingHours(dropDate, dailyWorkingHours, defaultWorkingHours)) {
+                actualStartTime = dropDate;
+              } else {
+                // Find the next available working time from the drop date
+                actualStartTime = findNextWorkingTime(dropDate, dailyWorkingHours, defaultWorkingHours);
+              }
+            }
 
-  // Add the offtime event after the last segment
-  const lastSegment = eventSegments[eventSegments.length - 1];
-  if (lastSegment) {
-    // Start offtime immediately after the last segment ends
-    const offtimeStart = dayjs(lastSegment.end as Date);
+            // Split the event into working hours segments using the actual start time
+            const eventSegments = splitEventIntoWorkingHours(
+              actualStartTime,
+              durationInMinutes,
+              dailyWorkingHours,
+              defaultWorkingHours,
+              draggedEvent
+            );
 
-    const offtimeConfig = getWorkingHours(
-      offtimeStart,
-      dailyWorkingHours,
-      defaultWorkingHours
-    );
+            // Add the offtime event after the last segment
+            const lastSegment = eventSegments[eventSegments.length - 1];
+            if (lastSegment) {
+              // Determine the correct start of the offtime. If the last segment ends
+              // outside working hours, the offtime should begin at the next available
+              // working time rather than at the event end itself.
+              const offtimeStart = findNextWorkingTime(
+                dayjs(lastSegment.end as Date),
+                dailyWorkingHours,
+                defaultWorkingHours
+              );
 
-    const offtimeEnd = addWorkingMinutes(offtimeStart, 30, offtimeConfig);
+              const offtimeConfig = getWorkingHours(
+                offtimeStart,
+                dailyWorkingHours,
+                defaultWorkingHours
+              );
 
-    const offEvent: EventInput = {
-      id: `${draggedEvent.id}-offtime`,
-      title: 'προετοιμασία μηχανής',
-      start: offtimeStart.toDate(),
-      end: offtimeEnd.toDate(),
-      color: 'gray',
-      extendedProps: { isOfftime: true },
-    };
-    setCurrentEvents((prev) => [...prev, ...eventSegments, offEvent]);
-  } else {
-    setCurrentEvents((prev) => [...prev, ...eventSegments]);
-  }
-}}
+              const offtimeEnd = addWorkingMinutes(offtimeStart, 30, offtimeConfig);
+
+              const offEvent: EventInput = {
+                id: `${draggedEvent.id}-offtime`,
+                title: 'προετοιμασία μηχανής',
+                start: offtimeStart.toDate(),
+                end: offtimeEnd.toDate(),
+                color: 'gray',
+                extendedProps: { isOfftime: true },
+              };
+              setCurrentEvents((prev) => [...prev, ...eventSegments, offEvent]);
+            } else {
+              setCurrentEvents((prev) => [...prev, ...eventSegments]);
+            }
+          }}
+
 
           eventAllow={(dropInfo) => {
             const start = dayjs(dropInfo.start);
@@ -505,51 +519,27 @@ drop={(info) => {
         />
       </Content>
       <Modal
-  open={editModalOpen}
-  title="αλλάξτε ώρα"
-  onCancel={() => setEditModalOpen(false)}
-  footer={[
-    <Button
-      key="delete"
-      danger
-      onClick={() => {
-        if (!selectedEvent) return;
+        open={editModalOpen}
+        title="αλλάξτε ώρα"
+        onCancel={() => setEditModalOpen(false)}
+        onOk={() => {
+          if (!selectedEvent || !editStart || !editEnd) return;
 
-        const updated = currentEvents.filter(ev => ev.id !== selectedEvent.id);
-        setCurrentEvents(updated);
-        setEditModalOpen(false);
-      }}
-    >
-      Διαγραφή
-    </Button>,
-    <Button key="cancel" onClick={() => setEditModalOpen(false)}>
-      Άκυρο
-    </Button>,
-    <Button
-      key="submit"
-      type="primary"
-      onClick={() => {
-        if (!selectedEvent || !editStart || !editEnd) return;
+          const updated = currentEvents.map(ev => {
+            if (ev.id === selectedEvent.id) {
+              return {
+                ...ev,
+                start: editStart.toDate(),
+                end: editEnd.toDate(),
+              };
+            }
+            return ev;
+          });
 
-        const updated = currentEvents.map(ev => {
-          if (ev.id === selectedEvent.id) {
-            return {
-              ...ev,
-              start: editStart.toDate(),
-              end: editEnd.toDate(),
-            };
-          }
-          return ev;
-        });
-
-        setCurrentEvents(updated);
-        setEditModalOpen(false);
-      }}
-    >
-      Αποθήκευση
-    </Button>
-  ]}
->
+          setCurrentEvents(updated);
+          setEditModalOpen(false);
+        }}
+      >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <Text>Start Time:</Text>
@@ -588,7 +578,7 @@ drop={(info) => {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", gap: 12 }}>
             <div>
-              <Text>ώρα έναρξης:</Text>
+              <Text>Start Time:</Text>
               <TimePicker
                 value={dayjs().hour(tempWorkingHours.startHour).minute(tempWorkingHours.startMinute)}
                 format="HH:mm"
@@ -604,7 +594,7 @@ drop={(info) => {
               />
             </div>
             <div>
-              <Text>ωρα λήξης:</Text>
+              <Text>End Time:</Text>
               <TimePicker
                 value={dayjs().hour(tempWorkingHours.endHour).minute(tempWorkingHours.endMinute)}
                 format="HH:mm"

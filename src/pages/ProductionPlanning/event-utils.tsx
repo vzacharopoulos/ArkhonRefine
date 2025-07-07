@@ -272,4 +272,12 @@ export function splitEventIntoWorkingHours(
 }
 
 
-
+export const DEFAULT_OFFTIME_RULES: OfftimeRule[] = [
+  { fromOrderType: 'A', toOrderType: 'B', minutes: 30 },
+  { fromOrderType: 'B', toOrderType: 'C', minutes: 45 },
+  { fromOrderType: 'A', toOrderType: 'C', minutes: 60 },
+  { fromOrderType: 'C', toOrderType: 'A', minutes: 45 },
+  { fromOrderType: 'C', toOrderType: 'B', minutes: 30 },
+  { fromOrderType: 'B', toOrderType: 'A', minutes: 40 },
+  // Add more rules as needed
+];
