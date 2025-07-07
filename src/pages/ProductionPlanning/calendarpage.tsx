@@ -358,7 +358,7 @@ export const ProductionCalendar: React.FC = () => {
         <Divider />
 
         <div style={{ marginBottom: 16 }}>
-          <Title level={5}>Configure Working Hours</Title>
+          <Title level={5}>αλλαγή ωρών λειτουργίας</Title>
           <DatePicker
             placeholder="διάλεξε ημερα"
             onChange={(date) => {
@@ -425,8 +425,8 @@ export const ProductionCalendar: React.FC = () => {
           drop={(info) => {
             const dropDate = dayjs(info.date);
             const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
-            const durationInMinutes = totalTime.hours * 60 + totalTime.minutes;
-
+            const durationInMinutes = draggedEvent.extendedProps?.duration ?? (totalTime.hours * 60 + totalTime.minutes);
+             
             // Find the last event's end time - this should include offtime events
             const lastEventEndTime = findLastEventEndTime([...currentEvents, ...finishedEvents]);
 
@@ -436,13 +436,15 @@ export const ProductionCalendar: React.FC = () => {
             if (lastEventEndTime) {
               // Start immediately after the last event (no additional buffer needed since offtime already provides spacing)
               const proposedStartTime = lastEventEndTime;
-
+                console.log(proposedStartTime)
               // Check if the proposed start time is within working hours
               if (isWithinWorkingHours(proposedStartTime, dailyWorkingHours, defaultWorkingHours)) {
                 actualStartTime = proposedStartTime;
+                console.log("actualstartime",actualStartTime)
               } else {
                 // If not within working hours, find the next available working time
                 actualStartTime = findNextWorkingTime(proposedStartTime, dailyWorkingHours, defaultWorkingHours);
+                
               }
             } else {
               // If no existing events, use the drop date but ensure it's within working hours
@@ -498,24 +500,7 @@ export const ProductionCalendar: React.FC = () => {
           }}
 
 
-          eventAllow={(dropInfo) => {
-            const start = dayjs(dropInfo.start);
-            const end = dayjs(dropInfo.end ?? dropInfo.start);
-            const config = getWorkingHours(start, dailyWorkingHours, defaultWorkingHours);
-
-            if (!config.isBusinessDay) return false;
-
-            const isSameDay = start.isSame(end, 'day');
-            const startTime = start.hour() * 60 + start.minute();
-            const endTime = end.hour() * 60 + end.minute();
-            const configStartTime = config.startHour * 60 + config.startMinute;
-            const configEndTime = config.endHour * 60 + config.endMinute;
-
-            const isStartValid = startTime >= configStartTime;
-            const isEndValid = endTime <= configEndTime;
-
-            return isSameDay && isStartValid && isEndValid;
-          }}
+     
         />
       </Content>
       <Modal
