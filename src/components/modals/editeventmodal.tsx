@@ -32,6 +32,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     open={open}
     title="αλλάξτε ώρα"
     onCancel={onCancel}
+    
     footer={[
       <Button key="delete" danger onClick={onDelete}>Διαγραφή</Button>,
       <Button key="cancel" onClick={onCancel}>Άκυρο</Button>,

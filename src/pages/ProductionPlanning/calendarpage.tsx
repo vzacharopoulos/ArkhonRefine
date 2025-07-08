@@ -16,7 +16,7 @@ import { finishedPporders, PPOrder, PPOrderLine, WorkingHoursConfig } from "./pr
 import { Sidebar } from "./sidebar";
 import { EditOutlined } from "@ant-design/icons";
 import isBetween from 'dayjs/plugin/isBetween';
-import { addWorkingMinutes, findLastEventEndTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from "./dateschedule-utils";
+import { addWorkingMinutes, findLastEventEndTime, findNextWorkingTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from "./dateschedule-utils";
 import { calculateTotalTime, EventTooltip } from "./event-utils";
 import { WorkingHoursModal } from "@/components/modals/workinghoursmodal";
 import { EditEventModal } from "@/components/modals/editeventmodal";
@@ -314,10 +314,15 @@ const dropHandler = useMemo(() =>
             >
               <div style={{
                 overflow: 'hidden',
+                overflowWrap: 'anywhere',
                 textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                whiteSpace: 'normal',
                 width: '100%',
-                padding: '2px'
+                padding: '2px',
+                wordBreak: 'break-word',
+                height: 'auto',
+                
+
               }}>
                 {args.timeText && <b>{args.timeText}</b>} {args.event.title}
               </div>
@@ -345,35 +350,85 @@ const dropHandler = useMemo(() =>
   const oldEvent = currentEvents.find(ev => ev.id === selectedEvent.id);
   if (!oldEvent?.end) return;
 
-  const oldEnd = dayjs(oldEvent.end);
+  const oldEnd = dayjs(oldEvent.end as Date);
   const newEnd = editEnd;
   const delta = newEnd.diff(oldEnd, "minute");
 
-  if (delta === 0) {
-    // No change — just update this event
-    setCurrentEvents(prev => prev.map(ev =>
-      ev.id === selectedEvent.id ? { ...ev, start: editStart.toDate(), end: editEnd.toDate() } : ev
-    ));
-    setEditModalOpen(false);
-    return;
-  }
+  const baseId = String(selectedEvent.id).split("-part-")[0];
+  const partRegex = new RegExp(`^${baseId}-part-`);
+  const eventParts = currentEvents.filter(ev => partRegex.test(String(ev.id)));
+  const sortedParts = [...eventParts].sort((a, b) =>
+    (a.extendedProps?.partIndex || 0) - (b.extendedProps?.partIndex || 0)
+  );
+  const lastPart = sortedParts[sortedParts.length - 1];
+  const lastPartOldEnd = lastPart && lastPart.end ? dayjs(lastPart.end as Date) : oldEnd;
+  const newLastPartEnd = lastPart
+    ? lastPart.id === selectedEvent.id
+      ? newEnd
+      : addWorkingMinutes(
+          dayjs(lastPart.end as Date),
+          delta,
+          getWorkingHours(dayjs(lastPart.end as Date), dailyWorkingHours, defaultWorkingHours)
+        )
+    : newEnd;
 
-  setCurrentEvents(prev =>
-    prev.map(ev => {
+   setCurrentEvents(prev => {
+    const updated = prev.map(ev => {
       if (ev.id === selectedEvent.id) {
         return { ...ev, start: editStart.toDate(), end: editEnd.toDate() };
       }
 
-      // Only shift events that start after the edited event’s old end time
-      if (ev.start && dayjs(ev.start).isAfter(oldEnd)) {
-        const newStart = dayjs(ev.start).add(delta, "minute").toDate();
-        const newEnd = ev.end ? dayjs(ev.end).add(delta, "minute").toDate() : undefined;
-        return { ...ev, start: newStart, end: newEnd };
+      if (lastPart && ev.id === lastPart.id && ev.id !== selectedEvent.id) {
+        const partEnd = addWorkingMinutes(
+          dayjs(ev.end as Date),
+          delta,
+          getWorkingHours(dayjs(ev.end as Date), dailyWorkingHours, defaultWorkingHours)
+        );
+        return { ...ev, end: partEnd.toDate() };
       }
 
       return ev;
-    })
-  );
+    });
+
+    const sorted = [...updated].sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
+    let refEnd = newLastPartEnd;
+
+    const shifted = sorted.map(ev => {
+      if (
+        ev.start &&
+        dayjs(ev.start as Date).isAfter(lastPartOldEnd)||dayjs(ev.start as Date).isSame(lastPartOldEnd) &&
+        ev.id !== selectedEvent.id &&
+        (!lastPart || ev.id !== lastPart.id)
+      ) {
+        const duration = ev.end ? dayjs(ev.end as Date).diff(dayjs(ev.start as Date), "minute") : 0;
+        let start = addWorkingMinutes(
+          dayjs(ev.start as Date),
+          delta,
+          getWorkingHours(dayjs(ev.start as Date), dailyWorkingHours, defaultWorkingHours)
+        );
+        if (start.isBefore(refEnd)) start = refEnd;
+        if (!isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)) {
+          start = findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
+        }
+        const end = ev.end
+          ? addWorkingMinutes(
+              start,
+              duration,
+              getWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
+            )
+          : undefined;
+        refEnd = end || start;
+        return { ...ev, start: start.toDate(), end: end ? end.toDate() : undefined };
+      }
+      if (ev.id === selectedEvent.id || (lastPart && ev.id === lastPart.id)) {
+        refEnd = dayjs(ev.end as Date);
+      }
+      return ev;
+    });
+
+    return shifted;
+  });
+
 
   setEditModalOpen(false);
 }}

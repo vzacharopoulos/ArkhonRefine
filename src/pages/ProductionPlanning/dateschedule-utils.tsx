@@ -263,13 +263,17 @@ export function splitEventIntoWorkingHours(
     const config = dailyWorkingHours[dateKey] ?? defaultWorkingHours[day];
 
     if (!config || !config.workingDays.includes(day)) {
-      // Move to next day and get the next day's configuration for proper start time
+      // Move to next working day
       const nextDay = current.add(1, "day");
+      const nextDateKey = nextDay.format("YYYY-MM-DD");
       const nextDayOfWeek = nextDay.day();
-      const nextDayConfig = defaultWorkingHours[nextDayOfWeek];
-      
+      const nextDayConfig = dailyWorkingHours[nextDateKey] ?? defaultWorkingHours[nextDayOfWeek];
+
       if (nextDayConfig) {
-        current = nextDay.hour(nextDayConfig.startHour).minute(nextDayConfig.startMinute).second(0);
+        current = nextDay
+          .hour(nextDayConfig.startHour)
+          .minute(nextDayConfig.startMinute)
+          .second(0);
       } else {
         // Ultimate fallback if no config exists
         current = nextDay.hour(6).minute(0).second(0);
@@ -286,13 +290,17 @@ export function splitEventIntoWorkingHours(
     }
 
     if (currentTime >= endTime) {
-      // Move to next day and get the next day's configuration for proper start time
+      // Move to next working day
       const nextDay = current.add(1, "day");
+      const nextDateKey = nextDay.format("YYYY-MM-DD");
       const nextDayOfWeek = nextDay.day();
-      const nextDayConfig = defaultWorkingHours[nextDayOfWeek];
-      
+      const nextDayConfig = dailyWorkingHours[nextDateKey] ?? defaultWorkingHours[nextDayOfWeek];
+
       if (nextDayConfig) {
-        current = nextDay.hour(nextDayConfig.startHour).minute(nextDayConfig.startMinute).second(0);
+        current = nextDay
+          .hour(nextDayConfig.startHour)
+          .minute(nextDayConfig.startMinute)
+          .second(0);
       } else {
         // Ultimate fallback if no config exists
         current = nextDay.hour(6).minute(0).second(0);
@@ -317,17 +325,22 @@ export function splitEventIntoWorkingHours(
       },
     });
 
+    current = segmentEnd;
     remaining -= chunk;
     partIndex++;
-    
+
     // When moving to the next day, use the next day's configuration
     if (remaining > 0) {
       const nextDay = current.add(1, "day");
+      const nextDateKey = nextDay.format("YYYY-MM-DD");
       const nextDayOfWeek = nextDay.day();
-      const nextDayConfig = defaultWorkingHours[nextDayOfWeek];
-      
+      const nextDayConfig = dailyWorkingHours[nextDateKey] ?? defaultWorkingHours[nextDayOfWeek];
+
       if (nextDayConfig) {
-        current = nextDay.hour(nextDayConfig.startHour).minute(nextDayConfig.startMinute).second(0);
+        current = nextDay
+          .hour(nextDayConfig.startHour)
+          .minute(nextDayConfig.startMinute)
+          .second(0);
       } else {
         // Ultimate fallback if no config exists
         current = nextDay.hour(6).minute(0).second(0);

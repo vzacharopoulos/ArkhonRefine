@@ -67,7 +67,10 @@ const { Title,Text  } = Typography;
           eventData: function (eventEl) {
             const data = eventEl.getAttribute("data-event");
             return data ? JSON.parse(data) : {};
+            
           },
+               minDistance: 10,
+          longPressDelay: 200,
         });
       }
     }, []);
