@@ -2,7 +2,7 @@
 import dayjs, { Dayjs } from "dayjs";
 import { DropArg } from "@fullcalendar/interaction";
 import { EventInput } from "@fullcalendar/core";
-import { addWorkingMinutes, findLastEventEndTime, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from "../dateschedule-utils";
+import { addWorkingMinutes, findLastEventEndTime, findNextWorkingTime, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from "../dateschedule-utils";
 import { WorkingHoursConfig } from "../productioncalendartypes";
 
 
@@ -18,31 +18,7 @@ export function handleDropFactory(
 ) {
   
 
-  const findNextWorkingTime = (
-    startTime: Dayjs,
-    dailyWorkingHours: Record<string, WorkingHoursConfig>,
-    defaultWorkingHours: Record<number, WorkingHoursConfig>
-  ): Dayjs => {
-    let currentTime = startTime;
-    let maxDaysToCheck = 30;
-
-    while (maxDaysToCheck > 0) {
-      const workingHoursConfig = getWorkingHours(currentTime, dailyWorkingHours, defaultWorkingHours);
-
-      if (workingHoursConfig.isBusinessDay) {
-        const dayStart = currentTime.startOf("day").hour(workingHoursConfig.startHour).minute(workingHoursConfig.startMinute);
-        const dayEnd = currentTime.startOf("day").hour(workingHoursConfig.endHour).minute(workingHoursConfig.endMinute);
-
-        if (currentTime.isBefore(dayStart)) return dayStart;
-        if (currentTime.isBetween(dayStart, dayEnd, null, "[]")) return currentTime;
-      }
-
-      currentTime = currentTime.add(1, "day").startOf("day");
-      maxDaysToCheck--;
-    }
-
-    return startTime;
-  };
+  
 
   return function handleDrop(info: DropArg) {
     if (dropTimeoutRef.current) return;
