@@ -40,19 +40,11 @@ export interface finishedPporders extends Omit<PPOrder, 'estDateOfProd' | 'panel
 }
 
 
- export interface SidebarProps {
-    weekendsVisible: boolean;
-    onToggleWeekends: () => void;
-    currentEvents: EventInput[];
-    onToggleCurrentEvents: () => void;
-    unscheduledorders: PPOrder[];
-    selectedOrderId: number | null;
-    onSelectOrder: (id: number) => void;
-    orderLines: PPOrderLine[];
-    orderLinesLoading: boolean;
-    totalTime: {
-    hours: number;
-    minutes: number;
-    formatted: string;
-  };
-  }
+ 
+export interface WorkingHoursConfig {
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+  workingDays: number[]; // 0 = Sunday, 6 = Saturday
+}

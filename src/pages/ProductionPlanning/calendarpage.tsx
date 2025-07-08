@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useCustom } from "@refinedev/core";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -7,153 +7,28 @@ import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS } from
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
-import { EventTooltip, addWorkingMinutes, calculateTotalTime, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from './event-utils'
 import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip, TimePicker, Modal, DatePicker } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
 import { STATUS_MAP, StatusTag } from "@/utilities/map-status-id-to-name";
 import duration from "dayjs/plugin/duration";
-import { finishedPporders, PPOrder, PPOrderLine } from "./productioncalendartypes";
+import { finishedPporders, PPOrder, PPOrderLine, WorkingHoursConfig } from "./productioncalendartypes";
 import { Sidebar } from "./sidebar";
 import { EditOutlined } from "@ant-design/icons";
 import isBetween from 'dayjs/plugin/isBetween';
+import { addWorkingMinutes, findLastEventEndTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from "./dateschedule-utils";
+import { calculateTotalTime, EventTooltip } from "./event-utils";
+import { WorkingHoursModal } from "@/components/modals/workinghoursmodal";
+import { EditEventModal } from "@/components/modals/editeventmodal";
+import { handleDropFactory } from "./utilities/usehandledrop";
 
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
 dayjs.extend(isBetween);
-export interface WorkingHoursConfig {
-  startHour: number;
-  startMinute: number;
-  endHour: number;
-  endMinute: number;
-  workingDays: number[]; // 0 = Sunday, 6 = Saturday
-}
-
-// Helper function to find the last event end time
-const findLastEventEndTime = (events: EventInput[]): Dayjs | null => {
-  if (events.length === 0) return null;
-
-  const sortedEvents = events
-    .filter(event => event.end) // Include ALL events with end times (including offtime)
-    .sort((a, b) => {
-      const endA = dayjs(a.end as Date);
-      const endB = dayjs(b.end as Date);
-      return endB.diff(endA); // Sort by end time descending
-    });
-
-  return sortedEvents.length > 0 ? dayjs(sortedEvents[0].end as Date) : null;
-};
-const findNextWorkingTime = (startTime: Dayjs, dailyWorkingHours: Record<string, WorkingHoursConfig>, defaultWorkingHours: Record<number, WorkingHoursConfig>): Dayjs => {
-  let currentTime = startTime;
-  let maxDaysToCheck = 30; // Prevent infinite loops
-
-  while (maxDaysToCheck > 0) {
-    const workingHoursConfig = getWorkingHours(currentTime, dailyWorkingHours, defaultWorkingHours);
-
-    if (workingHoursConfig.isBusinessDay) {
-      const dayStart = currentTime.startOf('day')
-        .hour(workingHoursConfig.startHour)
-        .minute(workingHoursConfig.startMinute);
-      const dayEnd = currentTime.startOf('day')
-        .hour(workingHoursConfig.endHour)
-        .minute(workingHoursConfig.endMinute);
-
-      // If current time is before the working day starts, use the start of working day
-      if (currentTime.isBefore(dayStart)) {
-        return dayStart;
-      }
-
-      // If current time is within working hours, use current time
-      if (currentTime.isBetween(dayStart, dayEnd, null, '[]')) {
-        return currentTime;
-      }
-
-      // If current time is after working hours, move to next day
-    }
-
-    // Move to the next day
-    currentTime = currentTime.add(1, 'day').startOf('day');
-    maxDaysToCheck--;
-  }
-
-  // Fallback to original time if no working time found
-  return startTime;
-};
 
 
 
-// Helper function to get date range for background events
-function getDateRange(days: number): Dayjs[] {
-  const today = dayjs();
-  const start = today.subtract(days / 2, "day");
-  return Array.from({ length: days }, (_, i) => start.add(i, "day"));
-}
-
-// Helper function to generate non-working hour background events
-function generateNonWorkingHourBackgroundEvents(
-  dailyWorkingHours: Record<string, WorkingHoursConfig>,
-  defaultWorkingHours: Record<number, WorkingHoursConfig>
-): EventInput[] {
-  const allDays = getDateRange(60);
-  const events: EventInput[] = [];
-
-  for (const day of allDays) {
-    const dateStr = day.format("YYYY-MM-DD");
-    const dayOfWeek = day.day();
-
-    // Get configuration for this specific day
-    const specificConfig = dailyWorkingHours[dateStr];
-    const config = specificConfig || defaultWorkingHours[dayOfWeek];
-
-    if (!config) continue;
-
-    // If it's not a working day, block the full day
-    if (!config.workingDays.includes(dayOfWeek)) {
-      events.push({
-        start: `${dateStr}T00:00:00`,
-        end: `${dateStr}T23:59:59`,
-        display: 'background',
-        color: 'rgb(158, 128, 128)',
-        title: 'αργία',
-      });
-      continue;
-    }
-
-    // Format time strings with proper padding
-    const startTimeStr = `${String(config.startHour).padStart(2, '0')}:${String(config.startMinute).padStart(2, '0')}:00`;
-    const endTimeStr = `${String(config.endHour).padStart(2, '0')}:${String(config.endMinute).padStart(2, '0')}:00`;
-
-    // Before working hours - only if start time is after 00:00
-    if (config.startHour > 0 || config.startMinute > 0) {
-      events.push({
-        start: `${dateStr}T00:00:00`,
-        end: `${dateStr}T${startTimeStr}`,
-        display: 'background',
-        color: 'rgba(188, 99, 99, 0.51)',
-        title: 'πριν την έναρξη',
-      });
-    }
-
-    // After working hours - only if end time is before 24:00 (midnight)
-    if (config.endHour < 24) {
-      events.push({
-        start: `${dateStr}T${endTimeStr}`,
-        end: `${dateStr}T23:59:59`,
-        display: 'background',
-        color: 'rgba(188, 99, 99, 0.51)',
-        title: 'λήξη εργασίας',
-      });
-    } else if (config.endHour === 24 && config.endMinute > 0) {
-      // Handle cases where endHour is 24 but endMinute is not 0
-      // This shouldn't normally happen, but if it does, we treat it as ending at midnight
-      // No background event needed as it goes to the end of the day
-    }
-    // If endHour is 24 and endMinute is 0, working hours go to midnight, so no "after hours" event needed
-  }
-
-  return events;
-}
 
 export const ProductionCalendar: React.FC = () => {
   const {
@@ -298,12 +173,15 @@ export const ProductionCalendar: React.FC = () => {
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
+  
+
   const finishedEvents: EventInput[] = finished.map((order) => {
     const theoreticalTime =
       order.time != null
         ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
         : "0h 0m";
 
+       
     return {
       id: String(order.id),
       title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
@@ -322,6 +200,28 @@ export const ProductionCalendar: React.FC = () => {
       },
     };
   });
+
+   const totalMinutes = totalTime.hours * 60 + totalTime.minutes;
+
+const dropTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+const dropHandler = useMemo(() =>
+  handleDropFactory(
+    currentEvents,
+    finishedEvents,
+    totalMinutes,
+    dailyWorkingHours,
+    defaultWorkingHours,
+    setCurrentEvents,
+    dropTimeoutRef
+  ), [
+    currentEvents,
+    finishedEvents,
+    totalMinutes,
+    dailyWorkingHours,
+    defaultWorkingHours,
+    setCurrentEvents
+]);
 
   const nonWorkingTimeBackgroundEvents = useMemo(() => {
     return generateNonWorkingHourBackgroundEvents(dailyWorkingHours, defaultWorkingHours);
@@ -386,6 +286,7 @@ export const ProductionCalendar: React.FC = () => {
           eventOverlap={false}
           droppable={true}
           selectable={true}
+          drop={dropHandler}
           dayHeaderContent={(arg) => (
             <div
               onClick={() => handleDateSelect(dayjs(arg.date))}
@@ -422,203 +323,73 @@ export const ProductionCalendar: React.FC = () => {
               </div>
             </EventTooltip>
           )}
-          drop={(info) => {
-            const dropDate = dayjs(info.date);
-            const draggedEvent = JSON.parse(info.draggedEl.dataset.event || '{}');
-            const durationInMinutes = draggedEvent.extendedProps?.duration ?? (totalTime.hours * 60 + totalTime.minutes);
-             
-            // Find the last event's end time - this should include offtime events
-            const lastEventEndTime = findLastEventEndTime([...currentEvents, ...finishedEvents]);
-
-            // Determine the actual start time for the new event
-            let actualStartTime: Dayjs;
-
-            if (lastEventEndTime) {
-              // Start immediately after the last event (no additional buffer needed since offtime already provides spacing)
-              const proposedStartTime = lastEventEndTime;
-                console.log(proposedStartTime)
-              // Check if the proposed start time is within working hours
-              if (isWithinWorkingHours(proposedStartTime, dailyWorkingHours, defaultWorkingHours)) {
-                actualStartTime = proposedStartTime;
-                console.log("actualstartime",actualStartTime)
-              } else {
-                // If not within working hours, find the next available working time
-                actualStartTime = findNextWorkingTime(proposedStartTime, dailyWorkingHours, defaultWorkingHours);
-                
-              }
-            } else {
-              // If no existing events, use the drop date but ensure it's within working hours
-              if (isWithinWorkingHours(dropDate, dailyWorkingHours, defaultWorkingHours)) {
-                actualStartTime = dropDate;
-              } else {
-                // Find the next available working time from the drop date
-                actualStartTime = findNextWorkingTime(dropDate, dailyWorkingHours, defaultWorkingHours);
-              }
-            }
-
-            // Split the event into working hours segments using the actual start time
-            const eventSegments = splitEventIntoWorkingHours(
-              actualStartTime,
-              durationInMinutes,
-              dailyWorkingHours,
-              defaultWorkingHours,
-              draggedEvent
-            );
-
-            // Add the offtime event after the last segment
-            const lastSegment = eventSegments[eventSegments.length - 1];
-            if (lastSegment) {
-              // Determine the correct start of the offtime. If the last segment ends
-              // outside working hours, the offtime should begin at the next available
-              // working time rather than at the event end itself.
-              const offtimeStart = findNextWorkingTime(
-                dayjs(lastSegment.end as Date),
-                dailyWorkingHours,
-                defaultWorkingHours
-              );
-
-              const offtimeConfig = getWorkingHours(
-                offtimeStart,
-                dailyWorkingHours,
-                defaultWorkingHours
-              );
-
-              const offtimeEnd = addWorkingMinutes(offtimeStart, 30, offtimeConfig);
-
-              const offEvent: EventInput = {
-                id: `${draggedEvent.id}-offtime`,
-                title: 'προετοιμασία μηχανής',
-                start: offtimeStart.toDate(),
-                end: offtimeEnd.toDate(),
-                color: 'gray',
-                extendedProps: { isOfftime: true },
-              };
-              setCurrentEvents((prev) => [...prev, ...eventSegments, offEvent]);
-            } else {
-              setCurrentEvents((prev) => [...prev, ...eventSegments]);
-            }
-          }}
-
+          
 
      
         />
       </Content>
-      <Modal
-        open={editModalOpen}
-        title="αλλάξτε ώρα"
-        onCancel={() => setEditModalOpen(false)}
-        onOk={() => {
-          if (!selectedEvent || !editStart || !editEnd) return;
+     <EditEventModal
+  open={editModalOpen}
+  event={selectedEvent}
+  editStart={editStart}
+  editEnd={editEnd}
+  onCancel={() => setEditModalOpen(false)}
+  onDelete={() => {
+    if (!selectedEvent) return;
+    setCurrentEvents(prev => prev.filter(ev => ev.id !== selectedEvent.id));
+    setEditModalOpen(false);
+  }}
+ onSave={() => {
+  if (!selectedEvent || !editStart || !editEnd) return;
 
-          const updated = currentEvents.map(ev => {
-            if (ev.id === selectedEvent.id) {
-              return {
-                ...ev,
-                start: editStart.toDate(),
-                end: editEnd.toDate(),
-              };
-            }
-            return ev;
-          });
+  const oldEvent = currentEvents.find(ev => ev.id === selectedEvent.id);
+  if (!oldEvent?.end) return;
 
-          setCurrentEvents(updated);
-          setEditModalOpen(false);
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <Text>Start Time:</Text>
-            <TimePicker
-              value={editStart}
-              format="HH:mm"
-              onChange={(time) => {
-                if (time && editStart) {
-                  setEditStart(editStart.hour(time.hour()).minute(time.minute()));
-                }
-              }}
-            />
-          </div>
+  const oldEnd = dayjs(oldEvent.end);
+  const newEnd = editEnd;
+  const delta = newEnd.diff(oldEnd, "minute");
 
-          <div>
-            <Text>End Time:</Text>
-            <TimePicker
-              value={editEnd}
-              format="HH:mm"
-              onChange={(time) => {
-                if (time && editEnd) {
-                  setEditEnd(editEnd.hour(time.hour()).minute(time.minute()));
-                }
-              }}
-            />
-          </div>
-        </div>
-      </Modal>
+  if (delta === 0) {
+    // No change — just update this event
+    setCurrentEvents(prev => prev.map(ev =>
+      ev.id === selectedEvent.id ? { ...ev, start: editStart.toDate(), end: editEnd.toDate() } : ev
+    ));
+    setEditModalOpen(false);
+    return;
+  }
 
-      <Modal
-        title={`Set Working Hours for ${selectedDate?.format("YYYY-MM-DD")}`}
-        open={workingHoursModalOpen}
-        onCancel={() => setWorkingHoursModalOpen(false)}
-        onOk={handleSaveWorkingHours}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div>
-              <Text>Start Time:</Text>
-              <TimePicker
-                value={dayjs().hour(tempWorkingHours.startHour).minute(tempWorkingHours.startMinute)}
-                format="HH:mm"
-                onChange={(time) => {
-                  if (time) {
-                    setTempWorkingHours((prev) => ({
-                      ...prev,
-                      startHour: time.hour(),
-                      startMinute: time.minute(),
-                    }));
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <Text>End Time:</Text>
-              <TimePicker
-                value={dayjs().hour(tempWorkingHours.endHour).minute(tempWorkingHours.endMinute)}
-                format="HH:mm"
-                onChange={(time) => {
-                  if (time) {
-                    setTempWorkingHours((prev) => ({
-                      ...prev,
-                      endHour: time.hour(),
-                      endMinute: time.minute(),
-                    }));
-                  }
-                }}
-              />
-            </div>
-          </div>
+  setCurrentEvents(prev =>
+    prev.map(ev => {
+      if (ev.id === selectedEvent.id) {
+        return { ...ev, start: editStart.toDate(), end: editEnd.toDate() };
+      }
 
-          <div>
-            <Text>Working Days:</Text>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                <Checkbox
-                  key={index}
-                  checked={tempWorkingHours.workingDays.includes(index)}
-                  onChange={(e) => {
-                    setTempWorkingHours((prev) => ({
-                      ...prev,
-                      workingDays: e.target.checked
-                        ? [...prev.workingDays, index]
-                        : prev.workingDays.filter((d) => d !== index),
-                    }));
-                  }}
-                >
-                  {day}
-                </Checkbox>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Modal>
+      // Only shift events that start after the edited event’s old end time
+      if (ev.start && dayjs(ev.start).isAfter(oldEnd)) {
+        const newStart = dayjs(ev.start).add(delta, "minute").toDate();
+        const newEnd = ev.end ? dayjs(ev.end).add(delta, "minute").toDate() : undefined;
+        return { ...ev, start: newStart, end: newEnd };
+      }
+
+      return ev;
+    })
+  );
+
+  setEditModalOpen(false);
+}}
+
+  onChangeStart={setEditStart}
+  onChangeEnd={setEditEnd}
+/>
+
+<WorkingHoursModal
+  open={workingHoursModalOpen}
+  date={selectedDate}
+  config={tempWorkingHours}
+  onChange={setTempWorkingHours}
+  onCancel={() => setWorkingHoursModalOpen(false)}
+  onOk={handleSaveWorkingHours}
+/>
     </Layout>
   );
 };
