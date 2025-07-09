@@ -218,113 +218,123 @@ export const ProductionCalendar: React.FC = () => {
   setEditModalOpen(false);
 };
 
- const handleSaveEdit = () => {
-  if (!selectedEvent || !editStart || !editEnd) return;
-
-  setCurrentEvents(prevEvents => {
-    // 1. Remove the original event and any existing split parts
-    const baseId = String(selectedEvent.id).split("-part-")[0];
-    const partRegex = new RegExp(`^${baseId}(-part-\\d+)?$`);
-    const filteredEvents = prevEvents.filter(ev => !partRegex.test(String(ev.id)));
-
-    // 2. Calculate duration and split into working hours
-    const duration = editEnd.diff(editStart, 'minute');
-    const splitEvents = splitEventIntoWorkingHours(
-      editStart,
-      duration,
-      dailyWorkingHours,
-      defaultWorkingHours,
-      {
-        ...selectedEvent,
-        start: editStart.toDate(),
-        end: editEnd.toDate()
-      }
-    );
-
-    // 3. Process subsequent events
-    const subsequentEvents = prevEvents.filter(ev => 
-      ev.start && dayjs(ev.start as Date).isAfter(editStart)
-    ).map(ev => ({ ...ev }));
-
-    let lastEnd = editEnd;
-    const processedSubsequentEvents = subsequentEvents.map(ev => {
-      const evDuration = ev.end 
-        ? dayjs(ev.end as Date).diff(dayjs(ev.start as Date), 'minute')
-        : 0;
-
-      const newStart = isWithinWorkingHours(lastEnd, dailyWorkingHours, defaultWorkingHours)
-        ? lastEnd
-        : findNextWorkingTime(lastEnd, dailyWorkingHours, defaultWorkingHours);
-
-      const newEnd = evDuration > 0
-        ? addWorkingMinutes(newStart, evDuration, 
-            getWorkingHours(newStart, dailyWorkingHours, defaultWorkingHours))
-        : undefined;
-
-      lastEnd = newEnd || newStart;
-
-      return {
-        ...ev,
-        start: newStart.toDate(),
-        end: newEnd?.toDate()
-      };
-    });
-
-    // 4. Group and merge split events by day
-    const mergedEvents: EventInput[] = [];
-    const eventsByDay: Record<string, EventInput[]> = {};
-
-    // Group split events by day
-    splitEvents.forEach(event => {
-      if (!event.start) return;
-      const dayKey = dayjs(event.start).format('YYYY-MM-DD');
-      if (!eventsByDay[dayKey]) {
-        eventsByDay[dayKey] = [];
-      }
-      eventsByDay[dayKey].push(event);
-    });
-
-    // Merge events for each day
-    Object.entries(eventsByDay).forEach(([dayKey, dayEvents]) => {
-      if (dayEvents.length === 0) return;
-
-      // Sort events by start time
-      dayEvents.sort((a, b) => 
+function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
+  const eventGroups = new Map<string, EventInput[]>();
+  
+  // Group events by date and base ID
+  events.forEach(event => {
+    if (!event.start || !event.id) return;
+    
+    const eventDate = dayjs(event.start as Date).format('YYYY-MM-DD');
+    const baseId = event.id.toString().split('-part-')[0]; // Extract base ID
+    const groupKey = `${eventDate}-${baseId}`;
+    
+    if (!eventGroups.has(groupKey)) {
+      eventGroups.set(groupKey, []);
+    }
+    eventGroups.get(groupKey)!.push(event);
+  });
+  
+  const mergedEvents: EventInput[] = [];
+  
+  eventGroups.forEach((group, groupKey) => {
+    if (group.length === 1) {
+      // Single event, no merging needed
+      mergedEvents.push(group[0]);
+    } else {
+      // Multiple parts to merge
+      const sortedParts = group.sort((a, b) => 
         dayjs(a.start as Date).diff(dayjs(b.start as Date))
       );
-
-      // Find earliest start and latest end
-      const mergedStart = dayEvents.reduce((min, ev) => 
-        !ev.start ? min : dayjs(ev.start).isBefore(min) ? dayjs(ev.start) : min, 
-        dayjs(dayEvents[0].start as Date)
-      );
-
-      const mergedEnd = dayEvents.reduce((max, ev) => 
-        !ev.end ? max : dayjs(ev.end).isAfter(max) ? dayjs(ev.end) : max, 
-        dayjs(dayEvents[0].end as Date)
-      );
-
+      
+      const firstPart = sortedParts[0];
+      const lastPart = sortedParts[sortedParts.length - 1];
+      
       // Create merged event
-      mergedEvents.push({
-        ...selectedEvent,
-        id: `${baseId}-${dayKey}`, // Unique ID with day suffix
-        start: mergedStart.toDate(),
-        end: mergedEnd.toDate(),
-        extendedProps: {
-          ...selectedEvent.extendedProps,
-          originalParts: dayEvents.length // Track how many parts were merged
-        }
-      });
-    });
+      const mergedEvent: EventInput = {
+        ...firstPart,
+        id: firstPart.id!.split('-part-')[0], // Use base ID
+        start: firstPart.start,
+        end: lastPart.end,
+        title: firstPart.title?.replace(/ - μέρος \d+$/, '') || firstPart.title, // Remove part suffix if exists
+      };
+      
+      mergedEvents.push(mergedEvent);
+    }
+  });
+  
+  return mergedEvents;
+}
 
-    // 5. Combine all events
-    return [
-      ...filteredEvents,
-      ...mergedEvents,
-      ...processedSubsequentEvents
-    ].sort((a, b) => 
+// Updated handleSaveEdit function
+const handleSaveEdit = () => {
+  if (!selectedEvent || !editStart || !editEnd) return;
+
+  const originalStart = selectedEvent.start ? dayjs(selectedEvent.start as Date) : null;
+  const originalEnd = selectedEvent.end ? dayjs(selectedEvent.end as Date) : null;
+
+  if (!originalEnd || !originalStart) return;
+
+  setCurrentEvents(prevEvents => {
+    const sorted = [...prevEvents].sort((a, b) =>
       dayjs(a.start as Date).diff(dayjs(b.start as Date))
     );
+
+    const idx = sorted.findIndex(
+      ev =>
+        ev.id === selectedEvent.id &&
+        dayjs(ev.start as Date).isSame(originalStart) &&
+        dayjs(ev.end as Date).isSame(originalEnd)
+    );
+
+    if (idx === -1) return prevEvents;
+
+    sorted[idx] = {
+      ...sorted[idx],
+      start: editStart.toDate(),
+      end: editEnd.toDate(),
+    };
+
+    let prevEnd = editEnd;
+
+    for (let i = idx + 1; i < sorted.length; i++) {
+      const ev = sorted[i];
+      const duration = dayjs(ev.end as Date).diff(dayjs(ev.start as Date), 'minute');
+
+      const tentativeStart = isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+        ? prevEnd
+        : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
+
+      // Remove the original event
+      sorted.splice(i, 1);
+
+      // Generate split events
+      const splitEvents = splitEventIntoWorkingHours(
+        tentativeStart,
+        duration,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        {
+          ...ev,
+          start: tentativeStart.toDate(),
+          end: undefined,
+        }
+      );
+
+      // Insert new parts
+      sorted.splice(i, 0, ...splitEvents);
+
+      // Adjust loop index
+      i += splitEvents.length - 1;
+
+      // Update prevEnd for next event
+      prevEnd = dayjs(splitEvents[splitEvents.length - 1].end as Date);
+    }
+
+    // Apply merging logic to combine same-day event parts
+    const mergedEvents = mergeSameDayEventParts(sorted);
+    
+    return mergedEvents;
   });
 
   setEditModalOpen(false);
