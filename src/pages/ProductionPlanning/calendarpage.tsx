@@ -147,6 +147,263 @@ export const ProductionCalendar: React.FC = () => {
     setWorkingHoursModalOpen(true);
   };
 
+  const onSave = () => {
+  if (!selectedEvent || !editStart || !editEnd) return;
+
+  // Find the original event
+  const originalEvent = currentEvents.find(ev => ev.id === selectedEvent.id);
+  if (!originalEvent?.end) return;
+
+  // Calculate the time difference
+  const originalEnd = dayjs(originalEvent.end as Date);
+  const newEnd = editEnd;
+  const deltaMinutes = newEnd.diff(originalEnd, "minute");
+
+  // Get all events that need to be shifted (those after our modified event)
+  const eventsToShift = currentEvents.filter(ev => {
+    return ev.start && dayjs(ev.start as Date).isSameOrAfter(originalEnd);
+  });
+
+  // Update the events
+  setCurrentEvents(prev => {
+    return prev.map(ev => {
+      // 1. Update the selected event
+      if (ev.id === selectedEvent.id) {
+        return { ...ev, start: editStart.toDate(), end: editEnd.toDate() };
+      }
+
+      // 2. Shift subsequent events
+      if (ev.start && dayjs(ev.start as Date).isSameOrAfter(originalEnd)) {
+        const workingHours = getWorkingHours(
+          dayjs(ev.start as Date), 
+          dailyWorkingHours, 
+          defaultWorkingHours
+        );
+        
+        // Calculate new start time
+        let newStart = addWorkingMinutes(
+          dayjs(ev.start as Date),
+          deltaMinutes,
+          workingHours
+        );
+
+        // Ensure we don't schedule before the new end of the modified event
+       
+
+        // Adjust to working hours if needed
+        if (!isWithinWorkingHours(newStart, dailyWorkingHours, defaultWorkingHours)) {
+          newStart = findNextWorkingTime(newStart, dailyWorkingHours, defaultWorkingHours);
+        }
+
+        // Calculate new end time maintaining the same duration
+        const duration = ev.end 
+          ? dayjs(ev.end as Date).diff(dayjs(ev.start as Date), "minute")
+          : 0;
+          
+        const newEnd = duration > 0
+          ? addWorkingMinutes(newStart, duration, workingHours)
+          : undefined;
+
+        return { 
+          ...ev, 
+          start: newStart.toDate(), 
+          end: newEnd?.toDate() 
+        };
+      }
+
+      return ev;
+    });
+  });
+
+  setEditModalOpen(false);
+};
+
+ const handleSaveEdit = () => {
+  if (!selectedEvent || !editStart || !editEnd) return;
+
+  setCurrentEvents(prevEvents => {
+    // 1. Remove the original event and any existing split parts
+    const baseId = String(selectedEvent.id).split("-part-")[0];
+    const partRegex = new RegExp(`^${baseId}(-part-\\d+)?$`);
+    const filteredEvents = prevEvents.filter(ev => !partRegex.test(String(ev.id)));
+
+    // 2. Calculate duration and split into working hours
+    const duration = editEnd.diff(editStart, 'minute');
+    const splitEvents = splitEventIntoWorkingHours(
+      editStart,
+      duration,
+      dailyWorkingHours,
+      defaultWorkingHours,
+      {
+        ...selectedEvent,
+        start: editStart.toDate(),
+        end: editEnd.toDate()
+      }
+    );
+
+    // 3. Process subsequent events
+    const subsequentEvents = prevEvents.filter(ev => 
+      ev.start && dayjs(ev.start as Date).isAfter(editStart)
+    ).map(ev => ({ ...ev }));
+
+    let lastEnd = editEnd;
+    const processedSubsequentEvents = subsequentEvents.map(ev => {
+      const evDuration = ev.end 
+        ? dayjs(ev.end as Date).diff(dayjs(ev.start as Date), 'minute')
+        : 0;
+
+      const newStart = isWithinWorkingHours(lastEnd, dailyWorkingHours, defaultWorkingHours)
+        ? lastEnd
+        : findNextWorkingTime(lastEnd, dailyWorkingHours, defaultWorkingHours);
+
+      const newEnd = evDuration > 0
+        ? addWorkingMinutes(newStart, evDuration, 
+            getWorkingHours(newStart, dailyWorkingHours, defaultWorkingHours))
+        : undefined;
+
+      lastEnd = newEnd || newStart;
+
+      return {
+        ...ev,
+        start: newStart.toDate(),
+        end: newEnd?.toDate()
+      };
+    });
+
+    // 4. Group and merge split events by day
+    const mergedEvents: EventInput[] = [];
+    const eventsByDay: Record<string, EventInput[]> = {};
+
+    // Group split events by day
+    splitEvents.forEach(event => {
+      if (!event.start) return;
+      const dayKey = dayjs(event.start).format('YYYY-MM-DD');
+      if (!eventsByDay[dayKey]) {
+        eventsByDay[dayKey] = [];
+      }
+      eventsByDay[dayKey].push(event);
+    });
+
+    // Merge events for each day
+    Object.entries(eventsByDay).forEach(([dayKey, dayEvents]) => {
+      if (dayEvents.length === 0) return;
+
+      // Sort events by start time
+      dayEvents.sort((a, b) => 
+        dayjs(a.start as Date).diff(dayjs(b.start as Date))
+      );
+
+      // Find earliest start and latest end
+      const mergedStart = dayEvents.reduce((min, ev) => 
+        !ev.start ? min : dayjs(ev.start).isBefore(min) ? dayjs(ev.start) : min, 
+        dayjs(dayEvents[0].start as Date)
+      );
+
+      const mergedEnd = dayEvents.reduce((max, ev) => 
+        !ev.end ? max : dayjs(ev.end).isAfter(max) ? dayjs(ev.end) : max, 
+        dayjs(dayEvents[0].end as Date)
+      );
+
+      // Create merged event
+      mergedEvents.push({
+        ...selectedEvent,
+        id: `${baseId}-${dayKey}`, // Unique ID with day suffix
+        start: mergedStart.toDate(),
+        end: mergedEnd.toDate(),
+        extendedProps: {
+          ...selectedEvent.extendedProps,
+          originalParts: dayEvents.length // Track how many parts were merged
+        }
+      });
+    });
+
+    // 5. Combine all events
+    return [
+      ...filteredEvents,
+      ...mergedEvents,
+      ...processedSubsequentEvents
+    ].sort((a, b) => 
+      dayjs(a.start as Date).diff(dayjs(b.start as Date))
+    );
+  });
+
+  setEditModalOpen(false);
+};
+
+  function calculateWorkingMinutesBetween(
+  start: Dayjs,
+  end: Dayjs,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>
+): number {
+  let total = 0;
+  let current = start.clone();
+
+  while (current.isBefore(end)) {
+    const dateKey = current.format("YYYY-MM-DD");
+    const day = current.day();
+    const config = dailyWorkingHours[dateKey] ?? defaultWorkingHours[day];
+
+    if (config && config.workingDays.includes(day)) {
+      const dayStart = current
+        .startOf("day")
+        .hour(config.startHour)
+        .minute(config.startMinute);
+      const dayEnd = current
+        .startOf("day")
+        .hour(config.endHour)
+        .minute(config.endMinute);
+
+      const segStart = current.isBefore(dayStart) ? dayStart : current;
+      const segEnd = end.isBefore(dayEnd) ? end : dayEnd;
+
+      if (segStart.isBefore(segEnd)) {
+        total += segEnd.diff(segStart, "minute");
+      }
+    }
+
+    current = current.add(1, "day").startOf("day");
+  }
+
+  return total;
+}
+
+ function calculateNonWorkingMinutesBetween(
+  start: Dayjs,
+  end: Dayjs,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>
+): number {
+  const totalMinutes = end.diff(start, "minute");
+  const workingMinutes = calculateWorkingMinutesBetween(
+    start,
+    end,
+    dailyWorkingHours,
+    defaultWorkingHours
+  );
+
+  return Math.max(totalMinutes - workingMinutes, 0);
+}
+
+ function deleteQuantityOutsideWorkingHours(
+  start: Dayjs,
+  end: Dayjs,
+  quantity: number,
+  quantityPerMinute: number,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>
+): number {
+  const nonWorkingMinutes = calculateNonWorkingMinutesBetween(
+    start,
+    end,
+    dailyWorkingHours,
+    defaultWorkingHours
+  );
+
+  const quantityToDelete = nonWorkingMinutes * quantityPerMinute;
+  return Math.max(quantity - quantityToDelete, 0);
+}
+
   const { data: orderLinesData, isLoading: orderLinesLoading } = useCustom<{ pporderlines2: PPOrderLine[] }>({
     url: "",
     method: "get",
@@ -346,10 +603,12 @@ const dropHandler = useMemo(() =>
     setCurrentEvents(prev => prev.filter(ev => ev.id !== selectedEvent.id));
     setEditModalOpen(false);
   }}
- onSave={}
+ onSave={handleSaveEdit}
 
-  
 
+
+  onChangeStart={setEditStart}
+  onChangeEnd={setEditEnd}
 />
 
 <WorkingHoursModal

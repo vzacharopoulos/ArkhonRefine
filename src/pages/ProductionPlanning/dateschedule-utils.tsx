@@ -312,20 +312,22 @@ export function splitEventIntoWorkingHours(
     const chunk = Math.min(availableMinutes, remaining);
     const segmentEnd = current.add(chunk, "minute");
 
- events.push({
+    events.push({
       ...eventData,
-      id: eventData.id,
-      title: eventData.title,
+      id: `${eventData.id}-part-${partIndex}`,
+      title: events.length === 0 ? eventData.title : `${eventData.title} `,
       start: current.toDate(),
       end: segmentEnd.toDate(),
       extendedProps: {
         ...eventData.extendedProps,
+        isPart: partIndex > 1,
+        partIndex,
       },
     });
 
     current = segmentEnd;
     remaining -= chunk;
-    
+    partIndex++;
 
     // When moving to the next day, use the next day's configuration
     if (remaining > 0) {
