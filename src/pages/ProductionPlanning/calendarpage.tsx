@@ -108,14 +108,65 @@ export const ProductionCalendar: React.FC = () => {
     setEditModalOpen(true);
   };
 
-  const handleSaveWorkingHours = () => {
+    const handleSaveWorkingHours = () => {
     if (!selectedDate) return;
 
     const dateKey = selectedDate.format("YYYY-MM-DD");
-    setDailyWorkingHours((prev) => ({
-      ...prev,
+
+    const newDailyWorkingHours = {
+      ...dailyWorkingHours,
       [dateKey]: { ...tempWorkingHours },
-    }));
+    };
+
+    setDailyWorkingHours(newDailyWorkingHours);
+
+    setCurrentEvents(prevEvents => {
+      const sorted = [...prevEvents].sort((a, b) =>
+        dayjs(a.start as Date).diff(dayjs(b.start as Date))
+      );
+
+      const startIdx = sorted.findIndex(ev =>
+        dayjs(ev.start as Date).isSameOrAfter(selectedDate.startOf('day'))
+      );
+
+      if (startIdx === -1) return prevEvents;
+
+      let prevEnd = startIdx > 0
+        ? dayjs(sorted[startIdx - 1].end as Date)
+        : selectedDate.startOf('day');
+
+      for (let i = startIdx; i < sorted.length; i++) {
+        const ev = sorted[i];
+        const duration = dayjs(ev.end as Date).diff(dayjs(ev.start as Date), 'minute');
+
+        const tentativeStart = isWithinWorkingHours(prevEnd, newDailyWorkingHours, defaultWorkingHours)
+          ? prevEnd
+          : findNextWorkingTime(prevEnd, newDailyWorkingHours, defaultWorkingHours);
+
+        sorted.splice(i, 1);
+
+        const splitEvents = splitEventIntoWorkingHours(
+          tentativeStart,
+          duration,
+          newDailyWorkingHours,
+          defaultWorkingHours,
+          {
+            ...ev,
+            start: tentativeStart.toDate(),
+            end: undefined,
+          }
+        );
+
+        sorted.splice(i, 0, ...splitEvents);
+
+        i += splitEvents.length - 1;
+
+        prevEnd = dayjs(splitEvents[splitEvents.length - 1].end as Date);
+      }
+
+      const mergedEvents = mergeSameDayEventParts(sorted);
+      return mergedEvents;
+    });
 
     setWorkingHoursModalOpen(false);
   };
@@ -147,76 +198,7 @@ export const ProductionCalendar: React.FC = () => {
     setWorkingHoursModalOpen(true);
   };
 
-  const onSave = () => {
-  if (!selectedEvent || !editStart || !editEnd) return;
 
-  // Find the original event
-  const originalEvent = currentEvents.find(ev => ev.id === selectedEvent.id);
-  if (!originalEvent?.end) return;
-
-  // Calculate the time difference
-  const originalEnd = dayjs(originalEvent.end as Date);
-  const newEnd = editEnd;
-  const deltaMinutes = newEnd.diff(originalEnd, "minute");
-
-  // Get all events that need to be shifted (those after our modified event)
-  const eventsToShift = currentEvents.filter(ev => {
-    return ev.start && dayjs(ev.start as Date).isSameOrAfter(originalEnd);
-  });
-
-  // Update the events
-  setCurrentEvents(prev => {
-    return prev.map(ev => {
-      // 1. Update the selected event
-      if (ev.id === selectedEvent.id) {
-        return { ...ev, start: editStart.toDate(), end: editEnd.toDate() };
-      }
-
-      // 2. Shift subsequent events
-      if (ev.start && dayjs(ev.start as Date).isSameOrAfter(originalEnd)) {
-        const workingHours = getWorkingHours(
-          dayjs(ev.start as Date), 
-          dailyWorkingHours, 
-          defaultWorkingHours
-        );
-        
-        // Calculate new start time
-        let newStart = addWorkingMinutes(
-          dayjs(ev.start as Date),
-          deltaMinutes,
-          workingHours
-        );
-
-        // Ensure we don't schedule before the new end of the modified event
-       
-
-        // Adjust to working hours if needed
-        if (!isWithinWorkingHours(newStart, dailyWorkingHours, defaultWorkingHours)) {
-          newStart = findNextWorkingTime(newStart, dailyWorkingHours, defaultWorkingHours);
-        }
-
-        // Calculate new end time maintaining the same duration
-        const duration = ev.end 
-          ? dayjs(ev.end as Date).diff(dayjs(ev.start as Date), "minute")
-          : 0;
-          
-        const newEnd = duration > 0
-          ? addWorkingMinutes(newStart, duration, workingHours)
-          : undefined;
-
-        return { 
-          ...ev, 
-          start: newStart.toDate(), 
-          end: newEnd?.toDate() 
-        };
-      }
-
-      return ev;
-    });
-  });
-
-  setEditModalOpen(false);
-};
 
 function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
   const eventGroups = new Map<string, EventInput[]>();
