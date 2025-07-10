@@ -63,10 +63,7 @@ export function handleDropFactory(
    const previousCode = previousEvent.extendedProps?.panelcode?.replace(/-001$/, "");
 const currentCode = draggedEvent.extendedProps.panelcode?.replace(/-001$/, "");
 const offtimeDuration = offTimeMap[previousCode]?.[currentCode] ?? 30;
- console.log(previousCode)
- console.log(previousEvent.id)
-  console.log(currentCode)
-  console.log(draggedEvent.id)
+ 
 
     // Determine offtime start and end
     const offtimeStart = baseStart;

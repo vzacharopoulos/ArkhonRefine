@@ -22,6 +22,7 @@ import { WorkingHoursModal } from "@/components/modals/workinghoursmodal";
 import { EditEventModal } from "@/components/modals/editeventmodal";
 import { handleDropFactory } from "./utilities/usehandledrop";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+
 import { handleSaveEdit } from "./utilities/usehandleedit";
 import { eventNames } from "process";
 const { Title, Text } = Typography;
@@ -322,25 +323,102 @@ export const ProductionCalendar: React.FC = () => {
     return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
   });
 
-  useEffect(() => {//map unscheduledevents to the calendar probably
+  
+function calculateWorkingDuration(
+  start: Dayjs,
+  end: Dayjs,
+  dailyOverrides: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>
+): number {
+  let totalMinutes = 0;
+  let current = start.clone();
+
+  while (current.isBefore(end)) {
+    const dateKey = current.format("YYYY-MM-DD");
+    const workingConfig = getWorkingHours(current, dailyOverrides, defaultWorkingHours);
+
+    const dayStart = current.hour(workingConfig.startHour).minute(workingConfig.startMinute).second(0);
+    const dayEnd = current.hour(workingConfig.endHour).minute(workingConfig.endMinute).second(0);
+
+    if (current.isBefore(dayStart)) {
+      current = dayStart;
+    }
+
+    if (current.isAfter(dayEnd)) {
+      // Skip to next day’s working start
+      current = current.add(1, "day").hour(0).minute(0);
+      continue;
+    }
+
+   const validEnd = end.isBefore(dayEnd) ? end : dayEnd;
+    totalMinutes += validEnd.diff(current, "minute");
+    current = validEnd;
+  }
+
+  return totalMinutes;
+}
+
+
+
+
+  useEffect(() => {// this useffect renders currentevents from unscheduled orders
     if (initialSyncRef.current) return;
-    const preScheduled = unscheduledorders.filter(o => o.estStartDate && o.estFinishDate);
+    const preScheduled = unscheduledorders
+      .filter(o => o.estStartDate && o.estFinishDate)
+      .sort((a, b) =>
+        dayjs(a.estStartDate as Date).diff(dayjs(b.estStartDate as Date))
+      );
+
     if (preScheduled.length > 0) {
-      const mapped = preScheduled.map(order => ({
-        id: String(order.id),
-        title: `${order.pporderno} - ${order.panelcode}`,
-        start: new Date(order.estStartDate as Date),
-        end: new Date(order.estFinishDate as Date),
-        color: statusColorMap[order.status ?? 0] || 'gray',
-        extendedProps: {
-          status: order.status,
-          tooltip: `${order.pporderno ?? ''} - ${order.panelcode ?? ''}\nκατάσταση: ${STATUS_MAP[order.status || 0] || 'Άγνωστη'}`
-        }
-      }));
-      setCurrentEvents(mapped);
+      const processed: EventInput[] = [];
+      let prevEnd: Dayjs | null = null;
+
+      preScheduled.forEach(order => {
+        const start = dayjs(order.estStartDate as Date);
+        const end = dayjs(order.estFinishDate as Date);
+const durationa = calculateWorkingDuration(start, end, dailyWorkingHours, defaultWorkingHours);
+        const tentativeStart = prevEnd
+          ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+            ? prevEnd
+            : findNextWorkingTime(
+                prevEnd,
+                dailyWorkingHours,
+                defaultWorkingHours
+              )
+          : isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
+          ? start
+          : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
+
+        const segments = splitEventIntoWorkingHours(
+          tentativeStart,
+          durationa,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: String(order.id),
+            title: `${order.pporderno} - ${order.panelcode}`,
+            color: statusColorMap[order.status ?? 0] || "gray",
+            extendedProps: {
+              status: order.status,
+              tooltip: `${order.pporderno ?? ""} - ${
+                order.panelcode ?? ""
+              }\nκατάσταση: ${
+                STATUS_MAP[order.status || 0] || "Άγνωστη"
+              }`,
+            },
+          }
+        );
+
+        processed.push(...segments);
+        prevEnd = dayjs(segments[segments.length - 1].end as Date);
+      });
+
+      const mergedEvents = mergeSameDayEventParts(processed);
+      setCurrentEvents(mergedEvents);
       initialSyncRef.current = true;
     }
-  }, [unscheduledorders]);
+  }, [unscheduledorders, dailyWorkingHours, defaultWorkingHours]);
+
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
@@ -522,8 +600,8 @@ export const ProductionCalendar: React.FC = () => {
               ...event,
               title:
                 duration < 20
-                  ? `${event.title.slice(0, 2)}...`
-                  : event.title,
+                               ? `${event.title?.slice(0, 2) || ""}...`
+                  : event.title ?? "",
             };
           }}
           eventContent={(args) => (
