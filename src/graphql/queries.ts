@@ -32,7 +32,8 @@ query GetPpOrders($filter: PpordersFilterInput) {
     finishDateDatetime
     estDateOfProdDatetime
     createDate
-    
+    estStartDate
+    estFinishDate
   
     
   }

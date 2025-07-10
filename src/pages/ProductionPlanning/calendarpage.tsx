@@ -74,8 +74,8 @@ export const ProductionCalendar: React.FC = () => {
         id,
         values: {
           // Wrap in 'input' object
-          startDateDatetime: startDate ? startDate.toISOString() : null,
-          finishDateDatetime: finishDate ? finishDate.toISOString() : null,
+          estStartDate: startDate ? startDate.toISOString() : null,
+          estFinishDate: finishDate ? finishDate.toISOString() : null,
           status: 14, // Default to status 2 if not provided
 
         },
@@ -322,6 +322,25 @@ export const ProductionCalendar: React.FC = () => {
     return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
   });
 
+  useEffect(() => {//map unscheduledevents to the calendar probably
+    if (initialSyncRef.current) return;
+    const preScheduled = unscheduledorders.filter(o => o.estStartDate && o.estFinishDate);
+    if (preScheduled.length > 0) {
+      const mapped = preScheduled.map(order => ({
+        id: String(order.id),
+        title: `${order.pporderno} - ${order.panelcode}`,
+        start: new Date(order.estStartDate as Date),
+        end: new Date(order.estFinishDate as Date),
+        color: statusColorMap[order.status ?? 0] || 'gray',
+        extendedProps: {
+          status: order.status,
+          tooltip: `${order.pporderno ?? ''} - ${order.panelcode ?? ''}\nκατάσταση: ${STATUS_MAP[order.status || 0] || 'Άγνωστη'}`
+        }
+      }));
+      setCurrentEvents(mapped);
+      initialSyncRef.current = true;
+    }
+  }, [unscheduledorders]);
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
 
@@ -385,11 +404,43 @@ export const ProductionCalendar: React.FC = () => {
 
   const handleWeekendsToggle = () => {
     setWeekendsVisible(!weekendsVisible);
+    console.log(currentEvents)
   };
 
   const handleCurrentEventToggle = () => {
     setWeekendsVisible(!weekendsVisible);
   };
+
+ const handleUpdateAllEvents = () => {
+  const grouped: Record<string, EventInput[]> = {};
+
+  // Group events by baseId (e.g., "asd" from "asd-part-1")
+  currentEvents.forEach(ev => {
+    if (!ev.id || !ev.start || !ev.end) return;
+    const idStr = ev.id.toString();
+    if (idStr.includes('offtime')) return;
+
+    const baseId = idStr.split('-part-')[0];
+
+    if (!grouped[baseId]) {
+      grouped[baseId] = [];
+    }
+
+    grouped[baseId].push(ev);
+  });
+
+  // For each group, update using the first start and last end
+  Object.entries(grouped).forEach(([baseId, events]) => {
+    const sorted = events.sort((a, b) =>
+      new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime()
+    );
+
+    const firstStart = new Date(sorted[0].start as Date);
+    const lastEnd = new Date(sorted[sorted.length - 1].end as Date);
+
+    handleUpdatePporder(Number(baseId), firstStart, lastEnd);
+  });
+};
 
   return (
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
@@ -423,6 +474,7 @@ export const ProductionCalendar: React.FC = () => {
             style={{ width: "100%" }}
           />
         </div>
+        
       </Sider>
 
       <Content style={{ flex: 1, minHeight: "80vh" }}>
@@ -549,6 +601,18 @@ export const ProductionCalendar: React.FC = () => {
         onCancel={() => setWorkingHoursModalOpen(false)}
         onOk={handleSaveWorkingHours}
       />
+      <Button
+  type="primary"
+  onClick={handleUpdateAllEvents}
+  style={{
+    position: "fixed",        // stays on screen
+    bottom: 24,               // distance from bottom
+    right: 24,                // distance from right
+    zIndex: 1000,             // make sure it's on top of calendar
+  }}
+>
+  ενημέρωση όλων
+</Button>
     </Layout>
   );
 };

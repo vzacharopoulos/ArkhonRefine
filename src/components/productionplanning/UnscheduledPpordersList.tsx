@@ -38,9 +38,13 @@ export const OrderList: React.FC<OrderListProps> = ({
           >
                {unscheduledorders.map((order) => {
                 const tooltip = `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\n` +
-                  `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`;
+                  `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}\n` +
+                  `εκτ εναρξη: ${order.estStartDate || "Άγνωστη"}\n`+
+                  `εκτ λήξη: ${order.estFinishDate || "Άγνωστη"}\n`;
                    const color = statusColorMap[order.status || 0] || "blue";
                 const theoreticalTime = totalTime.formatted;
+                console.log('esstartdate',order.estStartDate)
+                 console.log('estfinishdate',order.estFinishDate)
                 return (
                   <Menu.Item key={order.id}>
                     <EventTooltip tooltip={tooltip} status={order.status}>
@@ -49,8 +53,10 @@ export const OrderList: React.FC<OrderListProps> = ({
                         style={{ whiteSpace: "normal", lineHeight: 1.4 }}
                         data-event={JSON.stringify({
                           id: (order.id),
-                          title: `${order.pporderno} - ${order.panelcode}θεωρητικός χρόνος ${theoreticalTime}`,
+                          title: `${order.pporderno} - ${order.panelcode}`,
                            color,
+                           start:order.estStartDate,
+                           end:order.estFinishDate,
                           extendedProps:
                            { tooltip,
                              status: order.status,
