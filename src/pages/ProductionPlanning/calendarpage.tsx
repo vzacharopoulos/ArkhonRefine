@@ -324,40 +324,93 @@ export const ProductionCalendar: React.FC = () => {
   });
 
   
-function calculateWorkingDuration(
+ function calculateWorkingMinutesBetween(
   start: Dayjs,
   end: Dayjs,
-  dailyOverrides: Record<string, WorkingHoursConfig>,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
   defaultWorkingHours: Record<number, WorkingHoursConfig>
 ): number {
-  let totalMinutes = 0;
+  if (end.isBefore(start)) return 0;
+
   let current = start.clone();
+  let total = 0;
 
   while (current.isBefore(end)) {
-    const dateKey = current.format("YYYY-MM-DD");
-    const workingConfig = getWorkingHours(current, dailyOverrides, defaultWorkingHours);
+    const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+      getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
 
-    const dayStart = current.hour(workingConfig.startHour).minute(workingConfig.startMinute).second(0);
-    const dayEnd = current.hour(workingConfig.endHour).minute(workingConfig.endMinute).second(0);
+    if (isBusinessDay) {
+      const dayStart = current
+        .startOf('day')
+        .hour(startHour)
+        .minute(startMinute);
+      const dayEnd = current.startOf('day').hour(endHour).minute(endMinute);
+
+      const intervalStart = current.isBefore(dayStart) ? dayStart : current;
+      const intervalEnd = end.isBefore(dayEnd) ? end : dayEnd;
+
+      if (intervalEnd.isAfter(intervalStart)) {
+        total += intervalEnd.diff(intervalStart, 'minute');
+      }
+    }
+
+    current = current.add(1, 'day').startOf('day');
+  }
+
+  return total;
+}
+
+// Add working minutes considering varying daily working hours
+ function addWorkingMinutesDynamic(
+  start: Dayjs,
+  minutesToAdd: number,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>
+): Dayjs {
+  let current = start.clone();
+  let remaining = minutesToAdd;
+
+  while (remaining > 0) {
+    const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+      getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+
+    if (!isBusinessDay) {
+      current = current.add(1, 'day').startOf('day');
+      continue;
+    }
+
+    const dayStart = current
+      .startOf('day')
+      .hour(startHour)
+      .minute(startMinute)
+      .second(0);
+    const dayEnd = current
+      .startOf('day')
+      .hour(endHour)
+      .minute(endMinute)
+      .second(0);
 
     if (current.isBefore(dayStart)) {
       current = dayStart;
     }
 
-    if (current.isAfter(dayEnd)) {
-      // Skip to next day’s working start
-      current = current.add(1, "day").hour(0).minute(0);
+    if (current.isAfter(dayEnd) || current.isSame(dayEnd)) {
+      current = current.add(1, 'day').startOf('day');
       continue;
     }
 
-   const validEnd = end.isBefore(dayEnd) ? end : dayEnd;
-    totalMinutes += validEnd.diff(current, "minute");
-    current = validEnd;
+    const availableMinutes = dayEnd.diff(current, 'minute');
+    const chunk = Math.min(availableMinutes, remaining);
+    current = current.add(chunk, 'minute');
+    remaining -= chunk;
+
+    if (remaining > 0) {
+      current = current.add(1, 'day').startOf('day');
+    }
   }
 
-  return totalMinutes;
+  return current;
 }
-
 
 
 
@@ -376,7 +429,7 @@ function calculateWorkingDuration(
       preScheduled.forEach(order => {
         const start = dayjs(order.estStartDate as Date);
         const end = dayjs(order.estFinishDate as Date);
-const durationa = calculateWorkingDuration(start, end, dailyWorkingHours, defaultWorkingHours);
+const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
         const tentativeStart = prevEnd
           ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
             ? prevEnd
@@ -391,7 +444,7 @@ const durationa = calculateWorkingDuration(start, end, dailyWorkingHours, defaul
 
         const segments = splitEventIntoWorkingHours(
           tentativeStart,
-          durationa,
+          duration,
           dailyWorkingHours,
           defaultWorkingHours,
           {
@@ -654,14 +707,14 @@ const durationa = calculateWorkingDuration(start, end, dailyWorkingHours, defaul
             )
           );
 
-          if (selectedEvent?.id) {
+          /*if (selectedEvent?.id) {
             handleUpdatePporder(
               Number(selectedEvent?.id?.split('-part-')[0]),
               editStart?.toDate() as Date,
               editEnd?.toDate() as Date
 
             );
-          }
+          } */
           console.log(selectedEvent?.id?.split('-part-')[0])
           setEditModalOpen(false); // optional: close modal after saving
         }}
