@@ -1,11 +1,16 @@
-// utils/useHandleDrop.ts
 import dayjs, { Dayjs } from "dayjs";
 import { DropArg } from "@fullcalendar/interaction";
 import { EventInput } from "@fullcalendar/core";
-import { addWorkingMinutes, findLastEventEndTime, findNextWorkingTime, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from "../dateschedule-utils";
+import {
+  addWorkingMinutes,
+  findLastEventEndTime,
+  findNextWorkingTime,
+  getWorkingHours,
+  isWithinWorkingHours,
+  splitEventIntoWorkingHours,
+} from "../dateschedule-utils";
 import { WorkingHoursConfig } from "../productioncalendartypes";
-
-
+import { offTimeMap } from "./offtime-map";
 
 export function handleDropFactory(
   currentEvents: EventInput[],
@@ -14,64 +19,80 @@ export function handleDropFactory(
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
   defaultWorkingHours: Record<number, WorkingHoursConfig>,
   setCurrentEvents: React.Dispatch<React.SetStateAction<EventInput[]>>,
-  dropTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>
+  droppedIds: Set<string>,
+  setDroppedIds: React.Dispatch<React.SetStateAction<Set<string>>>
 ) {
-  
-
-  
-
   return function handleDrop(info: DropArg) {
-    if (dropTimeoutRef.current) return;
-
-dropTimeoutRef.current = setTimeout(() => {
-  dropTimeoutRef.current = null;
-}, 50);
-    const dropDate = dayjs(info.date);
     const draggedEvent = JSON.parse(info.draggedEl.dataset.event || "{}");
+
+    if (droppedIds.has(draggedEvent.id)) return;
+
+    // Avoid duplicates
+    setDroppedIds(prev => new Set(prev).add(draggedEvent.id));
+    setTimeout(() => {
+      setDroppedIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(draggedEvent.id);
+        return updated;
+      });
+    }, 100);
+
+    const dropDate = dayjs(info.date);
     const durationInMinutes = draggedEvent.extendedProps?.duration ?? totalTimeMinutes;
+    const allEvents = [...currentEvents, ...finishedEvents];
 
-    const lastEventEndTime = findLastEventEndTime([...currentEvents, ...finishedEvents]);
+    const lastEventEndTime = findLastEventEndTime(allEvents);
 
-    let actualStartTime: Dayjs;
-
+    let baseStart: Dayjs;
     if (lastEventEndTime) {
-      const proposedStartTime = lastEventEndTime;
-
-      actualStartTime = isWithinWorkingHours(proposedStartTime, dailyWorkingHours, defaultWorkingHours)
-        ? proposedStartTime
-        : findNextWorkingTime(proposedStartTime, dailyWorkingHours, defaultWorkingHours);
+      baseStart = isWithinWorkingHours(lastEventEndTime, dailyWorkingHours, defaultWorkingHours)
+        ? lastEventEndTime
+        : findNextWorkingTime(lastEventEndTime, dailyWorkingHours, defaultWorkingHours);
     } else {
-      actualStartTime = isWithinWorkingHours(dropDate, dailyWorkingHours, defaultWorkingHours)
+      baseStart = isWithinWorkingHours(dropDate, dailyWorkingHours, defaultWorkingHours)
         ? dropDate
         : findNextWorkingTime(dropDate, dailyWorkingHours, defaultWorkingHours);
     }
 
+    // Find previous event for offtime logic
+    
+     const previousEvent = allEvents
+  .filter(ev => ev.end && typeof ev.id === "string" && !ev.id.includes("offtime"))
+  .sort((a, b) => dayjs(b.end as Date).diff(dayjs(a.end as Date)))[0];
+
+   const previousCode = previousEvent.extendedProps?.panelcode?.replace(/-001$/, "");
+const currentCode = draggedEvent.extendedProps.panelcode?.replace(/-001$/, "");
+const offtimeDuration = offTimeMap[previousCode]?.[currentCode] ?? 30;
+ console.log(previousCode)
+ console.log(previousEvent.id)
+  console.log(currentCode)
+  console.log(draggedEvent.id)
+
+    // Determine offtime start and end
+    const offtimeStart = baseStart;
+    const offtimeConfig = getWorkingHours(offtimeStart, dailyWorkingHours, defaultWorkingHours);
+    const offtimeEnd = addWorkingMinutes(offtimeStart, offtimeDuration, offtimeConfig);
+
+    // Adjust dropped job to start AFTER offtime
+    const jobStart = offtimeEnd;
+
     const eventSegments = splitEventIntoWorkingHours(
-      actualStartTime,
+      jobStart,
       durationInMinutes,
       dailyWorkingHours,
       defaultWorkingHours,
       draggedEvent
     );
 
-    const lastSegment = eventSegments[eventSegments.length - 1];
-    if (lastSegment) {
-      const offtimeStart = findNextWorkingTime(dayjs(lastSegment.end as Date), dailyWorkingHours, defaultWorkingHours);
-      const offtimeConfig = getWorkingHours(offtimeStart, dailyWorkingHours, defaultWorkingHours);
-      const offtimeEnd = addWorkingMinutes(offtimeStart, 30, offtimeConfig);
+    const offEvent: EventInput = {
+      id: `${draggedEvent.id}-offtime`,
+      title: "προετοιμασία μηχανής",
+      start: offtimeStart.toDate(),
+      end: offtimeEnd.toDate(),
+      color: "gray",
+      extendedProps: { isOfftime: true },
+    };
 
-      const offEvent: EventInput = {
-        id: `${draggedEvent.id}-offtime`,
-        title: "προετοιμασία μηχανής",
-        start: offtimeStart.toDate(),
-        end: offtimeEnd.toDate(),
-        color: "gray",
-        extendedProps: { isOfftime: true },
-      };
-
-      setCurrentEvents(prev => [...prev, ...eventSegments, offEvent]);
-    } else {
-      setCurrentEvents(prev => [...prev, ...eventSegments]);
-    }
+    setCurrentEvents(prev => [...prev, offEvent, ...eventSegments]);
   };
 }

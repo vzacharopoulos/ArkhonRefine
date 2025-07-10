@@ -4,19 +4,32 @@
 
 
 import gql from "graphql-tag";
+export const UPDATE_PPORDERS = gql`
+mutation updatePporder($input: UpdatePporderInput!) {
+  updatePporder(input: $input) {
+    pporderno
+    id
+    startDate
+    status
+    startDateDatetime
+    finishDate
+    finishDateDatetime
+    estStartDate
+    estFinishDate
+  }
+
+}`
+
 
 export const GET_PPORDERS = gql`
 query GetPpOrders($filter: PpordersFilterInput) {
   pporders(filter: $filter) {
-    
     id
     pporderno
     panelcode
     status
-    
     startDateDatetime
     finishDateDatetime
-    
     estDateOfProdDatetime
     createDate
     

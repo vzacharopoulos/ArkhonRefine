@@ -7,7 +7,8 @@ export interface PPOrder {
   status?: number;
   startDateDatetime?: Date;
   finishDateDatetime?: Date;
-  estDateOfProd?: Date;
+  estStartDate?: Date;
+  estFinishDate?: Date;
   createDate?: Date;
 
 

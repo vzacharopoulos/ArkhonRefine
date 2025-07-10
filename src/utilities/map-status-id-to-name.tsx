@@ -24,11 +24,12 @@ interface StatusTagProps {
   status?: number;
 }
 
-const statusColorMap: Record<number, string> = {
+export const statusColorMap: Record<number, string> = {
   1: "gold",
   2: "blue",
   3: "cyan",
   4: "green",
+  14: "purple",
   [-1]: "red",
 };
 

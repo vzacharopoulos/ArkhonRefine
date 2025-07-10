@@ -156,10 +156,16 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
             time={editEnd} 
             onChange={onChangeEnd} 
           />
-          
+          <div style={{ marginTop: 'auto' }}>
+              <Text strong>θεωρητική διάρκεια:</Text>
+              <Text style={{ display: 'block' }}>
+                {dayjs.duration(event?.extendedProps?.duration, 'minutes').format('HH:mm')} ώρες
+              </Text>
+            </div>
+
           {editStart && editEnd && (
             <div style={{ marginTop: 'auto' }}>
-              <Text strong>Διάρκεια:</Text>
+              <Text strong>Διάρκεια για σήμερα:</Text>
               <Text style={{ display: 'block' }}>
                 {dayjs.duration(editEnd.diff(editStart)).format('HH:mm')} ώρες
               </Text>

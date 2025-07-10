@@ -30,3 +30,14 @@ INNER JOIN [192.168.10.167].panel.dbo.PanelProductionOrdersExt ppe
 INNER JOIN dbo.PPORDERS po
     ON po.PPORDERNO = pl.PPORDERNO
 GROUP BY pl.PPORDERNO,ppe.code, po.finish_date_datetime, po.start_date_datetime,po.create_date,po.status,po.id;
+
+
+
+USE [PanelMESDB_testing]
+GO
+
+ALTER TABLE [dbo].[PPORDERS]
+ADD 
+    [est_start_date] DATETIME NULL,
+    [est_finish_date] DATETIME NULL
+GO
