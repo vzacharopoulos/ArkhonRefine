@@ -68,7 +68,12 @@ export const ProductionCalendar: React.FC = () => {
   const { mutate: updatePporder } = useUpdate<PPOrder>();
 
   // Then create a function to handle the mutation:
-  const handleUpdatePporder = async (id: number, startDate: Date, finishDate: Date) => {
+  const handleUpdatePporder = async (
+    id: number,
+    startDate: Date,
+    finishDate: Date,
+    extraValues?: Partial<PPOrder>
+  ) => {
     try {
       await updatePporder({
         resource: "pporders",
@@ -78,7 +83,7 @@ export const ProductionCalendar: React.FC = () => {
           estStartDate: startDate ? startDate.toISOString() : null,
           estFinishDate: finishDate ? finishDate.toISOString() : null,
           status: 14, // Default to status 2 if not provided
-
+          ...extraValues,
         },
         meta: {
           gqlMutation: UPDATE_PPORDERS,
@@ -98,7 +103,7 @@ export const ProductionCalendar: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editStart, setEditStart] = useState<Dayjs | null>(null);
   const [editEnd, setEditEnd] = useState<Dayjs | null>(null);
-    const initialSyncRef = useRef(false); 
+  const initialSyncRef = useRef(false);
   // Keep your current defaultWorkingHours structure
   const [defaultWorkingHours, setDefaultWorkingHours] = useState<Record<number, WorkingHoursConfig>>({
     1: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] }, // Monday
@@ -323,94 +328,94 @@ export const ProductionCalendar: React.FC = () => {
     return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
   });
 
-  
- function calculateWorkingMinutesBetween(
-  start: Dayjs,
-  end: Dayjs,
-  dailyWorkingHours: Record<string, WorkingHoursConfig>,
-  defaultWorkingHours: Record<number, WorkingHoursConfig>
-): number {
-  if (end.isBefore(start)) return 0;
 
-  let current = start.clone();
-  let total = 0;
+  function calculateWorkingMinutesBetween(
+    start: Dayjs,
+    end: Dayjs,
+    dailyWorkingHours: Record<string, WorkingHoursConfig>,
+    defaultWorkingHours: Record<number, WorkingHoursConfig>
+  ): number {
+    if (end.isBefore(start)) return 0;
 
-  while (current.isBefore(end)) {
-    const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
-      getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+    let current = start.clone();
+    let total = 0;
 
-    if (isBusinessDay) {
+    while (current.isBefore(end)) {
+      const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+        getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+
+      if (isBusinessDay) {
+        const dayStart = current
+          .startOf('day')
+          .hour(startHour)
+          .minute(startMinute);
+        const dayEnd = current.startOf('day').hour(endHour).minute(endMinute);
+
+        const intervalStart = current.isBefore(dayStart) ? dayStart : current;
+        const intervalEnd = end.isBefore(dayEnd) ? end : dayEnd;
+
+        if (intervalEnd.isAfter(intervalStart)) {
+          total += intervalEnd.diff(intervalStart, 'minute');
+        }
+      }
+
+      current = current.add(1, 'day').startOf('day');
+    }
+
+    return total;
+  }
+
+  // Add working minutes considering varying daily working hours
+  function addWorkingMinutesDynamic(
+    start: Dayjs,
+    minutesToAdd: number,
+    dailyWorkingHours: Record<string, WorkingHoursConfig>,
+    defaultWorkingHours: Record<number, WorkingHoursConfig>
+  ): Dayjs {
+    let current = start.clone();
+    let remaining = minutesToAdd;
+
+    while (remaining > 0) {
+      const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+        getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+
+      if (!isBusinessDay) {
+        current = current.add(1, 'day').startOf('day');
+        continue;
+      }
+
       const dayStart = current
         .startOf('day')
         .hour(startHour)
-        .minute(startMinute);
-      const dayEnd = current.startOf('day').hour(endHour).minute(endMinute);
+        .minute(startMinute)
+        .second(0);
+      const dayEnd = current
+        .startOf('day')
+        .hour(endHour)
+        .minute(endMinute)
+        .second(0);
 
-      const intervalStart = current.isBefore(dayStart) ? dayStart : current;
-      const intervalEnd = end.isBefore(dayEnd) ? end : dayEnd;
+      if (current.isBefore(dayStart)) {
+        current = dayStart;
+      }
 
-      if (intervalEnd.isAfter(intervalStart)) {
-        total += intervalEnd.diff(intervalStart, 'minute');
+      if (current.isAfter(dayEnd) || current.isSame(dayEnd)) {
+        current = current.add(1, 'day').startOf('day');
+        continue;
+      }
+
+      const availableMinutes = dayEnd.diff(current, 'minute');
+      const chunk = Math.min(availableMinutes, remaining);
+      current = current.add(chunk, 'minute');
+      remaining -= chunk;
+
+      if (remaining > 0) {
+        current = current.add(1, 'day').startOf('day');
       }
     }
 
-    current = current.add(1, 'day').startOf('day');
+    return current;
   }
-
-  return total;
-}
-
-// Add working minutes considering varying daily working hours
- function addWorkingMinutesDynamic(
-  start: Dayjs,
-  minutesToAdd: number,
-  dailyWorkingHours: Record<string, WorkingHoursConfig>,
-  defaultWorkingHours: Record<number, WorkingHoursConfig>
-): Dayjs {
-  let current = start.clone();
-  let remaining = minutesToAdd;
-
-  while (remaining > 0) {
-    const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
-      getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
-
-    if (!isBusinessDay) {
-      current = current.add(1, 'day').startOf('day');
-      continue;
-    }
-
-    const dayStart = current
-      .startOf('day')
-      .hour(startHour)
-      .minute(startMinute)
-      .second(0);
-    const dayEnd = current
-      .startOf('day')
-      .hour(endHour)
-      .minute(endMinute)
-      .second(0);
-
-    if (current.isBefore(dayStart)) {
-      current = dayStart;
-    }
-
-    if (current.isAfter(dayEnd) || current.isSame(dayEnd)) {
-      current = current.add(1, 'day').startOf('day');
-      continue;
-    }
-
-    const availableMinutes = dayEnd.diff(current, 'minute');
-    const chunk = Math.min(availableMinutes, remaining);
-    current = current.add(chunk, 'minute');
-    remaining -= chunk;
-
-    if (remaining > 0) {
-      current = current.add(1, 'day').startOf('day');
-    }
-  }
-
-  return current;
-}
 
 
 
@@ -429,18 +434,18 @@ export const ProductionCalendar: React.FC = () => {
       preScheduled.forEach(order => {
         const start = dayjs(order.estStartDate as Date);
         const end = dayjs(order.estFinishDate as Date);
-const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
+        const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
         const tentativeStart = prevEnd
           ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
             ? prevEnd
             : findNextWorkingTime(
-                prevEnd,
-                dailyWorkingHours,
-                defaultWorkingHours
-              )
+              prevEnd,
+              dailyWorkingHours,
+              defaultWorkingHours
+            )
           : isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
-          ? start
-          : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
+            ? start
+            : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
 
         const segments = splitEventIntoWorkingHours(
           tentativeStart,
@@ -453,11 +458,9 @@ const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, d
             color: statusColorMap[order.status ?? 0] || "gray",
             extendedProps: {
               status: order.status,
-              tooltip: `${order.pporderno ?? ""} - ${
-                order.panelcode ?? ""
-              }\nκατάσταση: ${
-                STATUS_MAP[order.status || 0] || "Άγνωστη"
-              }`,
+              tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""
+                }\nκατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"
+                }`,
             },
           }
         );
@@ -542,37 +545,76 @@ const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, d
     setWeekendsVisible(!weekendsVisible);
   };
 
- const handleUpdateAllEvents = () => {
+const handleUpdateAllEvents = () => {
   const grouped: Record<string, EventInput[]> = {};
-
-  // Group events by baseId (e.g., "asd" from "asd-part-1")
+  const offInfo: Record<string, Partial<PPOrder>> = {};
+ 
+  // Group events by baseId
   currentEvents.forEach(ev => {
     if (!ev.id || !ev.start || !ev.end) return;
     const idStr = ev.id.toString();
-    if (idStr.includes('offtime')) return;
+   
+    if (!!ev.extendedProps?.isOfftime) {
+      const StrprevId=ev.extendedProps.prevId.toString();
+      const prevId = StrprevId.split('-part-')[0];
+      const currId = ev.extendedProps.currId;
+     
+      console.log('Processing offtime event:', {
+        eventId: idStr,
+        prevId: prevId,
+        currId: currId,
+        prevIdType: typeof prevId
+      });
+     
+      // Store offInfo using nextId as key (this will match the baseId later)
+      if (prevId) {
+        const currIdStr = currId.toString();
+        offInfo[currIdStr] = {
+          previd: Number(prevId),
+          prevpanelcode: ev.extendedProps.prevPanelcode,
+          offtimeduration: ev.extendedProps.offtimeDuration,
+          offtimestartdate: ev.extendedProps.offtimeStartDate,
+          offtimeenddate: ev.extendedProps.offtimeEndDate,
+        };
+        
+        console.log("Storing offInfo for nextId:", prevId);
+                console.log("prevpanelcode:", offInfo.prevpanelcode);
 
+        // Group using nextId as baseId
+        if (!grouped[currIdStr]) {
+          grouped[currIdStr] = [];
+        }
+        grouped[currIdStr].push(ev);
+      }
+     
+      return;
+    }
+   
     const baseId = idStr.split('-part-')[0];
-
     if (!grouped[baseId]) {
       grouped[baseId] = [];
     }
-
     grouped[baseId].push(ev);
   });
-
-  // For each group, update using the first start and last end
+ 
+  console.log('Final offInfo:', offInfo);
+  console.log('Final grouped keys:', Object.keys(grouped));
+ 
+  // Now the baseId will match the offInfo keys
   Object.entries(grouped).forEach(([baseId, events]) => {
+    console.log(`Checking baseId: ${baseId}, exists in offInfo: ${baseId in offInfo}`);
+    console.log('offInfo for baseId:', offInfo[baseId]);
+    console.log('nextid for baseId:', offInfo[baseId]?.previd);
+   
     const sorted = events.sort((a, b) =>
       new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime()
     );
-
     const firstStart = new Date(sorted[0].start as Date);
     const lastEnd = new Date(sorted[sorted.length - 1].end as Date);
-
-    handleUpdatePporder(Number(baseId), firstStart, lastEnd);
+   
+    handleUpdatePporder(Number(baseId), firstStart, lastEnd, offInfo[baseId]);
   });
 };
-
   return (
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
       <Sider width={300} style={{ background: "#fff", padding: 24 }}>
@@ -605,7 +647,7 @@ const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, d
             style={{ width: "100%" }}
           />
         </div>
-        
+
       </Sider>
 
       <Content style={{ flex: 1, minHeight: "80vh" }}>
@@ -653,7 +695,7 @@ const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, d
               ...event,
               title:
                 duration < 20
-                               ? `${event.title?.slice(0, 2) || ""}...`
+                  ? `${event.title?.slice(0, 2) || ""}...`
                   : event.title ?? "",
             };
           }}
@@ -733,17 +775,17 @@ const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, d
         onOk={handleSaveWorkingHours}
       />
       <Button
-  type="primary"
-  onClick={handleUpdateAllEvents}
-  style={{
-    position: "fixed",        // stays on screen
-    bottom: 24,               // distance from bottom
-    right: 24,                // distance from right
-    zIndex: 1000,             // make sure it's on top of calendar
-  }}
->
-  ενημέρωση όλων
-</Button>
+        type="primary"
+        onClick={handleUpdateAllEvents}
+        style={{
+          position: "fixed",        // stays on screen
+          bottom: 24,               // distance from bottom
+          right: 24,                // distance from right
+          zIndex: 1000,             // make sure it's on top of calendar
+        }}
+      >
+        ενημέρωση όλων
+      </Button>
     </Layout>
   );
 };

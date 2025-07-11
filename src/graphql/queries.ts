@@ -16,6 +16,11 @@ mutation updatePporder($input: UpdatePporderInput!) {
     finishDateDatetime
     estStartDate
     estFinishDate
+     previd
+    prevpanelcode
+    offtimeduration
+    offtimestartdate
+    offtimeenddate
   }
 
 }`
@@ -34,8 +39,8 @@ query GetPpOrders($filter: PpordersFilterInput) {
     createDate
     estStartDate
     estFinishDate
-     nextid
-    nextpanelcode
+     previd
+    prevpanelcode
     offtimeduration
     offtimestartdate
     offtimeenddate

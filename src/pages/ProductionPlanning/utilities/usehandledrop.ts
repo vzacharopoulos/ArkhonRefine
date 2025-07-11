@@ -87,9 +87,18 @@ const offtimeDuration = offTimeMap[previousCode]?.[currentCode] ?? 30;
       start: offtimeStart.toDate(),
       end: offtimeEnd.toDate(),
       color: "gray",
-      extendedProps: { isOfftime: true },
+      extendedProps: {
+        isOfftime: true,
+        prevId: previousEvent?.id?.toString(),
+        currId: draggedEvent.id,
+        prevpanelcode: previousEvent.extendedProps?.prevpanelcode,
+        offtimeDuration: offtimeDuration,
+        offtimeStartDate: offtimeStart.toISOString(),
+        offtimeEndDate: offtimeEnd.toISOString(),
+      },
+      
     };
-
+    console.log("offevent.extprops.prevpanelcode in usehandledrop",offEvent.extendedProps?.prevpanelcode)
     setCurrentEvents(prev => [...prev, offEvent, ...eventSegments]);
   };
 }

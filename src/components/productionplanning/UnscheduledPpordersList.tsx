@@ -43,8 +43,7 @@ export const OrderList: React.FC<OrderListProps> = ({
                   `εκτ λήξη: ${order.estFinishDate || "Άγνωστη"}\n`;
                    const color = statusColorMap[order.status || 0] || "blue";
                 const theoreticalTime = totalTime.formatted;
-                console.log('esstartdate',order.estStartDate)
-                 console.log('estfinishdate',order.estFinishDate)
+              
                 return (
                   <Menu.Item key={order.id}>
                     <EventTooltip tooltip={tooltip} status={order.status}>
