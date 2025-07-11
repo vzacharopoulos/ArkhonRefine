@@ -34,6 +34,11 @@ query GetPpOrders($filter: PpordersFilterInput) {
     createDate
     estStartDate
     estFinishDate
+     nextid
+    nextpanelcode
+    offtimeduration
+    offtimestartdate
+    offtimeenddate
   
     
   }

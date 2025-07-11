@@ -41,3 +41,13 @@ ADD
     [est_start_date] DATETIME NULL,
     [est_finish_date] DATETIME NULL
 GO
+
+
+
+ALTER TABLE PPORDERS
+ADD 
+    nextid int,      -- Code for the current panel
+    nextpanelcode NVARCHAR(150) NULL,          -- Code for the next panel
+    offtimeduration INT NULL,                         -- Duration in some unit
+    offtimestartdate DATETIME NULL,                   -- Start date and time
+    offtimeenddate DATETIME NULL;    
