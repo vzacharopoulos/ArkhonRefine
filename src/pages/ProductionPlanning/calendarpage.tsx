@@ -427,48 +427,72 @@ export const ProductionCalendar: React.FC = () => {
         dayjs(a.estStartDate as Date).diff(dayjs(b.estStartDate as Date))
       );
 
-    if (preScheduled.length > 0) {
+     if (preScheduled.length > 0) {
       const processed: EventInput[] = [];
       let prevEnd: Dayjs | null = null;
 
-      preScheduled.forEach(order => {
-        const start = dayjs(order.estStartDate as Date);
-        const end = dayjs(order.estFinishDate as Date);
-        const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
-        const tentativeStart = prevEnd
-          ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
-            ? prevEnd
-            : findNextWorkingTime(
-              prevEnd,
-              dailyWorkingHours,
-              defaultWorkingHours
-            )
-          : isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
-            ? start
-            : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
+        preScheduled.forEach(order => {
+          const start = dayjs(order.estStartDate as Date);
+          const end = dayjs(order.estFinishDate as Date);
+          const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
+          let tentativeStart = prevEnd
+            ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+              ? prevEnd
+              : findNextWorkingTime(
+                  prevEnd,
+                  dailyWorkingHours,
+                  defaultWorkingHours
+                )
+            : isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
+              ? start
+              : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
 
-        const segments = splitEventIntoWorkingHours(
-          tentativeStart,
-          duration,
-          dailyWorkingHours,
-          defaultWorkingHours,
-          {
-            id: String(order.id),
-            title: `${order.pporderno} - ${order.panelcode}`,
-            color: statusColorMap[order.status ?? 0] || "gray",
-            extendedProps: {
-              status: order.status,
-              tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""
-                }\nκατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"
-                }`,
-            },
+          if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
+            const offStart = dayjs(order.offtimestartdate as Date);
+            const offEnd = dayjs(order.offtimeenddate as Date);
+            const offEvent: EventInput = {
+              id: `${order.id}-offtime`,
+              title: "προετοιμασία μηχανής",
+              start: offStart.toDate(),
+              end: offEnd.toDate(),
+              color: "gray",
+              extendedProps: {
+                isOfftime: true,
+                prevId: order.previd?.toString(),
+                currId: order.id.toString(),
+                prevpanelcode: order.prevpanelcode,
+                offtimeduration: order.offtimeduration,
+                offtimestartDate: offStart.toISOString(),
+                offtimeenddate: offEnd.toISOString(),
+              },
+            };
+            processed.push(offEvent);
+            prevEnd = offEnd;
+            tentativeStart = isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+              ? prevEnd
+              : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
           }
-        );
 
-        processed.push(...segments);
-        prevEnd = dayjs(segments[segments.length - 1].end as Date);
-      });
+          const segments = splitEventIntoWorkingHours(
+            tentativeStart,
+            duration,
+            dailyWorkingHours,
+            defaultWorkingHours,
+            {
+              id: String(order.id),
+              title: `${order.pporderno} - ${order.panelcode}`,
+              color: statusColorMap[order.status ?? 0] || "gray",
+              extendedProps: {
+                panelcode:order.panelcode,
+                status: order.status,
+                tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\nκατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
+              },
+            }
+          );
 
+          processed.push(...segments);
+          prevEnd = dayjs(segments[segments.length - 1].end as Date);
+        });
       const mergedEvents = mergeSameDayEventParts(processed);
       setCurrentEvents(mergedEvents);
       initialSyncRef.current = true;
@@ -496,6 +520,7 @@ export const ProductionCalendar: React.FC = () => {
       duration: order.time,
       color,
       extendedProps: {
+        panelcode:order.code,
         status: order.status,
         totalMeter: order.totalMeter,
         speed: order.speed,
@@ -545,12 +570,13 @@ export const ProductionCalendar: React.FC = () => {
     setWeekendsVisible(!weekendsVisible);
   };
 
-const handleUpdateAllEvents = () => {
+const handleUpdateAllEvents = async  (eventsArg?: EventInput[]) => {
+  const eventsToProcess = eventsArg ?? currentEvents;
   const grouped: Record<string, EventInput[]> = {};
   const offInfo: Record<string, Partial<PPOrder>> = {};
  
   // Group events by baseId
-  currentEvents.forEach(ev => {
+  eventsToProcess.forEach(ev => {
     if (!ev.id || !ev.start || !ev.end) return;
     const idStr = ev.id.toString();
    
@@ -558,12 +584,13 @@ const handleUpdateAllEvents = () => {
       const StrprevId=ev.extendedProps.prevId.toString();
       const prevId = StrprevId.split('-part-')[0];
       const currId = ev.extendedProps.currId;
-     
+     const prevcode=ev.extendedProps.prevpanelcode;
       console.log('Processing offtime event:', {
         eventId: idStr,
         prevId: prevId,
         currId: currId,
-        prevIdType: typeof prevId
+        prevIdType: typeof prevId,
+        prevcode:prevcode
       });
      
       // Store offInfo using nextId as key (this will match the baseId later)
@@ -571,7 +598,7 @@ const handleUpdateAllEvents = () => {
         const currIdStr = currId.toString();
         offInfo[currIdStr] = {
           previd: Number(prevId),
-          prevpanelcode: ev.extendedProps.prevPanelcode,
+          prevpanelcode: prevcode,
           offtimeduration: ev.extendedProps.offtimeDuration,
           offtimestartdate: ev.extendedProps.offtimeStartDate,
           offtimeenddate: ev.extendedProps.offtimeEndDate,
@@ -601,19 +628,28 @@ const handleUpdateAllEvents = () => {
   console.log('Final grouped keys:', Object.keys(grouped));
  
   // Now the baseId will match the offInfo keys
-  Object.entries(grouped).forEach(([baseId, events]) => {
+  // Now the baseId will match the offInfo keys
+  for (const [baseId, events] of Object.entries(grouped)) {
     console.log(`Checking baseId: ${baseId}, exists in offInfo: ${baseId in offInfo}`);
     console.log('offInfo for baseId:', offInfo[baseId]);
     console.log('nextid for baseId:', offInfo[baseId]?.previd);
    
-    const sorted = events.sort((a, b) =>
+    const filtered = events.filter(ev => !ev.extendedProps?.isOfftime);
+    if (filtered.length === 0) return;
+
+    const sorted = filtered.sort((a, b) =>
       new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime()
     );
     const firstStart = new Date(sorted[0].start as Date);
     const lastEnd = new Date(sorted[sorted.length - 1].end as Date);
    
-    handleUpdatePporder(Number(baseId), firstStart, lastEnd, offInfo[baseId]);
-  });
+    await handleUpdatePporder(
+      Number(baseId),
+      firstStart,
+      lastEnd,
+      offInfo[baseId]
+    );
+  }
 };
   return (
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
@@ -749,6 +785,8 @@ const handleUpdateAllEvents = () => {
             )
           );
 
+          
+
           /*if (selectedEvent?.id) {
             handleUpdatePporder(
               Number(selectedEvent?.id?.split('-part-')[0]),
@@ -776,7 +814,7 @@ const handleUpdateAllEvents = () => {
       />
       <Button
         type="primary"
-        onClick={handleUpdateAllEvents}
+       onClick={() => handleUpdateAllEvents()}
         style={{
           position: "fixed",        // stays on screen
           bottom: 24,               // distance from bottom
