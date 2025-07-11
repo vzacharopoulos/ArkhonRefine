@@ -635,7 +635,7 @@ const handleUpdateAllEvents = async  (eventsArg?: EventInput[]) => {
     console.log('nextid for baseId:', offInfo[baseId]?.previd);
    
     const filtered = events.filter(ev => !ev.extendedProps?.isOfftime);
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) continue;
 
     const sorted = filtered.sort((a, b) =>
       new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime()
