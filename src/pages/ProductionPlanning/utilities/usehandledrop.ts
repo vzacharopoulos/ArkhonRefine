@@ -11,6 +11,7 @@ import {
 } from "../dateschedule-utils";
 import { WorkingHoursConfig } from "../productioncalendartypes";
 import { offTimeMap } from "./offtime-map";
+import { addWorkingMinutesDynamic } from "../calendarpage";
 
 export function handleDropFactory(
   currentEvents: EventInput[],
@@ -20,14 +21,13 @@ export function handleDropFactory(
   defaultWorkingHours: Record<number, WorkingHoursConfig>,
   setCurrentEvents: React.Dispatch<React.SetStateAction<EventInput[]>>,
   droppedIds: Set<string>,
-  setDroppedIds: React.Dispatch<React.SetStateAction<Set<string>>>
+  setDroppedIds: React.Dispatch<React.SetStateAction<Set<string>>>,
+  
 ) {
   return function handleDrop(info: DropArg) {
     const draggedEvent = JSON.parse(info.draggedEl.dataset.event || "{}");
-
     if (droppedIds.has(draggedEvent.id)) return;
 
-    // Avoid duplicates
     setDroppedIds(prev => new Set(prev).add(draggedEvent.id));
     setTimeout(() => {
       setDroppedIds(prev => {
@@ -40,7 +40,6 @@ export function handleDropFactory(
     const dropDate = dayjs(info.date);
     const durationInMinutes = draggedEvent.extendedProps?.duration ?? totalTimeMinutes;
     const allEvents = [...currentEvents, ...finishedEvents];
-
     const lastEventEndTime = findLastEventEndTime(allEvents);
 
     let baseStart: Dayjs;
@@ -54,52 +53,60 @@ export function handleDropFactory(
         : findNextWorkingTime(dropDate, dailyWorkingHours, defaultWorkingHours);
     }
 
-    // Find previous event for offtime logic
-    
-     const previousEvent = allEvents
-  .filter(ev => ev.end && typeof ev.id === "string" && !ev.id.includes("offtime"))
-  .sort((a, b) => dayjs(b.end as Date).diff(dayjs(a.end as Date)))[0];
+    // Determine offtime duration
+    const previousEvent = allEvents
+      .filter(ev => ev.end && typeof ev.id === "string" && !ev.id.includes("offtime"))
+      .sort((a, b) => dayjs(b.end as Date).diff(dayjs(a.end as Date)))[0];
 
-   const previousCode = previousEvent.extendedProps?.panelcode?.replace(/-001$/, "");
-const currentCode = draggedEvent.extendedProps.panelcode?.replace(/-001$/, "");
-const offtimeDuration = offTimeMap[previousCode]?.[currentCode] ?? 30;
- 
+    const previousCode = previousEvent?.extendedProps?.panelcode?.replace(/-001$/, "");
+    const currentCode = draggedEvent.extendedProps.panelcode?.replace(/-001$/, "");
+    const offtimeDuration = offTimeMap[previousCode]?.[currentCode] ?? 30;
 
-    // Determine offtime start and end
-    const offtimeStart = baseStart;
-    const offtimeConfig = getWorkingHours(offtimeStart, dailyWorkingHours, defaultWorkingHours);
-    const offtimeEnd = addWorkingMinutes(offtimeStart, offtimeDuration, offtimeConfig);
+    // Split the offtime event as needed
+    const offtimeSegments = splitEventIntoWorkingHours(
+      baseStart,
+      offtimeDuration,
+      dailyWorkingHours,
+      defaultWorkingHours,
+      {
+        id: `${draggedEvent.id}-offtime`,
+        title: "προετοιμασία μηχανής",
+        color: "gray",
+        extendedProps: {
+          isOfftime: true,
+          prevId: previousEvent?.id?.toString(),
+          currId: draggedEvent.id,
+          prevpanelcode: previousEvent?.extendedProps?.panelcode,
+          offtimeDuration: offtimeDuration,
+          // We'll set individual segment start/end below
+        }
+      }
+    );
 
-    // Adjust dropped job to start AFTER offtime
-    const jobStart = offtimeEnd;
+    // Manually apply split segment start/end to their extendedProps
+    offtimeSegments.forEach(seg => {
+      seg.extendedProps = {
+        ...seg.extendedProps,
+        offtimeStartDate: (seg.start as Date).toISOString(),
+        offtimeEndDate: (seg.end as Date).toISOString(),
+      };
+    });
 
-    const eventSegments = splitEventIntoWorkingHours(
-      jobStart,
+    const lastOffEnd = dayjs(offtimeSegments[offtimeSegments.length - 1].end as Date);
+
+    // Now schedule the actual job
+    const jobSegments = splitEventIntoWorkingHours(
+      lastOffEnd,
       durationInMinutes,
       dailyWorkingHours,
       defaultWorkingHours,
-      draggedEvent
+      {
+        ...draggedEvent,
+        start: lastOffEnd.toDate(),
+        end: undefined,
+      }
     );
 
-    const offEvent: EventInput = {
-      id: `${draggedEvent.id}-offtime`,
-      title: "προετοιμασία μηχανής",
-      start: offtimeStart.toDate(),
-      end: offtimeEnd.toDate(),
-      color: "gray",
-      extendedProps: {
-        isOfftime: true,
-        prevId: previousEvent?.id?.toString(),
-        currId: draggedEvent.id,
-        prevpanelcode: previousEvent.extendedProps?.panelcode,
-        offtimeDuration: offtimeDuration,
-        offtimeStartDate: offtimeStart.toISOString(),
-        offtimeEndDate: offtimeEnd.toISOString(),
-      },
-      
-    };
-    console.log("offevent.extprops.prevpanelcode in usehandledrop",offEvent.extendedProps?.prevpanelcode)
-    console.log("offevent.extprops.prevpanelcode in usehandledrop",offEvent.extendedProps?.panelcode)
-    setCurrentEvents(prev => [...prev, offEvent, ...eventSegments]);
+    setCurrentEvents(prev => [...prev, ...offtimeSegments, ...jobSegments]);
   };
 }

@@ -13,7 +13,7 @@ const GET_PPORDERS = gql`
       status
       startDateDatetime
       finishDateDatetime
-      estDateOfProd
+      
       createDate
       
     }
