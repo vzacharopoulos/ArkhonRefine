@@ -60,12 +60,12 @@ export function handleDropFactory(
 
     const previousCode = previousEvent?.extendedProps?.panelcode?.replace(/-001$/, "");
     const currentCode = draggedEvent.extendedProps.panelcode?.replace(/-001$/, "");
-    const offtimeDuration = offTimeMap[previousCode]?.[currentCode] ?? 30;
+    const offtimeduration = offTimeMap[previousCode]?.[currentCode] ?? 30;
 
     // Split the offtime event as needed
     const offtimeSegments = splitEventIntoWorkingHours(
       baseStart,
-      offtimeDuration,
+      offtimeduration,
       dailyWorkingHours,
       defaultWorkingHours,
       {
@@ -77,7 +77,7 @@ export function handleDropFactory(
           prevId: previousEvent?.id?.toString(),
           currId: draggedEvent.id,
           prevpanelcode: previousEvent?.extendedProps?.panelcode,
-          offtimeDuration: offtimeDuration,
+          offtimeduration: offtimeduration,
           // We'll set individual segment start/end below
         }
       }
