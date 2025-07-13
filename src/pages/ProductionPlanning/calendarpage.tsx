@@ -3,11 +3,11 @@ import { useCustom, useUpdate } from "@refinedev/core";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { EventInput } from "@fullcalendar/core";
-import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS, UPDATE_PPORDERS } from "@/graphql/queries";
+import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS, PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, UPDATE_PPORDERS } from "@/graphql/queries";
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
-import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip, TimePicker, Modal, DatePicker } from "antd";
+import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip, TimePicker, Modal, DatePicker, message } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
 import { STATUS_MAP, statusColorMap, StatusTag } from "@/utilities/map-status-id-to-name";
@@ -16,15 +16,18 @@ import { finishedPporders, PPOrder, PPOrderLine, WorkingHoursConfig } from "./pr
 import { Sidebar } from "./sidebar";
 import { EditOutlined } from "@ant-design/icons";
 import isBetween from 'dayjs/plugin/isBetween';
-import { addWorkingMinutes, findLastEventEndTime, findNextWorkingTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, splitEventIntoWorkingHours } from "./dateschedule-utils";
+import { addWorkingMinutes, calculateWorkingMinutesBetween, findLastEventEndTime, findNextWorkingTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, mergeSameDayEventParts, splitEventIntoWorkingHours } from "./dateschedule-utils";
 import { calculateTotalTime, EventTooltip } from "./event-utils";
 import { WorkingHoursModal } from "@/components/modals/workinghoursmodal";
 import { EditEventModal } from "@/components/modals/editeventmodal";
 import { handleDropFactory } from "./utilities/usehandledrop";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
-
+import { print } from "graphql";
 import { handleSaveEdit } from "./utilities/usehandleedit";
 import { eventNames } from "process";
+import { handleDateSelect } from "./workinghours-utils";
+import { offTimeMap } from "./utilities/offtime-map";
+import { wsClient } from "@/providers";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -34,57 +37,7 @@ dayjs.extend(isSameOrAfter);
 
 
   // Add working minutes considering varying daily working hours
-  export function addWorkingMinutesDynamic(
-    start: Dayjs,
-    minutesToAdd: number,
-    dailyWorkingHours: Record<string, WorkingHoursConfig>,
-    defaultWorkingHours: Record<number, WorkingHoursConfig>
-  ): Dayjs {
-    let current = start.clone();
-    let remaining = minutesToAdd;
-
-    while (remaining > 0) {
-      const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
-        getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
-
-      if (!isBusinessDay) {
-        current = current.add(1, 'day').startOf('day');
-        continue;
-      }
-
-      const dayStart = current
-        .startOf('day')
-        .hour(startHour)
-        .minute(startMinute)
-        .second(0);
-      const dayEnd = current
-        .startOf('day')
-        .hour(endHour)
-        .minute(endMinute)
-        .second(0);
-
-      if (current.isBefore(dayStart)) {
-        current = dayStart;
-      }
-
-      if (current.isAfter(dayEnd) || current.isSame(dayEnd)) {
-        current = current.add(1, 'day').startOf('day');
-        continue;
-      }
-
-      const availableMinutes = dayEnd.diff(current, 'minute');
-      const chunk = Math.min(availableMinutes, remaining);
-      current = current.add(chunk, 'minute');
-      remaining -= chunk;
-
-      if (remaining > 0) {
-        current = current.add(1, 'day').startOf('day');
-      }
-    }
-
-    return current;
-  }
-
+  
 
 
 export const ProductionCalendar: React.FC = () => {
@@ -92,6 +45,7 @@ export const ProductionCalendar: React.FC = () => {
     data: ppordersData,
     isLoading: ppordersLoading,
     error: ppordersError
+    
   } = useCustom<{ pporders: PPOrder[] }>({
     url: "",
     method: "get",
@@ -142,9 +96,73 @@ export const ProductionCalendar: React.FC = () => {
         },
       });
     } catch (error) {
-      console.error("Failed to update PPOrder:", error);
+      console.error("Η εντολή δεν ενημερώθηκε:", error);
     }
   };
+
+    const handleUnschedulePporder = async (
+  id?: string,
+  extraValues?: Partial<PPOrder>
+) => {
+  const allPartsId = String(id).split('-')[0];
+  const numerified = Number(allPartsId);
+
+  const currentOrder = orders.find(order => order.id === numerified);
+  if (!currentOrder) return;
+
+  // Find the next order in the chain
+  const nextOrder = orders.find(order => order.previd === numerified);
+
+  try {
+    // 1. Clear current order
+    await updatePporder({
+      resource: "pporders",
+      id: numerified,
+      values: {
+        estStartDate: null,
+        estFinishDate: null,
+        status: 1,
+        offtimeduration: null,
+        offtimestartdate: null,
+        offtimeenddate: null,
+        previd: null,
+        prevpanelcode: null,
+        ...extraValues,
+      },
+      meta: {
+        gqlMutation: UPDATE_PPORDERS,
+      },
+    });
+
+    // 2. If there's a next order, transfer offtime data to it
+    if (nextOrder) {
+       const previousCode = currentOrder.prevpanelcode?.replace(/-001$/, "");
+    const currentCode = nextOrder.panelcode?.replace(/-001$/, "");
+      const offtimeduration = offTimeMap?.[previousCode??0]?.[currentCode??0] ?? 30;
+      console.log(currentOrder.prevpanelcode)
+      console.log(nextOrder.panelcode)
+      console.log(offtimeduration)
+
+      await updatePporder({
+        resource: "pporders",
+        id: nextOrder.id,
+        values: {
+          offtimeduration: offtimeduration ?? null,
+          offtimestartdate: currentOrder.offtimestartdate ?? null,
+          offtimeenddate: currentOrder.offtimeenddate ?? null,
+          previd: currentOrder.previd ?? null,
+          prevpanelcode: currentOrder.prevpanelcode ?? null,
+        },
+        meta: {
+          gqlMutation: UPDATE_PPORDERS,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Η εντολή δεν ενημερώθηκε:", error);
+  }
+};
+
 
   
   const [weekendsVisible, setWeekendsVisible] = useState(true);
@@ -182,6 +200,40 @@ export const ProductionCalendar: React.FC = () => {
     endMinute: 0,
     workingDays: [1, 2, 3, 4, 5],
   });
+
+  useEffect(() => {
+    
+    if (!wsClient) return;
+    console.log("subscription srartd")
+
+    const dispose = wsClient.subscribe(
+      { query: print(PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION) },
+      {
+        next: async (value: any) => {
+          const line = value?.data?.pporderlineStatusChanged;
+              console.log("line")
+
+          const orderId = line?.pporders?.id;
+          if (orderId) {
+            await updatePporder({
+              resource: "pporders",
+              id: orderId,
+              values: { status: 2 },
+              meta: { gqlMutation: UPDATE_PPORDERS },
+            });
+            message.success("Παραγγελία ενημερώθηκε");
+            console.log("useffect srartd")
+          }
+        },
+        error: (err) => console.error(err),
+        complete: () => {},
+      }
+    );
+
+    return () => {
+      dispose();
+    };
+  }, [updatePporder]);
 
   const handleEventClick = (clickInfo: any) => {
     const event = clickInfo.event;
@@ -272,83 +324,11 @@ export const ProductionCalendar: React.FC = () => {
     setWorkingHoursModalOpen(false);
   };
 
-  const handleDateSelect = (date: Dayjs) => {
-    setSelectedDate(date);
-    const dateKey = date.format("YYYY-MM-DD");
-    const existing = dailyWorkingHours[dateKey];
-
-    if (existing) {
-      setTempWorkingHours({ ...existing });
-    } else {
-      const weekday = date.day(); // 0 (Sunday) to 6 (Saturday)
-      const defaultConfig = defaultWorkingHours[weekday];
-
-      if (defaultConfig) {
-        setTempWorkingHours({ ...defaultConfig });
-      } else {
-        // fallback if no config exists for that weekday
-        setTempWorkingHours({
-          startHour: 6,
-          startMinute: 0,
-          endHour: 22,
-          endMinute: 0,
-          workingDays: [1, 2, 3, 4, 5],
-        });
-      }
-    }
-    setWorkingHoursModalOpen(true);
-  };
+  
 
 
 
-  function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
-    const eventGroups = new Map<string, EventInput[]>();
-
-    // Group events by date and base ID
-    events.forEach(event => {
-      if (!event.start || !event.id) return;
-
-      const eventDate = dayjs(event.start as Date).format('YYYY-MM-DD');
-      const baseId = event.id.toString().split('-part-')[0]; // Extract base ID
-      const groupKey = `${eventDate}-${baseId}`;
-
-      if (!eventGroups.has(groupKey)) {
-        eventGroups.set(groupKey, []);
-      }
-      eventGroups.get(groupKey)!.push(event);
-    });
-
-    const mergedEvents: EventInput[] = [];
-
-    eventGroups.forEach((group, groupKey) => {
-      if (group.length === 1) {
-        // Single event, no merging needed
-        mergedEvents.push(group[0]);
-      } else {
-        // Multiple parts to merge
-        const sortedParts = group.sort((a, b) =>
-          dayjs(a.start as Date).diff(dayjs(b.start as Date))
-        );
-
-        const firstPart = sortedParts[0];
-        const lastPart = sortedParts[sortedParts.length - 1];
-
-        // Create merged event
-        const mergedEvent: EventInput = {
-          ...firstPart,
-          id: firstPart.id!.split('-part-')[0], // Use base ID
-          start: firstPart.start,
-          end: lastPart.end,
-          title: firstPart.title?.replace(/ - μέρος \d+$/, '') || firstPart.title, // Remove part suffix if exists
-        };
-
-        mergedEvents.push(mergedEvent);
-      }
-    });
-
-    return mergedEvents;
-  }
-
+ 
 
 
 
@@ -383,51 +363,20 @@ export const ProductionCalendar: React.FC = () => {
   });
 
 
-  function calculateWorkingMinutesBetween(
-    start: Dayjs,
-    end: Dayjs,
-    dailyWorkingHours: Record<string, WorkingHoursConfig>,
-    defaultWorkingHours: Record<number, WorkingHoursConfig>
-  ): number {
-    if (end.isBefore(start)) return 0;
-
-    let current = start.clone();
-    let total = 0;
-
-    while (current.isBefore(end)) {
-      const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
-        getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
-
-      if (isBusinessDay) {
-        const dayStart = current
-          .startOf('day')
-          .hour(startHour)
-          .minute(startMinute);
-        const dayEnd = current.startOf('day').hour(endHour).minute(endMinute);
-
-        const intervalStart = current.isBefore(dayStart) ? dayStart : current;
-        const intervalEnd = end.isBefore(dayEnd) ? end : dayEnd;
-
-        if (intervalEnd.isAfter(intervalStart)) {
-          total += intervalEnd.diff(intervalStart, 'minute');
-        }
-      }
-
-      current = current.add(1, 'day').startOf('day');
-    }
-
-    return total;
-  }
+  
 
 
 
   useEffect(() => {// this useffect renders currentevents from unscheduled orders
     
     
-    if (initialSyncRef.current) return;
+   if (
+    currentEvents.length > 0 || // Events already populated
+    !unscheduledorders.some(o => o.estStartDate && o.estFinishDate && o.status !== 1)
+  ) return;
     const preScheduled = unscheduledorders
-      .filter(o => o.estStartDate && o.estFinishDate)
-      .sort((a, b) =>
+      .filter(o => o.estStartDate && o.estFinishDate&& !(o.status===1))
+       .sort((a, b) =>
         dayjs(a.estStartDate as Date).diff(dayjs(b.estStartDate as Date))
       );
 
@@ -452,45 +401,46 @@ export const ProductionCalendar: React.FC = () => {
               : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
 
           if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
-          const offtimeduration=order.offtimeduration;
-          const offStart = dayjs(order.offtimestartdate as Date);
-            const offEnd = dayjs(order.offtimeenddate as Date);
+            const offtimeduration = order.offtimeduration;
+            let offStart = dayjs(order.offtimestartdate as Date);
+            // If the previous event ended later than the planned offtime start,
+            // begin the offtime after the previous event
+            console.log("unupdated offStart",offStart)
+            if (prevEnd && !prevEnd.isSame(offStart)) {
+              offStart = prevEnd
+            }
+           console.log("offStart",offStart)
+            const offtimeSegments = splitEventIntoWorkingHours(
+              offStart,
+              offtimeduration,
+              dailyWorkingHours,
+              defaultWorkingHours,
+              {
+                id: `${order.id}-offtime`,
+                title: "προετοιμασία μηχανής",
+                color: "gray",
+                extendedProps: {
+                  isOfftime: true,
+                  prevId: order.previd?.toString(),
+                  currId: order.id.toString(),
+                  prevpanelcode: order.prevpanelcode,
+                  offtimeduration: order.offtimeduration,
+                },
+              }
+            );
 
-             const offtimeSegments = splitEventIntoWorkingHours(
-      offStart,
-      offtimeduration,
-      dailyWorkingHours,
-      defaultWorkingHours,
-      {
-            
-              id: `${order.id}-offtime`,
-              title: "προετοιμασία μηχανής",
-              
-              color: "gray",
-              extendedProps: {
-                isOfftime: true,
-                prevId: order.previd?.toString(),
-                currId: order.id.toString(),
-                prevpanelcode: order.prevpanelcode,
-                offtimeduration: order.offtimeduration,
-           
-              
-            },
-          })
-           // Manually apply split segment start/end to their extendedProps
-    offtimeSegments.forEach(seg => {
-      seg.extendedProps = {
-        ...seg.extendedProps,
-        offtimeStartDate: (seg.start as Date).toISOString(),
-        offtimeEndDate: (seg.end as Date).toISOString(),
-      };
-    });
-
-    
+            // Manually apply split segment start/end to their extendedProps
+            offtimeSegments.forEach(seg => {
+              seg.extendedProps = {
+                ...seg.extendedProps,
+                offtimeStartDate: (seg.start as Date).toISOString(),
+                offtimeEndDate: (seg.end as Date).toISOString(),
+              };
+            });
 
             processed.push(...offtimeSegments);
             const lastSegment = offtimeSegments[offtimeSegments.length - 1];
-prevEnd = dayjs(lastSegment.end as Date);
+            prevEnd = dayjs(lastSegment.end as Date);
             tentativeStart = isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
               ? prevEnd
               : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
@@ -515,12 +465,14 @@ prevEnd = dayjs(lastSegment.end as Date);
 
           processed.push(...segments);
           prevEnd = dayjs(segments[segments.length - 1].end as Date);
+          console.log("prevend",prevEnd)
+          
         });
       const mergedEvents = mergeSameDayEventParts(processed);
       setCurrentEvents(mergedEvents);
       initialSyncRef.current = true;
     }
-  }, [unscheduledorders, dailyWorkingHours, defaultWorkingHours]);
+  }, [unscheduledorders, dailyWorkingHours, defaultWorkingHours,currentEvents]);
 
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
@@ -727,9 +679,12 @@ console.log("extra",extra)
     console.error(`Failed to update PPOrder ${baseId}:`, error);
   }
 }
-  
+ 
   console.log('All updates completed');
 };
+console.log("currentEvents",currentEvents)
+console.log("unscheduledorders",unscheduledorders)
+
   return (
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
       <Sider width={300} style={{ background: "#fff", padding: 24 }}>
@@ -757,7 +712,14 @@ console.log("extra",extra)
           <DatePicker
             placeholder="διάλεξε ημερα"
             onChange={(date) => {
-              if (date) handleDateSelect(date);
+              if (date)handleDateSelect(
+        date,
+        setSelectedDate,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        setTempWorkingHours,
+        setWorkingHoursModalOpen
+      );;
             }}
             style={{ width: "100%" }}
           />
@@ -782,25 +744,38 @@ console.log("extra",extra)
           droppable={true}
           selectable={true}
           drop={dropHandler}
-          dayHeaderContent={(arg) => (
-            <div
-              onClick={() => handleDateSelect(dayjs(arg.date))}
-              style={{ cursor: 'pointer', padding: '4px' }}
-            >
-              {arg.text}
-              <Tooltip title="ώρισε εργάσιμες ώρες">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDateSelect(dayjs(arg.date));
-                  }}
-                />
-              </Tooltip>
-            </div>
-          )}
+          dayHeaderContent={(arg) => {
+    const date = dayjs(arg.date);
+
+    const handleClick = (e?: React.MouseEvent) => {
+      if (e) e.stopPropagation(); // prevent double trigger from button
+      handleDateSelect(
+        date,
+        setSelectedDate,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        setTempWorkingHours,
+        setWorkingHoursModalOpen
+      );
+    };
+
+    return (
+      <div
+        onClick={handleClick}
+        style={{ cursor: 'pointer', padding: '4px' }}
+      >
+        {arg.text}
+        <Tooltip title="ώρισε εργάσιμες ώρες">
+          <Button
+            type="text"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={handleClick}
+          />
+        </Tooltip>
+      </div>
+      
+          )}}
           height="100%"
           eventDataTransform={(event) => {
 
@@ -847,11 +822,20 @@ console.log("extra",extra)
         editStart={editStart}
         editEnd={editEnd}
         onCancel={() => setEditModalOpen(false)}
-        onDelete={() => {
-          if (!selectedEvent) return;
-          setCurrentEvents(prev => prev.filter(ev => ev.id !== selectedEvent.id));
-          setEditModalOpen(false);
-        }}
+       onDelete={async () => {
+  if (!selectedEvent) return;
+
+  // Optional: persist the reset to your backend
+  console.log("selectedEvent.id", (selectedEvent.id as string).split('-')[0]);
+ handleUnschedulePporder(selectedEvent.id,selectedEvent.extendedProps?.previd)
+const baseId = String(selectedEvent.id).split('-')[0];
+  // Remove from calendar display
+  setCurrentEvents(prev =>
+    prev.filter(ev => String(ev.id).split('-')[0] !== baseId)
+  );
+
+  setEditModalOpen(false);
+}}
         onSave={() => {
           setCurrentEvents(prevEvents =>
             handleSaveEdit(

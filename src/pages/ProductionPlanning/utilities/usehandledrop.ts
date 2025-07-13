@@ -11,7 +11,6 @@ import {
 } from "../dateschedule-utils";
 import { WorkingHoursConfig } from "../productioncalendartypes";
 import { offTimeMap } from "./offtime-map";
-import { addWorkingMinutesDynamic } from "../calendarpage";
 
 export function handleDropFactory(
   currentEvents: EventInput[],

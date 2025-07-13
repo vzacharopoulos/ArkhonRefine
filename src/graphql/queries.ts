@@ -4,6 +4,20 @@
 
 
 import gql from "graphql-tag";
+
+export const PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION = gql`
+  subscription PporderlineStatusChanged {
+    pporderlineStatusChanged {
+      id
+      status
+      pporders {
+        id
+      }
+    }
+  }
+`;
+
+
 export const UPDATE_PPORDERS = gql`
 mutation updatePporder($input: UpdatePporderInput!) {
   updatePporder(input: $input) {

@@ -311,10 +311,12 @@ export function splitEventIntoWorkingHours(
     const availableMinutes = endTime - currentTime;
     const chunk = Math.min(availableMinutes, remaining);
     const segmentEnd = current.add(chunk, "minute");
+     const idStr = eventData.id?.toString() ?? "";
+    const baseId = idStr.split("-part-")[0];
 
     events.push({
       ...eventData,
-      id: `${eventData.id}-part-${partIndex}`,
+      id: `${baseId}-part-${partIndex}`,
       title: events.length === 0 ? eventData.title : `${eventData.title} `,
       start: current.toDate(),
       end: segmentEnd.toDate(),
@@ -351,3 +353,137 @@ export function splitEventIntoWorkingHours(
   return events;
 }
 
+export function addWorkingMinutesDynamic(
+    start: Dayjs,
+    minutesToAdd: number,
+    dailyWorkingHours: Record<string, WorkingHoursConfig>,
+    defaultWorkingHours: Record<number, WorkingHoursConfig>
+  ): Dayjs {
+    let current = start.clone();
+    let remaining = minutesToAdd;
+
+    while (remaining > 0) {
+      const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+        getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+
+      if (!isBusinessDay) {
+        current = current.add(1, 'day').startOf('day');
+        continue;
+      }
+
+      const dayStart = current
+        .startOf('day')
+        .hour(startHour)
+        .minute(startMinute)
+        .second(0);
+      const dayEnd = current
+        .startOf('day')
+        .hour(endHour)
+        .minute(endMinute)
+        .second(0);
+
+      if (current.isBefore(dayStart)) {
+        current = dayStart;
+      }
+
+      if (current.isAfter(dayEnd) || current.isSame(dayEnd)) {
+        current = current.add(1, 'day').startOf('day');
+        continue;
+      }
+
+      const availableMinutes = dayEnd.diff(current, 'minute');
+      const chunk = Math.min(availableMinutes, remaining);
+      current = current.add(chunk, 'minute');
+      remaining -= chunk;
+
+      if (remaining > 0) {
+        current = current.add(1, 'day').startOf('day');
+      }
+    }
+
+    return current;
+  }
+
+   export function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
+      const eventGroups = new Map<string, EventInput[]>();
+  
+      // Group events by date and base ID
+      events.forEach(event => {
+        if (!event.start || !event.id) return;
+  
+        const eventDate = dayjs(event.start as Date).format('YYYY-MM-DD');
+        const baseId = event.id.toString().split('-part-')[0]; // Extract base ID
+        const groupKey = `${eventDate}-${baseId}`;
+  
+        if (!eventGroups.has(groupKey)) {
+          eventGroups.set(groupKey, []);
+        }
+        eventGroups.get(groupKey)!.push(event);
+      });
+  
+      const mergedEvents: EventInput[] = [];
+  
+      eventGroups.forEach((group, groupKey) => {
+        if (group.length === 1) {
+          // Single event, no merging needed
+          mergedEvents.push(group[0]);
+        } else {
+          // Multiple parts to merge
+          const sortedParts = group.sort((a, b) =>
+            dayjs(a.start as Date).diff(dayjs(b.start as Date))
+          );
+  
+          const firstPart = sortedParts[0];
+          const lastPart = sortedParts[sortedParts.length - 1];
+  
+          // Create merged event
+          const mergedEvent: EventInput = {
+            ...firstPart,
+            id: firstPart.id!.split('-part-')[0], // Use base ID
+            start: firstPart.start,
+            end: lastPart.end,
+            title: firstPart.title?.replace(/ - μέρος \d+$/, '') || firstPart.title, // Remove part suffix if exists
+          };
+  
+          mergedEvents.push(mergedEvent);
+        }
+      });
+  
+      return mergedEvents;
+    }
+  
+    export function calculateWorkingMinutesBetween(
+        start: Dayjs,
+        end: Dayjs,
+        dailyWorkingHours: Record<string, WorkingHoursConfig>,
+        defaultWorkingHours: Record<number, WorkingHoursConfig>
+      ): number {
+        if (end.isBefore(start)) return 0;
+    
+        let current = start.clone();
+        let total = 0;
+    
+        while (current.isBefore(end)) {
+          const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+            getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+    
+          if (isBusinessDay) {
+            const dayStart = current
+              .startOf('day')
+              .hour(startHour)
+              .minute(startMinute);
+            const dayEnd = current.startOf('day').hour(endHour).minute(endMinute);
+    
+            const intervalStart = current.isBefore(dayStart) ? dayStart : current;
+            const intervalEnd = end.isBefore(dayEnd) ? end : dayEnd;
+    
+            if (intervalEnd.isAfter(intervalStart)) {
+              total += intervalEnd.diff(intervalStart, 'minute');
+            }
+          }
+    
+          current = current.add(1, 'day').startOf('day');
+        }
+    
+        return total;
+      }
