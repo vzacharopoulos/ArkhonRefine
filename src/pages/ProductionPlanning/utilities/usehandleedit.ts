@@ -36,11 +36,23 @@ export function handleSaveEdit(
 
   if (idx === -1) return prevEvents;
 
-  sorted[idx] = {
+  const updatedEvent: EventInput = {
     ...sorted[idx],
     start: editStart.toDate(),
     end: editEnd.toDate(),
   };
+
+  if (sorted[idx].extendedProps?.isOfftime) {
+    const newDuration = editEnd.diff(editStart, "minute");
+    updatedEvent.extendedProps = {
+      ...sorted[idx].extendedProps,
+      offtimeduration: newDuration,
+      offtimeStartDate: editStart.toISOString(),
+      offtimeEndDate: editEnd.toISOString(),
+    };
+  }
+
+  sorted[idx] = updatedEvent;
 
   let prevEnd = editEnd;
 

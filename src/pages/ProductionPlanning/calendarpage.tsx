@@ -422,6 +422,8 @@ export const ProductionCalendar: React.FC = () => {
 
 
   useEffect(() => {// this useffect renders currentevents from unscheduled orders
+    
+    
     if (initialSyncRef.current) return;
     const preScheduled = unscheduledorders
       .filter(o => o.estStartDate && o.estFinishDate)
@@ -450,13 +452,20 @@ export const ProductionCalendar: React.FC = () => {
               : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
 
           if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
-            const offStart = dayjs(order.offtimestartdate as Date);
+          const offtimeduration=order.offtimeduration;
+          const offStart = dayjs(order.offtimestartdate as Date);
             const offEnd = dayjs(order.offtimeenddate as Date);
-            const offEvent: EventInput = {
+
+             const offtimeSegments = splitEventIntoWorkingHours(
+      offStart,
+      offtimeduration,
+      dailyWorkingHours,
+      defaultWorkingHours,
+      {
+            
               id: `${order.id}-offtime`,
               title: "προετοιμασία μηχανής",
-              start: offStart.toDate(),
-              end: offEnd.toDate(),
+              
               color: "gray",
               extendedProps: {
                 isOfftime: true,
@@ -464,12 +473,24 @@ export const ProductionCalendar: React.FC = () => {
                 currId: order.id.toString(),
                 prevpanelcode: order.prevpanelcode,
                 offtimeduration: order.offtimeduration,
-                offtimestartDate: offStart.toISOString(),
-                offtimeenddate: offEnd.toISOString(),
-              },
-            };
-            processed.push(offEvent);
-            prevEnd = offEnd;
+           
+              
+            },
+          })
+           // Manually apply split segment start/end to their extendedProps
+    offtimeSegments.forEach(seg => {
+      seg.extendedProps = {
+        ...seg.extendedProps,
+        offtimeStartDate: (seg.start as Date).toISOString(),
+        offtimeEndDate: (seg.end as Date).toISOString(),
+      };
+    });
+
+    
+
+            processed.push(...offtimeSegments);
+            const lastSegment = offtimeSegments[offtimeSegments.length - 1];
+prevEnd = dayjs(lastSegment.end as Date);
             tentativeStart = isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
               ? prevEnd
               : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
