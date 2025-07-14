@@ -39,7 +39,6 @@ export const GET_PANEL_PRODUCTION_ORDERS_EXT2 = gql`
 `;
 
 export type PanelProductionOrderExt2 = {
-  prodOrder?: string;
   productionNo: string;
   tradecode: string;
   materialCode: string;
@@ -59,41 +58,30 @@ export type PanelProductionOrderExt2 = {
 const SimpleList: React.FC = () => {
   const { data, isLoading } = useList({
     resource: "panelProductionOrdersExt2s",
-   metaData: {
-  gqlQuery: GET_PANEL_PRODUCTION_ORDERS_EXT2,
-  fields: [
-    "data.productionNo",
-    "data.tradecode",
-    "data.materialCode",
-    "data.cin",
-    "data.cout",
-    "data.thickin",
-    "data.thickout",
-    "data.moldin",
-    "data.moldout",
-    "data.widthin",
-    "data.widthout",
-    "data.importNo",
-    "data.ttm",
-    "data.count",
-    "total",
-  ],
-},
     pagination: {
-      mode: "server",
+      mode: "off",
     },
-    queryOptions: {
-      select: (response) => {
-        console.log("🚀 Full GraphQL response:", response);
-        console.log("📦 Extracted data:", response?.panelProductionOrdersExt2s?.data);
-        return response?.panelProductionOrdersExt2s?.data ?? [];
-      },
+    meta: {
+      gqlQuery: GET_PANEL_PRODUCTION_ORDERS_EXT2,
+      operation: "GetPanelProductionOrdersExt2s",
+      
     },
   });
 
-  const records = data ?? [];
+  console.log("📦 useList raw data:", data);
+  console.log("📍 data?.data:", data?.data);
+  console.log("📍 data?.data?.panelProductionOrdersExt2s:", data?.data?.panelProductionOrdersExt2s);
+  console.log("📍 data?.data?.panelProductionOrdersExt2s?.data:", data?.data?.panelProductionOrdersExt2s?.data);
+  console.log("📍 data?.panelProductionOrdersExt2s?.data:", data?.panelProductionOrdersExt2s?.data);
+  console.log("📍 data?.data?.data:", data?.data?.data);
 
-  console.log("🧾 Final records passed to AntdList:", records);
+  const records =
+    data?.data?.panelProductionOrdersExt2s?.data ??
+    data?.panelProductionOrdersExt2s?.data ??
+    data?.data?.data ??
+    [];
+
+  console.log("✅ Final records used for rendering:", records);
 
   return (
     <List title="Panel Production Orders Ext2">
