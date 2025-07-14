@@ -17,28 +17,29 @@ export const GET_PANEL_PRODUCTION_ORDERS_EXT2 = gql`
       limit: $limit
       offset: $offset
     ) {
-      nodes{
-      productionNo
-      tradecode
-      materialCode
-      cin
-      cout
-      thickin
-      thickout
-      moldin
-      moldout
-      widthin
-      widthout
-      importNo
-      ttm
-      count
+      data {
+        productionNo
+        tradecode
+        materialCode
+        cin
+        cout
+        thickin
+        thickout
+        moldin
+        moldout
+        widthin
+        widthout
+        importNo
+        ttm
+        count
       }
-      totalCount
+      total
     }
   }
 `;
+
 export type PanelProductionOrderExt2 = {
-  prodOrder: string;
+  prodOrder?: string;
   productionNo: string;
   tradecode: string;
   materialCode: string;
@@ -56,61 +57,54 @@ export type PanelProductionOrderExt2 = {
 };
 
 const SimpleList: React.FC = () => {
- const { data, isLoading } = useList<{
-  panelProductionOrdersExt2s: {
-    nodes: PanelProductionOrderExt2[];
-    totalCount: number;
-  };
-}>({
-  meta: {
-    gqlQuery: GET_PANEL_PRODUCTION_ORDERS_EXT2,
-    fields: [
-      {
-        nodes: [
-          "productionNo",
-          "tradecode",
-          "materialCode",
-          "cin",
-          "cout",
-          "thickin",
-          "thickout",
-          "moldin",
-          "moldout",
-          "widthin",
-          "widthout",
-          "importNo",
-          "ttm",
-          "count",
-        ],
+  const { data, isLoading } = useList({
+    resource: "panelProductionOrdersExt2s",
+   metaData: {
+  gqlQuery: GET_PANEL_PRODUCTION_ORDERS_EXT2,
+  fields: [
+    "data.productionNo",
+    "data.tradecode",
+    "data.materialCode",
+    "data.cin",
+    "data.cout",
+    "data.thickin",
+    "data.thickout",
+    "data.moldin",
+    "data.moldout",
+    "data.widthin",
+    "data.widthout",
+    "data.importNo",
+    "data.ttm",
+    "data.count",
+    "total",
+  ],
+},
+    pagination: {
+      mode: "server",
+    },
+    queryOptions: {
+      select: (response) => {
+        console.log("🚀 Full GraphQL response:", response);
+        console.log("📦 Extracted data:", response?.panelProductionOrdersExt2s?.data);
+        return response?.panelProductionOrdersExt2s?.data ?? [];
       },
-      "totalCount",
-    ],
-  },
-  pagination: {
-    mode: "server",
-  },
-   filters: [],
-  sorters: [],
-});
-console.log("✅ Full useList response:", data);
+    },
+  });
 
-console.log("✅ data?.data:", data?.data);
+  const records = data ?? [];
 
-console.log("✅ data?.data?.panelProductionOrdersExt2s:", data?.data?.panelProductionOrdersExt2s);
+  console.log("🧾 Final records passed to AntdList:", records);
 
-console.log("✅ data?.data?.panelProductionOrdersExt2s?.nodes:", data?.data?.panelProductionOrdersExt2s?.nodes);
-
-const records = data?.panelProductionOrdersExt2s?.nodes;
   return (
     <List title="Panel Production Orders Ext2">
       <AntdList
         loading={isLoading}
         dataSource={records}
         renderItem={(item) => (
-          <AntdList.Item key={item.prodOrder}>
+          <AntdList.Item key={item.productionNo + item.materialCode}>
             <AntdList.Item.Meta
-              title={item.prodOrder}
-              description={`ProductionNo: ${item.productionNo}, Tradecode: ${item.tradecode}`}
+              title={`Tradecode: ${item.tradecode}`}
+              description={`Production No: ${item.productionNo} | Material: ${item.materialCode}`}
             />
           </AntdList.Item>
         )}
