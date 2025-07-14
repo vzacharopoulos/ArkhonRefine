@@ -40,6 +40,7 @@ import { CoilEdit } from "./pages/coillist/CoilEdit";
 import { Calendar } from "antd";
 import { ProductionCalendar } from "./pages/ProductionPlanning/calendarpage";
 import PanelMachineDashboard from "./pages/panelmachine/panelmachinedashboard";
+import SimpleListPage from "./pages/simplelist/simplelist";
 
 
 function App() {
@@ -79,6 +80,14 @@ function App() {
                       icon: <FormatListBulletedIcon />,
                     },
                   },
+                           {
+                    name: "simple-list",
+                    list: "/simple-list",
+                    meta: {
+                      label: "Simple List",
+                      icon: <ShopOutlined />,
+                    },
+                  },
                   {
                     name: "pporders",
                     list:"/pporders",
@@ -105,9 +114,12 @@ function App() {
                     <Route path="/coil" element={<CoilPage />} />
                    <Route path="/coil/show/:id" element={<CoilShow />} />
                       <Route path="/coil/edit/:id" element={< CoilEdit />} />         
+                                           <Route path="/simple-list" element={<SimpleListPage />} />
 
                      <Route index element={<NavigateToResource resource="pporders" />} />
                      <Route path= '/pporders' element ={<ProductionCalendar/>}/>
+
+                     <Route path="/simple-list" element={<SimpleListPage />} />
                       
                       <Route index element={<NavigateToResource resource="PanelMachine" />} />
                       <Route path= '/PanelMachine' element ={<PanelMachineDashboard/>}/>

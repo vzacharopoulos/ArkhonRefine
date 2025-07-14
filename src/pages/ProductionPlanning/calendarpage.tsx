@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useCustom, useUpdate } from "@refinedev/core";
+import { useCustom, useResourceSubscription, useUpdate } from "@refinedev/core";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { EventInput } from "@fullcalendar/core";
@@ -215,7 +215,7 @@ export const ProductionCalendar: React.FC = () => {
         next: async (value: any) => {
            console.log("Subscription value received:", value);
           const line = value?.data?.pporderlineStatusChanged;
-              console.log("line")
+              console.log("line",line)
 
           const orderId = line?.pporders?.id;
           if (orderId) {
