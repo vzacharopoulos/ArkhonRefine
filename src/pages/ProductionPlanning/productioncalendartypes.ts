@@ -11,12 +11,14 @@ export interface PPOrder {
   estFinishDate?: Date;
   createDate?: Date;
    previd?: number;
+   pporderlines?:PPOrderLine;
   prevpanelcode?: string;
   offtimeduration?: number;
   offtimestartdate?: Date;
   offtimeenddate?: Date;
 
 }
+
 
 export interface ProdOrdersView {
   isCanceled: number;

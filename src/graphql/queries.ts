@@ -17,6 +17,21 @@ export const PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION = gql`
   }
 `;
 
+export const PPORDER_UPDATED_SUBSCRIPTION = gql`
+  subscription PporderUpdated {
+    pporderUpdated {
+      id
+      status
+      panelcode
+      pporderno
+      estStartDate
+      estFinishDate
+      offtimeduration
+      offtimestartdate
+      offtimeenddate
+    }
+  }
+`;
 
 export const UPDATE_PPORDERS = gql`
 mutation updatePporder($input: UpdatePporderInput!) {
@@ -35,6 +50,10 @@ mutation updatePporder($input: UpdatePporderInput!) {
     offtimeduration
     offtimestartdate
     offtimeenddate
+      pporderlines{
+      status
+      upDate
+    }
   }
 
 }`

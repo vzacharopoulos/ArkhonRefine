@@ -3,7 +3,7 @@ import { useCustom, useUpdate } from "@refinedev/core";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { EventInput } from "@fullcalendar/core";
-import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS, PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, UPDATE_PPORDERS } from "@/graphql/queries";
+import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS, PPORDER_UPDATED_SUBSCRIPTION, PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, UPDATE_PPORDERS } from "@/graphql/queries";
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
@@ -44,7 +44,8 @@ export const ProductionCalendar: React.FC = () => {
   const {
     data: ppordersData,
     isLoading: ppordersLoading,
-    error: ppordersError
+    error: ppordersError,
+    refetch: refetchPporders,
     
   } = useCustom<{ pporders: PPOrder[] }>({
     url: "",
@@ -89,6 +90,7 @@ export const ProductionCalendar: React.FC = () => {
           estStartDate: startDate ? startDate.toISOString() : null,
           estFinishDate: finishDate ? finishDate.toISOString() : null,
           status: 14, // Default to status 2 if not provided
+         
           ...extraValues,
         },
         meta: {
@@ -237,6 +239,25 @@ export const ProductionCalendar: React.FC = () => {
     };
   }, [updatePporder]);
 
+   useEffect(() => {
+    if (!wsClient) return;
+
+    const dispose = wsClient.subscribe(
+      { query: print(PPORDER_UPDATED_SUBSCRIPTION) },
+      {
+        next: () => {
+          refetchPporders();
+        },
+        error: (err) => console.error(err),
+        complete: () => {console.log("refetched")},
+      }
+    );
+
+    return () => {
+      dispose();
+    };
+  }, [refetchPporders]);
+
   const handleEventClick = (clickInfo: any) => {
     const event = clickInfo.event;
 
@@ -358,32 +379,34 @@ export const ProductionCalendar: React.FC = () => {
   const finished = finishedData?.data?.masterlengths ?? [];
   const orders = ppordersData?.data?.pporders ?? [];
 
-  const unscheduledorders = orders.filter((order) => {
-    if (order.status == null || ![1, 2, 3, 14].includes(order.status)) return false;
-    const recentThreshold = getlast80days();
-    return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
-  });
+const unscheduledorders = useMemo(
+  () =>
+    orders.filter(order => {
+      if (order.status == null || ![1, 2, 3, 14].includes(order.status)) return false;
+      const recentThreshold = getlast80days();
+      return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
+    }),
+  [orders]
+);
 
 
   
 
 
 
-  useEffect(() => {// this useffect renders currentevents from unscheduled orders
-    
-    
-   if (
-    currentEvents.length > 0 || // Events already populated
-    !unscheduledorders.some(o => o.estStartDate && o.estFinishDate && o.status !== 1)
-  ) return;
+    useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
     const preScheduled = unscheduledorders
-      .filter(o => o.estStartDate && o.estFinishDate&& !(o.status===1))
-       .sort((a, b) =>
+      .filter(o => o.estStartDate && o.estFinishDate && !(o.status === 1))
+      .sort((a, b) =>
         dayjs(a.estStartDate as Date).diff(dayjs(b.estStartDate as Date))
       );
 
-     if (preScheduled.length > 0) {
-      const processed: EventInput[] = [];
+    if (preScheduled.length === 0) {
+      setCurrentEvents([]);
+      return;
+    }
+
+    const processed: EventInput[] = [];
       let prevEnd: Dayjs | null = null;
 
         preScheduled.forEach(order => {
@@ -474,7 +497,7 @@ export const ProductionCalendar: React.FC = () => {
       setCurrentEvents(mergedEvents);
       initialSyncRef.current = true;
     }
-  }, [unscheduledorders, dailyWorkingHours, defaultWorkingHours,currentEvents]);
+  , [unscheduledorders, dailyWorkingHours, defaultWorkingHours]);
 
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
@@ -674,7 +697,10 @@ console.log("extra",extra)
       Number(baseId),
       firstStart,
       lastEnd,
-      updatedOffInfo || {}
+      {...updatedOffInfo,
+       
+    }
+      
     );
     console.log(`Successfully updated PPOrder ${baseId}`);
   } catch (error) {
@@ -684,8 +710,7 @@ console.log("extra",extra)
  
   console.log('All updates completed');
 };
-console.log("currentEvents",currentEvents)
-console.log("unscheduledorders",unscheduledorders)
+
 
   return (
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
