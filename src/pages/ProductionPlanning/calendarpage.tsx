@@ -207,9 +207,11 @@ export const ProductionCalendar: React.FC = () => {
     console.log("subscription srartd")
 
     const dispose = wsClient.subscribe(
+      
       { query: print(PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION) },
       {
         next: async (value: any) => {
+           console.log("Subscription value received:", value);
           const line = value?.data?.pporderlineStatusChanged;
               console.log("line")
 

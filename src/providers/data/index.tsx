@@ -33,16 +33,19 @@ export const wsClient =
         url: WS_URL,
         connectionParams: () => {
           const accessToken = localStorage.getItem("access_token");
-
           return {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
           };
         },
+        on: {
+          connected: () => console.log("✅ WS connected"),
+          closed: () => console.log("❌ WS closed"),
+          error: (err) => console.error("🔥 WS error", err),
+        },
       })
     : undefined;
-    
 
     
 
