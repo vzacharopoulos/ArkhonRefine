@@ -77,6 +77,8 @@ query GetPpOrders($filter: PpordersFilterInput) {
     offtimeduration
     offtimestartdate
     offtimeenddate
+    totalTime
+    totalTtm
   
     
   }

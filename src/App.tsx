@@ -81,10 +81,10 @@ function App() {
                     },
                   },
                            {
-                    name: "simple-list",
-                    list: "/simple-list",
+                    name: "panelProductionOrdersExt2s",
+                    list: "/panelProductionOrdersExt2s",
                     meta: {
-                      label: "Simple List",
+                      label: "panelProductionOrdersExt2s",
                       icon: <ShopOutlined />,
                     },
                   },
@@ -114,7 +114,7 @@ function App() {
                     <Route path="/coil" element={<CoilPage />} />
                    <Route path="/coil/show/:id" element={<CoilShow />} />
                       <Route path="/coil/edit/:id" element={< CoilEdit />} />         
-                                           <Route path="/simple-list" element={<SimpleListPage />} />
+                                           <Route path="/panelProductionOrdersExt2s" element={<SimpleListPage />} />
 
                      <Route index element={<NavigateToResource resource="pporders" />} />
                      <Route path= '/pporders' element ={<ProductionCalendar/>}/>

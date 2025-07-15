@@ -5,19 +5,18 @@ import { useList } from "@refinedev/core";
 import gql from "graphql-tag";
 
 export const GET_PANEL_PRODUCTION_ORDERS_EXT2 = gql`
-  query GetPanelProductionOrdersExt2s(
+  query panelProductionOrdersExt2s(
     $filter: PanelProductionOrdersExt2FilterInput
     $sorting: [PanelProductionOrdersExt2SortInput!]
-    $limit: Int
-    $offset: Int
+    $paging: PagingInput
   ) {
     panelProductionOrdersExt2s(
       filter: $filter
       sorting: $sorting
-      limit: $limit
-      offset: $offset
+      paging: $paging
     ) {
-      data {
+      nodes {
+        prodOrder
         productionNo
         tradecode
         materialCode
@@ -33,12 +32,13 @@ export const GET_PANEL_PRODUCTION_ORDERS_EXT2 = gql`
         ttm
         count
       }
-      total
+      totalCount
     }
   }
 `;
 
 export type PanelProductionOrderExt2 = {
+  prodOrder: string;
   productionNo: string;
   tradecode: string;
   materialCode: string;
@@ -56,32 +56,49 @@ export type PanelProductionOrderExt2 = {
 };
 
 const SimpleList: React.FC = () => {
-  const { data, isLoading } = useList({
+  const { data, isLoading, error } = useList<PanelProductionOrderExt2>({
     resource: "panelProductionOrdersExt2s",
     pagination: {
       mode: "off",
     },
+    sorters: [
+      {
+        field: "prodOrder",
+        order: "asc",
+      },
+    ],
     meta: {
       gqlQuery: GET_PANEL_PRODUCTION_ORDERS_EXT2,
-      operation: "GetPanelProductionOrdersExt2s",
-      
     },
+    // Remove queryOptions entirely - let Refine handle it
   });
 
-  console.log("📦 useList raw data:", data);
-  console.log("📍 data?.data:", data?.data);
-  console.log("📍 data?.data?.panelProductionOrdersExt2s:", data?.data?.panelProductionOrdersExt2s);
-  console.log("📍 data?.data?.panelProductionOrdersExt2s?.data:", data?.data?.panelProductionOrdersExt2s?.data);
-  console.log("📍 data?.panelProductionOrdersExt2s?.data:", data?.panelProductionOrdersExt2s?.data);
-  console.log("📍 data?.data?.data:", data?.data?.data);
+  const mockArray: PanelProductionOrderExt2[] = [
+    {
+      prodOrder: "PO001",
+      productionNo: "P123",
+      tradecode: "TR001",
+      materialCode: "M001",
+      cin: "CIN001",
+      cout: "COUT001",
+      thickin: 1,
+      thickout: 2,
+      moldin: 1,
+      moldout: 2,
+      widthin: 100,
+      widthout: 120,
+      importNo: "IMP001",
+      ttm: 123,
+      count: 10,
+    },
+  ];
 
-  const records =
-    data?.data?.panelProductionOrdersExt2s?.data ??
-    data?.panelProductionOrdersExt2s?.data ??
-    data?.data?.data ??
-    [];
+  // Debug logging
+  console.log("useList data:", data);
+  console.log("useList error:", error);
 
-  console.log("✅ Final records used for rendering:", records);
+  // Use the actual data from the API, fallback to mock if needed
+  const records = data?.data ?? mockArray;
 
   return (
     <List title="Panel Production Orders Ext2">
@@ -89,7 +106,7 @@ const SimpleList: React.FC = () => {
         loading={isLoading}
         dataSource={records}
         renderItem={(item) => (
-          <AntdList.Item key={item.productionNo + item.materialCode}>
+          <AntdList.Item key={item.prodOrder}>
             <AntdList.Item.Meta
               title={`Tradecode: ${item.tradecode}`}
               description={`Production No: ${item.productionNo} | Material: ${item.materialCode}`}

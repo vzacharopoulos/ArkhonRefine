@@ -10,12 +10,15 @@ export interface PPOrder {
   estStartDate?: Date;
   estFinishDate?: Date;
   createDate?: Date;
+  totalTime?:number;
+  totalTtm?:number
    previd?: number;
    pporderlines?:PPOrderLine;
   prevpanelcode?: string;
   offtimeduration?: number;
   offtimestartdate?: Date;
   offtimeenddate?: Date;
+
 
 }
 

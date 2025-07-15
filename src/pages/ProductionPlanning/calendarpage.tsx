@@ -16,7 +16,7 @@ import { finishedPporders, PPOrder, PPOrderLine, WorkingHoursConfig } from "./pr
 import { Sidebar } from "./sidebar";
 import { EditOutlined } from "@ant-design/icons";
 import isBetween from 'dayjs/plugin/isBetween';
-import { addWorkingMinutes, calculateWorkingMinutesBetween, findLastEventEndTime, findNextWorkingTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, mergeSameDayEventParts, splitEventIntoWorkingHours } from "./dateschedule-utils";
+import { addWorkingMinutes, addWorkingMinutesDynamic, calculateWorkingMinutesBetween, findLastEventEndTime, findNextWorkingTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, mergeSameDayEventParts, splitEventIntoWorkingHours } from "./dateschedule-utils";
 import { calculateTotalTime, EventTooltip } from "./event-utils";
 import { WorkingHoursModal } from "@/components/modals/workinghoursmodal";
 import { EditEventModal } from "@/components/modals/editeventmodal";
@@ -25,7 +25,7 @@ import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import { print } from "graphql";
 import { handleSaveEdit } from "./utilities/usehandleedit";
 import { eventNames } from "process";
-import { handleDateSelect } from "./workinghours-utils";
+import { handleDateSelect, handleSaveWorkingHours } from "./workinghours-utils";
 import { offTimeMap } from "./utilities/offtime-map";
 import { wsClient } from "@/providers";
 const { Title, Text } = Typography;
@@ -36,8 +36,8 @@ dayjs.extend(isSameOrAfter);
 
 
 
-  // Add working minutes considering varying daily working hours
-  
+// Add working minutes considering varying daily working hours
+
 
 
 export const ProductionCalendar: React.FC = () => {
@@ -46,7 +46,7 @@ export const ProductionCalendar: React.FC = () => {
     isLoading: ppordersLoading,
     error: ppordersError,
     refetch: refetchPporders,
-    
+
   } = useCustom<{ pporders: PPOrder[] }>({
     url: "",
     method: "get",
@@ -90,7 +90,7 @@ export const ProductionCalendar: React.FC = () => {
           estStartDate: startDate ? startDate.toISOString() : null,
           estFinishDate: finishDate ? finishDate.toISOString() : null,
           status: 14, // Default to status 2 if not provided
-         
+
           ...extraValues,
         },
         meta: {
@@ -102,71 +102,71 @@ export const ProductionCalendar: React.FC = () => {
     }
   };
 
-    const handleUnschedulePporder = async (
-  id?: string,
-  extraValues?: Partial<PPOrder>
-) => {
-  const allPartsId = String(id).split('-')[0];
-  const numerified = Number(allPartsId);
+  const handleUnschedulePporder = async (
+    id?: string,
+    extraValues?: Partial<PPOrder>
+  ) => {
+    const allPartsId = String(id).split('-')[0];
+    const numerified = Number(allPartsId);
 
-  const currentOrder = orders.find(order => order.id === numerified);
-  if (!currentOrder) return;
+    const currentOrder = orders.find(order => order.id === numerified);
+    if (!currentOrder) return;
 
-  // Find the next order in the chain
-  const nextOrder = orders.find(order => order.previd === numerified);
+    // Find the next order in the chain
+    const nextOrder = orders.find(order => order.previd === numerified);
 
-  try {
-    // 1. Clear current order
-    await updatePporder({
-      resource: "pporders",
-      id: numerified,
-      values: {
-        estStartDate: null,
-        estFinishDate: null,
-        status: 1,
-        offtimeduration: null,
-        offtimestartdate: null,
-        offtimeenddate: null,
-        previd: null,
-        prevpanelcode: null,
-        ...extraValues,
-      },
-      meta: {
-        gqlMutation: UPDATE_PPORDERS,
-      },
-    });
-
-    // 2. If there's a next order, transfer offtime data to it
-    if (nextOrder) {
-       const previousCode = currentOrder.prevpanelcode?.replace(/-001$/, "");
-    const currentCode = nextOrder.panelcode?.replace(/-001$/, "");
-      const offtimeduration = offTimeMap?.[previousCode??0]?.[currentCode??0] ?? 30;
-      console.log(currentOrder.prevpanelcode)
-      console.log(nextOrder.panelcode)
-      console.log(offtimeduration)
-
+    try {
+      // 1. Clear current order
       await updatePporder({
         resource: "pporders",
-        id: nextOrder.id,
+        id: numerified,
         values: {
-          offtimeduration: offtimeduration ?? null,
-          offtimestartdate: currentOrder.offtimestartdate ?? null,
-          offtimeenddate: currentOrder.offtimeenddate ?? null,
-          previd: currentOrder.previd ?? null,
-          prevpanelcode: currentOrder.prevpanelcode ?? null,
+          estStartDate: null,
+          estFinishDate: null,
+          status: 1,
+          offtimeduration: null,
+          offtimestartdate: null,
+          offtimeenddate: null,
+          previd: null,
+          prevpanelcode: null,
+          ...extraValues,
         },
         meta: {
           gqlMutation: UPDATE_PPORDERS,
         },
       });
+
+      // 2. If there's a next order, transfer offtime data to it
+      if (nextOrder) {
+        const previousCode = currentOrder.prevpanelcode?.replace(/-001$/, "");
+        const currentCode = nextOrder.panelcode?.replace(/-001$/, "");
+        const offtimeduration = offTimeMap?.[previousCode ?? 0]?.[currentCode ?? 0] ?? 30;
+        console.log(currentOrder.prevpanelcode)
+        console.log(nextOrder.panelcode)
+        console.log(offtimeduration)
+
+        await updatePporder({
+          resource: "pporders",
+          id: nextOrder.id,
+          values: {
+            offtimeduration: offtimeduration ?? null,
+            offtimestartdate: currentOrder.offtimestartdate ?? null,
+            offtimeenddate: currentOrder.offtimeenddate ?? null,
+            previd: currentOrder.previd ?? null,
+            prevpanelcode: currentOrder.prevpanelcode ?? null,
+          },
+          meta: {
+            gqlMutation: UPDATE_PPORDERS,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Η εντολή δεν ενημερώθηκε:", error);
     }
-  } catch (error) {
-    console.error("Η εντολή δεν ενημερώθηκε:", error);
-  }
-};
+  };
 
 
-  
+
   const [weekendsVisible, setWeekendsVisible] = useState(true);
   const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -204,34 +204,40 @@ export const ProductionCalendar: React.FC = () => {
   });
 
   useEffect(() => {
-    
+
     if (!wsClient) return;
     console.log("subscription srartd")
 
     const dispose = wsClient.subscribe(
-      
+
       { query: print(PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION) },
       {
         next: async (value: any) => {
-           console.log("Subscription value received:", value);
+          console.log("Subscription value received:", value);
           const line = value?.data?.pporderlineStatusChanged;
-              console.log("line",line)
+          console.log("line", line)
+          if (line.status != 2) {
+            return
+          }
+          else {
 
-          const orderId = line?.pporders?.id;
-          if (orderId) {
-            await updatePporder({
-              resource: "pporders",
-              id: orderId,
-              values: { status: 2 },
-              meta: { gqlMutation: UPDATE_PPORDERS },
-            });
-            message.success("Παραγγελία ενημερώθηκε");
-            console.log("useffect srartd")
+            const orderId = line?.pporders?.id;
+            if (orderId) {
+              await updatePporder({
+                resource: "pporders",
+                id: orderId,
+                values: { status: 2 },
+                meta: { gqlMutation: UPDATE_PPORDERS },
+              });
+              message.success("Παραγγελία ενημερώθηκε");
+              console.log("useffect srartd")
+            }
           }
         },
         error: (err) => console.error(err),
-        complete: () => {},
+        complete: () => { },
       }
+
     );
 
     return () => {
@@ -239,7 +245,7 @@ export const ProductionCalendar: React.FC = () => {
     };
   }, [updatePporder]);
 
-   useEffect(() => {
+  useEffect(() => {
     if (!wsClient) return;
 
     const dispose = wsClient.subscribe(
@@ -249,7 +255,7 @@ export const ProductionCalendar: React.FC = () => {
           refetchPporders();
         },
         error: (err) => console.error(err),
-        complete: () => {console.log("refetched")},
+        complete: () => { console.log("refetched") },
       }
     );
 
@@ -284,74 +290,12 @@ export const ProductionCalendar: React.FC = () => {
     setEditEnd(originalEnd.add(delta, "minute"));
   }, [editStart, selectedEvent]);
 
-  const handleSaveWorkingHours = () => {
-    if (!selectedDate) return;
-
-    const dateKey = selectedDate.format("YYYY-MM-DD");
-
-    const newDailyWorkingHours = {
-      ...dailyWorkingHours,
-      [dateKey]: { ...tempWorkingHours },
-    };
-
-    setDailyWorkingHours(newDailyWorkingHours);
-
-    setCurrentEvents(prevEvents => {
-      const sorted = [...prevEvents].sort((a, b) =>
-        dayjs(a.start as Date).diff(dayjs(b.start as Date))
-      );
-
-      const startIdx = sorted.findIndex(ev =>
-        dayjs(ev.start as Date).isSameOrAfter(selectedDate.startOf('day'))
-      );
-
-      if (startIdx === -1) return prevEvents;
-
-      let prevEnd = startIdx > 0
-        ? dayjs(sorted[startIdx - 1].end as Date)
-        : selectedDate.startOf('day');
-
-      for (let i = startIdx; i < sorted.length; i++) {
-        const ev = sorted[i];
-        const duration = dayjs(ev.end as Date).diff(dayjs(ev.start as Date), 'minute');
-
-        const tentativeStart = isWithinWorkingHours(prevEnd, newDailyWorkingHours, defaultWorkingHours)
-          ? prevEnd
-          : findNextWorkingTime(prevEnd, newDailyWorkingHours, defaultWorkingHours);
-
-        sorted.splice(i, 1);
-
-        const splitEvents = splitEventIntoWorkingHours(
-          tentativeStart,
-          duration,
-          newDailyWorkingHours,
-          defaultWorkingHours,
-          {
-            ...ev,
-            start: tentativeStart.toDate(),
-            end: undefined,
-          }
-        );
-
-        sorted.splice(i, 0, ...splitEvents);
-
-        i += splitEvents.length - 1;
-
-        prevEnd = dayjs(splitEvents[splitEvents.length - 1].end as Date);
-      }
-
-      const mergedEvents = mergeSameDayEventParts(sorted);
-      return mergedEvents;
-    });
-
-    setWorkingHoursModalOpen(false);
-  };
-
-  
 
 
 
- 
+
+
+
 
 
 
@@ -379,22 +323,22 @@ export const ProductionCalendar: React.FC = () => {
   const finished = finishedData?.data?.masterlengths ?? [];
   const orders = ppordersData?.data?.pporders ?? [];
 
-const unscheduledorders = useMemo(
-  () =>
-    orders.filter(order => {
-      if (order.status == null || ![1, 2, 3, 14].includes(order.status)) return false;
-      const recentThreshold = getlast80days();
-      return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
-    }),
-  [orders]
-);
-
-
-  
+  const unscheduledorders = useMemo(
+    () =>
+      orders.filter(order => {
+        if (order.status == null || ![1, 2, 3, 14].includes(order.status)) return false;
+        const recentThreshold = getlast80days();
+        return order.createDate && dayjs(order.createDate).isAfter(recentThreshold);
+      }),
+    [orders]
+  );
 
 
 
-    useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
+
+
+
+  useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
     const preScheduled = unscheduledorders
       .filter(o => o.estStartDate && o.estFinishDate && !(o.status === 1))
       .sort((a, b) =>
@@ -407,97 +351,97 @@ const unscheduledorders = useMemo(
     }
 
     const processed: EventInput[] = [];
-      let prevEnd: Dayjs | null = null;
+    let prevEnd: Dayjs | null = null;
 
-        preScheduled.forEach(order => {
-          const start = dayjs(order.estStartDate as Date);
-          const end = dayjs(order.estFinishDate as Date);
-          const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
-          let tentativeStart = prevEnd
-            ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
-              ? prevEnd
-              : findNextWorkingTime(
-                  prevEnd,
-                  dailyWorkingHours,
-                  defaultWorkingHours
-                )
-            : isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
-              ? start
-              : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
-
-          if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
-            const offtimeduration = order.offtimeduration;
-            let offStart = dayjs(order.offtimestartdate as Date);
-            // If the previous event ended later than the planned offtime start,
-            // begin the offtime after the previous event
-            console.log("unupdated offStart",offStart)
-            if (prevEnd && !prevEnd.isSame(offStart)) {
-              offStart = prevEnd
-            }
-           console.log("offStart",offStart)
-            const offtimeSegments = splitEventIntoWorkingHours(
-              offStart,
-              offtimeduration,
-              dailyWorkingHours,
-              defaultWorkingHours,
-              {
-                id: `${order.id}-offtime`,
-                title: "προετοιμασία μηχανής",
-                color: "gray",
-                extendedProps: {
-                  isOfftime: true,
-                  prevId: order.previd?.toString(),
-                  currId: order.id.toString(),
-                  prevpanelcode: order.prevpanelcode,
-                  offtimeduration: order.offtimeduration,
-                },
-              }
-            );
-
-            // Manually apply split segment start/end to their extendedProps
-            offtimeSegments.forEach(seg => {
-              seg.extendedProps = {
-                ...seg.extendedProps,
-                offtimeStartDate: (seg.start as Date).toISOString(),
-                offtimeEndDate: (seg.end as Date).toISOString(),
-              };
-            });
-
-            processed.push(...offtimeSegments);
-            const lastSegment = offtimeSegments[offtimeSegments.length - 1];
-            prevEnd = dayjs(lastSegment.end as Date);
-            tentativeStart = isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
-              ? prevEnd
-              : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
-          }
-
-          const segments = splitEventIntoWorkingHours(
-            tentativeStart,
-            duration,
+    preScheduled.forEach(order => {
+      const start = dayjs(order.estStartDate as Date);
+      const end = dayjs(order.estFinishDate as Date);
+      const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
+      let tentativeStart = prevEnd
+        ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+          ? prevEnd
+          : findNextWorkingTime(
+            prevEnd,
             dailyWorkingHours,
-            defaultWorkingHours,
-            {
-              id: String(order.id),
-              title: `${order.pporderno} - ${order.panelcode}`,
-              color: statusColorMap[order.status ?? 0] || "gray",
-              extendedProps: {
-                panelcode:order.panelcode,
-                status: order.status,
-                tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\nκατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
-              },
-            }
-          );
+            defaultWorkingHours
+          )
+        : isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
+          ? start
+          : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
 
-          processed.push(...segments);
-          prevEnd = dayjs(segments[segments.length - 1].end as Date);
-          console.log("prevend",prevEnd)
-          
+      if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
+        const offtimeduration = order.offtimeduration;
+        let offStart = dayjs(order.offtimestartdate as Date);
+        // If the previous event ended later than the planned offtime start,
+        // begin the offtime after the previous event
+        console.log("unupdated offStart", offStart)
+        if (prevEnd && !prevEnd.isSame(offStart)) {
+          offStart = prevEnd
+        }
+        console.log("offStart", offStart)
+        const offtimeSegments = splitEventIntoWorkingHours(
+          offStart,
+          offtimeduration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: `${order.id}-offtime`,
+            title: "προετοιμασία μηχανής",
+            color: "gray",
+            extendedProps: {
+              isOfftime: true,
+              prevId: order.previd?.toString(),
+              currId: order.id.toString(),
+              prevpanelcode: order.prevpanelcode,
+              offtimeduration: order.offtimeduration,
+            },
+          }
+        );
+
+        // Manually apply split segment start/end to their extendedProps
+        offtimeSegments.forEach(seg => {
+          seg.extendedProps = {
+            ...seg.extendedProps,
+            offtimeStartDate: (seg.start as Date).toISOString(),
+            offtimeEndDate: (seg.end as Date).toISOString(),
+          };
         });
-      const mergedEvents = mergeSameDayEventParts(processed);
-      setCurrentEvents(mergedEvents);
-      initialSyncRef.current = true;
-    }
-  , [unscheduledorders, dailyWorkingHours, defaultWorkingHours]);
+
+        processed.push(...offtimeSegments);
+        const lastSegment = offtimeSegments[offtimeSegments.length - 1];
+        prevEnd = dayjs(lastSegment.end as Date);
+        tentativeStart = isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+          ? prevEnd
+          : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
+      }
+
+      const segments = splitEventIntoWorkingHours(
+        tentativeStart,
+        duration,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        {
+          id: String(order.id),
+          title: `${order.pporderno} - ${order.panelcode}`,
+          color: statusColorMap[order.status ?? 0] || "gray",
+          extendedProps: {
+            panelcode: order.panelcode,
+            status: order.status,
+            tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\nκατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
+          },
+        }
+      );
+
+      processed.push(...segments);
+      prevEnd = dayjs(segments[segments.length - 1].end as Date);
+      console.log("prevend", prevEnd)
+
+    });
+    const mergedEvents = mergeSameDayEventParts(processed);
+    setCurrentEvents(mergedEvents);
+    initialSyncRef.current = true;
+  }
+    , [unscheduledorders, dailyWorkingHours, defaultWorkingHours]);
 
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
@@ -520,7 +464,7 @@ const unscheduledorders = useMemo(
       duration: order.time,
       color,
       extendedProps: {
-        panelcode:order.code,
+        panelcode: order.code,
         status: order.status,
         totalMeter: order.totalMeter,
         speed: order.speed,
@@ -536,7 +480,7 @@ const unscheduledorders = useMemo(
   const totalMinutes = totalTime.hours * 60 + totalTime.minutes;
   const [droppedIds, setDroppedIds] = useState<Set<string>>(new Set());
 
-  
+
 
   const dropHandler = useMemo(() =>
     handleDropFactory(
@@ -548,7 +492,7 @@ const unscheduledorders = useMemo(
       setCurrentEvents,
       droppedIds,
       setDroppedIds
-      
+
     ), [
     currentEvents,
     finishedEvents,
@@ -571,146 +515,248 @@ const unscheduledorders = useMemo(
     setWeekendsVisible(!weekendsVisible);
   };
 
-const handleUpdateAllEvents = async (eventsArg?: EventInput[]) => {
-  const rawEvents = eventsArg ?? currentEvents;
-  
-  if (!eventsArg) {
-    setCurrentEvents(rawEvents);
-  }
+  const handleUpdateAllEvents = async (eventsArg?: EventInput[]) => {
+    const rawEvents = eventsArg ?? currentEvents;
 
-  const grouped: Record<string, EventInput[]> = {};
-  const offInfo: Record<string, Partial<PPOrder>> = {};
+    if (!eventsArg) {
+      setCurrentEvents(rawEvents);
+    }
 
-  // Process all events and group them (similar to handleDrop logic)
-  rawEvents.forEach(ev => {
-    if (!ev.id || !ev.start || !ev.end) return;
-    
-    const idStr = ev.id.toString();
-    
-    // Handle offtime events - use the already split segments from handleDrop
-    if (ev.extendedProps?.isOfftime) {
-      const currId = ev.extendedProps.currId;
-      const strPrevId = ev.extendedProps.prevId?.toString();
-      const prevId = strPrevId?.split('-part-')[0];
-      const prevPanelCode = ev.extendedProps.prevpanelcode;
-      
-      if (currId) {
-        console.log("currId", currId);
-        const currIdStr = currId.toString();
-        
-        // If this is the first offtime segment for this currId, initialize offInfo
-        if (!offInfo[currIdStr]) {
-          offInfo[currIdStr] = {
-            previd: Number(prevId),
-            prevpanelcode: prevPanelCode,
-            offtimeduration: ev.extendedProps.offtimeduration,
-            // Use the individual segment's start/end from extendedProps (set by handleDrop)
-            offtimestartdate: ev.extendedProps.offtimeStartDate 
-              ? new Date(ev.extendedProps.offtimeStartDate)
-              : new Date(ev.start as Date),
-            offtimeenddate: ev.extendedProps.offtimeEndDate
-              ? new Date(ev.extendedProps.offtimeEndDate)
-              : new Date(ev.end as Date),
-          };
-        } else {
-          // Update the end date if this segment ends later
-          const currentEnd = new Date(ev.extendedProps.offtimeEndDate || ev.end as Date);
-          const existingEnd = offInfo[currIdStr].offtimeenddate;
-          if (existingEnd && currentEnd > existingEnd) {
-            offInfo[currIdStr].offtimeenddate = currentEnd;
+    const grouped: Record<string, EventInput[]> = {};
+    const offInfo: Record<string, Partial<PPOrder>> = {};
+
+    // Process all events and group them (similar to handleDrop logic)
+    rawEvents.forEach(ev => {
+      if (!ev.id || !ev.start || !ev.end) return;
+
+      const idStr = ev.id.toString();
+
+      // Handle offtime events - use the already split segments from handleDrop
+      if (ev.extendedProps?.isOfftime) {
+        const currId = ev.extendedProps.currId;
+        const strPrevId = ev.extendedProps.prevId?.toString();
+        const prevId = strPrevId?.split('-part-')[0];
+        const prevPanelCode = ev.extendedProps.prevpanelcode;
+
+        if (currId) {
+          console.log("currId", currId);
+          const currIdStr = currId.toString();
+
+          // If this is the first offtime segment for this currId, initialize offInfo
+          if (!offInfo[currIdStr]) {
+            offInfo[currIdStr] = {
+              previd: Number(prevId),
+              prevpanelcode: prevPanelCode,
+              offtimeduration: ev.extendedProps.offtimeduration,
+              // Use the individual segment's start/end from extendedProps (set by handleDrop)
+              offtimestartdate: ev.extendedProps.offtimeStartDate
+                ? new Date(ev.extendedProps.offtimeStartDate)
+                : new Date(ev.start as Date),
+              offtimeenddate: ev.extendedProps.offtimeEndDate
+                ? new Date(ev.extendedProps.offtimeEndDate)
+                : new Date(ev.end as Date),
+            };
+          } else {
+            // Update the end date if this segment ends later
+            const currentEnd = new Date(ev.extendedProps.offtimeEndDate || ev.end as Date);
+            const existingEnd = offInfo[currIdStr].offtimeenddate;
+            if (existingEnd && currentEnd > existingEnd) {
+              offInfo[currIdStr].offtimeenddate = currentEnd;
+            }
           }
         }
+        return;
       }
-      return;
-    }
-    
-    // Handle regular events - extract base ID (same as before)
-    const baseId = idStr.includes('-part-') ? idStr.split('-part-')[0] : idStr;
-    
-    // Only process events with status 1, 2, 3, or 14
-    const eventStatus = ev.extendedProps?.status;
-    if (eventStatus && [1, 2, 3, 14].includes(eventStatus)) {
-      if (!grouped[baseId]) {
-        grouped[baseId] = [];
+
+      // Handle regular events - extract base ID (same as before)
+      const baseId = idStr.includes('-part-') ? idStr.split('-part-')[0] : idStr;
+
+      // Only process events with status 1, 2, 3, or 14
+      const eventStatus = ev.extendedProps?.status;
+      if (eventStatus && [1, 2, 3, 14].includes(eventStatus)) {
+        if (!grouped[baseId]) {
+          grouped[baseId] = [];
+        }
+        grouped[baseId].push(ev);
       }
-      grouped[baseId].push(ev);
-    }
-  });
+    });
 
-  console.log('Grouped events:', Object.keys(grouped));
-  console.log('OffInfo:', offInfo);
+    console.log('Grouped events:', Object.keys(grouped));
+    console.log('OffInfo:', offInfo);
 
-  // Second pass: Process each group and update PPOrders (same as before)
-  for (const [baseId, events] of Object.entries(grouped)) {
-  if (events.length === 0) continue;
+    // Second pass: Process each group and update PPOrders (same as before)
+    for (const [baseId, events] of Object.entries(grouped)) {
+      if (events.length === 0) continue;
 
-  const sortedEvents = events.sort((a, b) =>
-    new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime()
-  );
+      const sortedEvents = events.sort((a, b) =>
+        new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime()
+      );
 
-  const firstStart = new Date(sortedEvents[0].start as Date);
-  const lastEnd = new Date(sortedEvents[sortedEvents.length - 1].end as Date);
+      const firstStart = new Date(sortedEvents[0].start as Date);
+      const lastEnd = new Date(sortedEvents[sortedEvents.length - 1].end as Date);
 
-  const extra = offInfo[baseId];
-  let updatedOffInfo = extra;
-console.log("extra",extra)
-  // If there's an offtime duration, recalculate and split using working hours
-  if (extra?.offtimeduration && extra.offtimestartdate) {
-    const offtimeSegments = splitEventIntoWorkingHours(
-      dayjs(extra.offtimestartdate),
-      extra.offtimeduration,
-      dailyWorkingHours,
-      defaultWorkingHours,
-      {
-        id: `${baseId}-offtime`,
-        title: "προετοιμασία μηχανής",
-        color: "gray",
-        extendedProps: {
-          isOfftime: true,
-          currId: baseId,
-          prevId: extra.previd?.toString(),
-          prevpanelcode: extra.prevpanelcode,
-          offtimeduration: extra.offtimeduration,
-        },
+      const extra = offInfo[baseId];
+      let updatedOffInfo = extra;
+      console.log("extra", extra)
+      // If there's an offtime duration, recalculate and split using working hours
+      if (extra?.offtimeduration && extra.offtimestartdate) {
+        const offtimeSegments = splitEventIntoWorkingHours(
+          dayjs(extra.offtimestartdate),
+          extra.offtimeduration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: `${baseId}-offtime`,
+            title: "προετοιμασία μηχανής",
+            color: "gray",
+            extendedProps: {
+              isOfftime: true,
+              currId: baseId,
+              prevId: extra.previd?.toString(),
+              prevpanelcode: extra.prevpanelcode,
+              offtimeduration: extra.offtimeduration,
+            },
+          }
+        );
+
+        const first = offtimeSegments[0];
+        const last = offtimeSegments[offtimeSegments.length - 1];
+
+        // Replace offtime range in `updatedOffInfo`
+        updatedOffInfo = {
+          ...updatedOffInfo,
+          offtimestartdate: new Date(first.start as Date),
+          offtimeenddate: new Date(last.end as Date),
+        };
       }
-    );
 
-    const first = offtimeSegments[0];
-    const last = offtimeSegments[offtimeSegments.length - 1];
+      console.log(`Updating PPOrder ${baseId}:`, {
+        start: firstStart,
+        end: lastEnd,
+        offInfo: updatedOffInfo,
+      });
 
-    // Replace offtime range in `updatedOffInfo`
-    updatedOffInfo = {
-      ...updatedOffInfo,
-      offtimestartdate: new Date(first.start as Date),
-      offtimeenddate: new Date(last.end as Date),
-    };
-  }
+      try {
+        await handleUpdatePporder(
+          Number(baseId),
+          firstStart,
+          lastEnd,
+          {
+            ...updatedOffInfo,
 
-  console.log(`Updating PPOrder ${baseId}:`, {
-    start: firstStart,
-    end: lastEnd,
-    offInfo: updatedOffInfo,
-  });
+          }
 
-  try {
-    await handleUpdatePporder(
-      Number(baseId),
-      firstStart,
-      lastEnd,
-      {...updatedOffInfo,
-       
+        );
+        console.log(`Successfully updated PPOrder ${baseId}`);
+      } catch (error) {
+        console.error(`Failed to update PPOrder ${baseId}:`, error);
+      }
     }
-      
-    );
-    console.log(`Successfully updated PPOrder ${baseId}`);
-  } catch (error) {
-    console.error(`Failed to update PPOrder ${baseId}:`, error);
-  }
-}
- 
-  console.log('All updates completed');
-};
 
+    console.log('All updates completed');
+  };
+/* handleStartEvent()
+  const handleStartEvent = async (eventsArg?: EventInput[]) => {
+    const rawEvents = eventsArg ?? currentEvents;
+
+    if (!eventsArg&&rawEvents  !== currentEvents) {
+      setCurrentEvents(rawEvents);
+    }
+
+    const grouped: Record<string, EventInput[]> = {};
+    const offInfo: Record<string, Partial<PPOrder>> = {};
+
+    // Process all events and group them (similar to handleDrop logic)
+    rawEvents.forEach(ev => {
+      if (!ev.id || !ev.start || !ev.end) return;
+
+      const idStr = ev.id.toString();
+
+      // Handle offtime events - use the already split segments from handleDrop
+      if (ev.extendedProps?.isOfftime) {
+        const currId = ev.extendedProps.currId;
+        const strPrevId = ev.extendedProps.prevId?.toString();
+        const prevId = strPrevId?.split('-part-')[0];
+        const prevPanelCode = ev.extendedProps.prevpanelcode;
+
+        if (currId) {
+          console.log("currId", currId);
+          const currIdStr = currId.toString();
+
+          // If this is the first offtime segment for this currId, initialize offInfo
+          if (!offInfo[currIdStr]) {
+            offInfo[currIdStr] = {
+              previd: Number(prevId),
+              prevpanelcode: prevPanelCode,
+              offtimeduration: ev.extendedProps.offtimeduration,
+              // Use the individual segment's start/end from extendedProps (set by handleDrop)
+              offtimestartdate: ev.extendedProps.offtimeStartDate
+                ? new Date(ev.extendedProps.offtimeStartDate)
+                : new Date(ev.start as Date),
+              offtimeenddate: ev.extendedProps.offtimeEndDate
+                ? new Date(ev.extendedProps.offtimeEndDate)
+                : new Date(ev.end as Date),
+            };
+          } else {
+            // Update the end date if this segment ends later
+            const currentEnd = new Date(ev.extendedProps.offtimeEndDate || ev.end as Date);
+            const existingEnd = offInfo[currIdStr].offtimeenddate;
+            if (existingEnd && currentEnd > existingEnd) {
+              offInfo[currIdStr].offtimeenddate = currentEnd;
+            }
+          }
+        }
+        return;
+      }
+
+      // Handle regular events - extract base ID (same as before)
+      const baseId = idStr.includes('-part-') ? idStr.split('-part-')[0] : idStr;
+
+      // Only process events with status 1, 2, 3, or 14
+      const eventStatus = ev.extendedProps?.status;
+      if (eventStatus && [1, 2, 3, 14].includes(eventStatus)) {
+        if (!grouped[baseId]) {
+          grouped[baseId] = [];
+        }
+        grouped[baseId].push(ev);
+      }
+
+      function getEventProperties(ev) {
+        return {
+          id: String(ev.id),
+          title: `${ev.pporderno} - ${ev.panelcode}`,
+          start: ev.start,
+          end: ev.end,
+          color: statusColorMap[ev.status ?? 0] || "gray",
+          extendedProps: {
+            panelcode: ev.panelcode,
+            status: ev.status,
+            tooltip: `${ev.pporderno ?? ""} - ${ev.panelcode ?? ""}\nκατάσταση: ${STATUS_MAP[ev.status || 0] || "Άγνωστη"}`,
+          }
+        };
+      }
+      const teststart = dayjs(ev.start as Date);
+
+
+      // Then use it like this:
+      const testsegments = splitEventIntoWorkingHours(
+        teststart,
+        totalMinutes,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        getEventProperties(ev)
+      );
+      const testfinish = dayjs(testsegments[testsegments.length - 1].end as Date);
+
+      console.log("start", teststart, "-", "finish", testfinish)
+    });
+
+    console.log('test Grouped events:', Object.keys(grouped));
+    console.log('test OffInfo:', offInfo);
+
+  };
+
+*/
 
   return (
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
@@ -739,14 +785,14 @@ console.log("extra",extra)
           <DatePicker
             placeholder="διάλεξε ημερα"
             onChange={(date) => {
-              if (date)handleDateSelect(
-        date,
-        setSelectedDate,
-        dailyWorkingHours,
-        defaultWorkingHours,
-        setTempWorkingHours,
-        setWorkingHoursModalOpen
-      );;
+              if (date) handleDateSelect(
+                date,
+                setSelectedDate,
+                dailyWorkingHours,
+                defaultWorkingHours,
+                setTempWorkingHours,
+                setWorkingHoursModalOpen
+              );;
             }}
             style={{ width: "100%" }}
           />
@@ -772,37 +818,38 @@ console.log("extra",extra)
           selectable={true}
           drop={dropHandler}
           dayHeaderContent={(arg) => {
-    const date = dayjs(arg.date);
+            const date = dayjs(arg.date);
 
-    const handleClick = (e?: React.MouseEvent) => {
-      if (e) e.stopPropagation(); // prevent double trigger from button
-      handleDateSelect(
-        date,
-        setSelectedDate,
-        dailyWorkingHours,
-        defaultWorkingHours,
-        setTempWorkingHours,
-        setWorkingHoursModalOpen
-      );
-    };
+            const handleClick = (e?: React.MouseEvent) => {
+              if (e) e.stopPropagation(); // prevent double trigger from button
+              handleDateSelect(
+                date,
+                setSelectedDate,
+                dailyWorkingHours,
+                defaultWorkingHours,
+                setTempWorkingHours,
+                setWorkingHoursModalOpen
+              );
+            };
 
-    return (
-      <div
-        onClick={handleClick}
-        style={{ cursor: 'pointer', padding: '4px' }}
-      >
-        {arg.text}
-        <Tooltip title="ώρισε εργάσιμες ώρες">
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={handleClick}
-          />
-        </Tooltip>
-      </div>
-      
-          )}}
+            return (
+              <div
+                onClick={handleClick}
+                style={{ cursor: 'pointer', padding: '4px' }}
+              >
+                {arg.text}
+                <Tooltip title="ώρισε εργάσιμες ώρες">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={handleClick}
+                  />
+                </Tooltip>
+              </div>
+
+            )
+          }}
           height="100%"
           eventDataTransform={(event) => {
 
@@ -849,20 +896,20 @@ console.log("extra",extra)
         editStart={editStart}
         editEnd={editEnd}
         onCancel={() => setEditModalOpen(false)}
-       onDelete={async () => {
-  if (!selectedEvent) return;
+        onDelete={async () => {
+          if (!selectedEvent) return;
 
-  // Optional: persist the reset to your backend
-  console.log("selectedEvent.id", (selectedEvent.id as string).split('-')[0]);
- handleUnschedulePporder(selectedEvent.id,selectedEvent.extendedProps?.previd)
-const baseId = String(selectedEvent.id).split('-')[0];
-  // Remove from calendar display
-  setCurrentEvents(prev =>
-    prev.filter(ev => String(ev.id).split('-')[0] !== baseId)
-  );
+          // Optional: persist the reset to your backend
+          console.log("selectedEvent.id", (selectedEvent.id as string).split('-')[0]);
+          handleUnschedulePporder(selectedEvent.id, selectedEvent.extendedProps?.previd)
+          const baseId = String(selectedEvent.id).split('-')[0];
+          // Remove from calendar display
+          setCurrentEvents(prev =>
+            prev.filter(ev => String(ev.id).split('-')[0] !== baseId)
+          );
 
-  setEditModalOpen(false);
-}}
+          setEditModalOpen(false);
+        }}
         onSave={() => {
           setCurrentEvents(prevEvents =>
             handleSaveEdit(
@@ -875,7 +922,7 @@ const baseId = String(selectedEvent.id).split('-')[0];
             )
           );
 
-          
+
 
           /*if (selectedEvent?.id) {
             handleUpdatePporder(
@@ -900,11 +947,20 @@ const baseId = String(selectedEvent.id).split('-')[0];
         config={tempWorkingHours}
         onChange={setTempWorkingHours}
         onCancel={() => setWorkingHoursModalOpen(false)}
-        onOk={handleSaveWorkingHours}
+        onOk={()=>handleSaveWorkingHours(
+          selectedDate,
+          tempWorkingHours,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          setDailyWorkingHours,
+          setCurrentEvents,
+          setWorkingHoursModalOpen,
+
+        )}
       />
       <Button
         type="primary"
-       onClick={() => handleUpdateAllEvents()}
+        onClick={() => handleUpdateAllEvents()}
         style={{
           position: "fixed",        // stays on screen
           bottom: 24,               // distance from bottom

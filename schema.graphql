@@ -280,6 +280,152 @@ type CoilColorType {
   isPvc: Int
 }
 
+type PPackages {
+  id: Int!
+  packno: String
+  iteid: Int
+  itename: String
+  description: String
+  pcs: Int
+  quantity: Float
+  tradecode: String
+  createDt: Date
+  despatchDt: Date
+  status: Int
+  loc: Int
+  upDate: Date
+  classification: String
+  comment: String
+  importNo: Int
+  panelThickness: String
+  cin: String
+  cout: String
+  thickin: String
+  thickout: String
+  moldin: String
+  moldout: String
+  panelWeightPerMeter: Float
+  widthin: String
+  widthout: String
+  total: Float
+  panelSpeed: PanelSpeeds
+  productionTime: Float
+}
+
+type ProdOrdersView {
+  prodOrder: String!
+  productionNo: Int!
+  tradecode: String
+  code: String
+  cin: String
+  cout: String
+  thickin: String
+  thickout: String
+  moldin: String
+  moldout: String
+  widthin: String
+  widthout: String
+  importNo: Int
+  ttm: Float
+  panelSpeed: PanelSpeeds
+  speed: Float
+  time: Float
+  isCanceled: Boolean
+  count: Int
+}
+
+type PanelSpeeds {
+  code: String!
+  thickness: String
+  speed: Float
+  packages: [PPackages!]!
+  prodorderview: [ProdOrdersView!]!
+}
+
+type PpackagesSummary {
+  itename: String
+  tradecode: String
+  cin: String
+  cout: String
+  thickin: String
+  thickout: String
+  moldin: String
+  moldout: String
+  totalProductionTime: Float!
+}
+
+type Pporders {
+  id: Int!
+  pporderno: String
+  startDate: Date
+  finishDate: Date
+  status: Int
+  panelcode: String
+  estStartDate: Date
+  estFinishDate: Date
+  createDate: Date
+  startDateDatetime: Date
+  finishDateDatetime: Date
+  estDateOfProdDatetime: Date
+  previd: Int
+  prevpanelcode: String
+  offtimeduration: Int
+  offtimestartdate: Date
+  offtimeenddate: Date
+  pporderlines: [Pporderlines2!]!
+  totalTime: Float
+}
+
+type Pporderlines2 {
+  id: Int!
+  pporderno: String
+  custporderno: String
+  prodDate: Date
+  upDate: Date
+  status: Int
+  isCanceled: Int
+  panelcode: String
+  tradecode: String
+  prodOrdersView: ProdOrdersView
+  pporders: Pporders
+}
+
+type PanelProductionOrdersExt2 {
+  prodOrder: String!
+  productionNo: Int!
+  tradecode: String
+  materialCode: String
+  cin: String
+  cout: String
+  thickin: String
+  thickout: String
+  moldin: String
+  moldout: String
+  widthin: String
+  widthout: String
+  importNo: Int
+  ttm: Float
+  count: Int
+}
+
+type PanelProductionOrdersExt2Response {
+  nodes: [PanelProductionOrdersExt2!]!
+  totalCount: Int!
+}
+
+type Masterlength {
+  id: Int!
+  pporderno: String!
+  code: String!
+  status: Int
+  totalMeter: Float
+  startDateDatetime: Date
+  finishDateDatetime: Date
+  createDate: Date
+  panelSpeed: PanelSpeeds
+  time: Float
+}
+
 # Date custom scalar type
 scalar Date
 
@@ -301,7 +447,7 @@ type Query {
     limit: Int
     offset: Int
   ): CoilsResponse!
-  coil(id: String!): Coil
+  coil(id: Int!): Coil
   statuses: [StatusType!]!
   status(id: Int!): StatusType
   statusByName(name: String!): StatusType
@@ -310,6 +456,33 @@ type Query {
   allowedLocations(userId: String!): [Location!]!
   locations: [Location!]!
   location(locationId: Int!): Location
+  ppackages: [PPackages!]!
+  ppackage(id: Int!): PPackages
+  ppackagesGrouped: [PpackagesSummary!]!
+  masterlengths(filter: MasterlengthFilterInput): [Masterlength!]!
+  masterlength(pporderno: String!): Masterlength
+  pporderlines2(filter: Pporderlines2FilterInput): [Pporderlines2!]!
+  pporderline2(id: Int!): Pporderlines2
+
+  # Get a single production order by ID
+  pporder(
+    # The ID of the production order
+    id: Int!
+  ): Pporders!
+
+  # Get all production orders
+  pporders(filter: PpordersFilterInput): [Pporders!]!
+  prodOrdersViews: [ProdOrdersView!]!
+  prodOrdersView(prodOrder: String!): ProdOrdersView
+  panelProductionOrdersExt2s(
+    filter: PanelProductionOrdersExt2FilterInput
+    sorting: [PanelProductionOrdersExt2SortInput!]
+    limit: Int
+    offset: Int
+  ): PanelProductionOrdersExt2Response!
+  panelProductionOrdersExt2(prodOrder: String!): PanelProductionOrdersExt2
+  panelSpeeds: [PanelSpeeds!]!
+  panelSpeed(code: String!): PanelSpeeds
   me: Users!
 }
 
@@ -365,16 +538,58 @@ enum CoilSortField {
   color
 }
 
-# Specify ascending or descending order
 enum SortOrder {
   ASC
   DESC
 }
 
+input MasterlengthFilterInput {
+  pporderno: String
+  status: [Int!]
+  lastDays: Int
+}
+
+input Pporderlines2FilterInput {
+  ppordernos: [String!]
+}
+
+input PpordersFilterInput {
+  pporderno: String
+  status: [Int!]
+  lastDays: Int
+}
+
+input PanelProductionOrdersExt2FilterInput {
+  prodOrder: String
+  tradecode: String
+  materialCode: String
+}
+
+input PanelProductionOrdersExt2SortInput {
+  field: PanelProductionOrdersExt2SortField!
+  direction: SortOrder!
+}
+
+enum PanelProductionOrdersExt2SortField {
+  prodOrder
+  productionNo
+  tradecode
+}
+
 type Mutation {
   addRecipe(newRecipeData: NewRecipeInput!): Recipe!
   removeRecipe(id: String!): Boolean!
-  updateCoil(updateCoilInput: UpdateCoilInput!): Coil!
+  updateOneCoil(input: UpdateOneCoilInput!): Coil!
+  updatePporderlineStatus(input: UpdatePporderlineStatusInput!): Pporderlines2!
+
+  # Create a new production order
+  createPporder(input: CreatePpordersInput!): Pporders!
+
+  # Update an existing production order
+  updatePporder(input: UpdatePporderInput!): Pporders!
+
+  # Delete a production order
+  deletePporder(id: Int!): Boolean!
   login(loginInput: LoginInput!): LoginResponse!
 }
 
@@ -382,6 +597,11 @@ input NewRecipeInput {
   title: String!
   description: String
   ingredients: [String!]!
+}
+
+input UpdateOneCoilInput {
+  id: Int!
+  update: UpdateCoilInput!
 }
 
 input UpdateCoilInput {
@@ -392,12 +612,69 @@ input UpdateCoilInput {
   upDate: Date
   thickness: Float
   widthCoil: Float
-  currWeight: Float
   openstatus: String
   supplier: String
   company: String
   statusId: Int
+  createDate: Date
+  delDate: Date
+  currWeight: Float
+  initWeight: Float
+  commentsPanel: String
+  cutComment: String
+  prodComment: String
+}
+
+input UpdatePporderlineStatusInput {
   id: Int!
+  status: Int!
+}
+
+input CreatePpordersInput {
+  pporderno: String
+  id: Int
+  startDate: Date
+  finishDate: Date
+  finishDateDatetime: Date
+  startDateDatetime: Date
+  estStartDate: Date
+  estFinishDate: Date
+  status: Int
+  panelcode: String
+  estDateOfProd: Date
+  createDate: Date
+  quantity: Float
+  previd: Int
+  prevpanelcode: String
+  offtimeduration: Int
+  offtimestartdate: Date
+  offtimeenddate: Date
+}
+
+input UpdatePporderInput {
+  id: Int!
+  update: UpdatePpordersInput!
+}
+
+input UpdatePpordersInput {
+  pporderno: String
+  id: Int
+  startDate: Date
+  finishDate: Date
+  finishDateDatetime: Date
+  startDateDatetime: Date
+  estStartDate: Date
+  estFinishDate: Date
+  status: Int
+  panelcode: String
+  estDateOfProd: Date
+  createDate: Date
+  quantity: Float
+  previd: Int
+  prevpanelcode: String
+  offtimeduration: Int
+  offtimestartdate: Date
+  offtimeenddate: Date
 }
 
 input LoginInput {
@@ -407,4 +684,6 @@ input LoginInput {
 
 type Subscription {
   recipeAdded: Recipe!
+  pporderlineStatusChanged: Pporderlines2!
+  pporderUpdated: Pporders!
 }
