@@ -40,6 +40,7 @@ export interface PPOrderLine {
   custporderno?: string;
   upDate?: Date;
   prodOrdersView?: ProdOrdersView;
+  pporders:PPOrder;
 }
 
 export interface finishedPporders extends Omit<PPOrder, 'estDateOfProd' | 'panelcode'> {

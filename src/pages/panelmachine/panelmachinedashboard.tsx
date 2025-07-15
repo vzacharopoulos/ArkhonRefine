@@ -3,6 +3,7 @@ import { Select, Form, Spin, Alert, Button, message } from "antd";
 import gql from "graphql-tag";
 import React, { useState, useEffect } from "react";
 import { client } from "@/providers";
+import { UPDATE_PPORDERS } from "@/graphql/queries";
 
 const GET_PPORDERS = gql`
   query GetPpOrders($filter: PpordersFilterInput) {
@@ -20,26 +21,16 @@ const GET_PPORDERS = gql`
   }
 `;
 
-const UPDATE_PPORDER = gql`
-  mutation UpdatePporder($id: Int!, $input: UpdatePpordersInput!) {
-    updatePporder(id: $id, input: $input) {
-      id
-      pporderno
-      startDateDatetime
-      finishDateDatetime
-      status
-    }
-  }
-`;
+
 
 
 type PPOrder = {
   id: number;
   pporderno: string;
   panelcode: string;
-  status: string;
-  startDateDatetime?: string;
-  finishDateDatetime?: string;
+  status: number;
+  startDateDatetime?: Date;
+  finishDateDatetime?: Date;
 };
 
 
@@ -63,8 +54,8 @@ const PanelMachineDashboard: React.FC<{
       gqlQuery: GET_PPORDERS,
       variables: {
         filter: {
-          status: [1, 2, 3, 4],
-          lastDays: 100,
+          status: [1, 2, 3, 4,14],
+          lastDays: 120,
         },
       },
     },
@@ -101,12 +92,13 @@ const PanelMachineDashboard: React.FC<{
 
     try {
       const currentDate = new Date().toISOString();
-      const result = await client.request(UPDATE_PPORDER, {
-        id: selectedId,
+      const result = await client.request(UPDATE_PPORDERS, {
         input: {
+                  id: selectedId,
+ update: {
           startDateDatetime: currentDate,
           status: 2, // Set status to "In Progress"
-        },
+         } },
       });
 
       messageApi.success("Η εντολή ξεκίνησε!");
@@ -130,14 +122,14 @@ const PanelMachineDashboard: React.FC<{
     }
 
     // Check if order has already been started
-    if (!order.startDateDatetime) {
+    if (order.status!=2) {
       messageApi.warning("Η εντολή πρέπει να έχει ξεκινήσει πρώτα");
       return;
     }
 
     try {
       const currentDate = new Date().toISOString();
-      const result = await client.request(UPDATE_PPORDER, {
+      const result = await client.request(UPDATE_PPORDERS, {
         id: selectedId,
         input: {
           finishDateDatetime: currentDate,
@@ -159,8 +151,8 @@ const PanelMachineDashboard: React.FC<{
         label: `${order.pporderno} - ${order.panelcode}`,
         value: order.pporderno,
         status: order.status,
-        started: !!order.startDateDatetime,
-        finished: !!order.finishDateDatetime,
+        started: Number(order.status)==2,
+        finished: Number(order.status)==4,
       })) ?? [],
     [data?.data?.pporders]
   );
@@ -194,8 +186,8 @@ const PanelMachineDashboard: React.FC<{
 
   // Get the current order status
   const currentOrder = selectedId ? ordersById.get(selectedId) : null;
-  const isStarted = currentOrder?.startDateDatetime;
-  const isFinished = currentOrder?.finishDateDatetime;
+  const isStarted = currentOrder?.status===2;
+  const isFinished = currentOrder?.status===4;
 
   if (isLoading) {
     return (
@@ -225,7 +217,7 @@ const PanelMachineDashboard: React.FC<{
         style={{ marginBottom: 16, width: '100%' }}
       >
         <Select
-          value={selectedPporderno || value}
+          value={value ?? selectedPporderno}
           onChange={handleSelectChange}
           placeholder={placeholder}
           showSearch
@@ -233,8 +225,8 @@ const PanelMachineDashboard: React.FC<{
           style={{ width: '60%' }}
           loading={isLoading}
           size="large"
-          onDropdownVisibleChange={(open) => setDropdownOpen(open)} // Track dropdown open state
-          dropdownRender={(menu) => (
+          onOpenChange={(open) => setDropdownOpen(open)} // Track dropdown open state
+          popupRender ={(menu) => (
             <div>
               {menu}
               {/* You can add additional elements here that will appear at the bottom of the dropdown */}
@@ -242,25 +234,31 @@ const PanelMachineDashboard: React.FC<{
           )}
         >
           {options.map((option) => (
-            <Select.Option
-              key={option.value}
-              value={option.value}
-              label={option.label}
-              disabled={option.finished}
-            >
-              <div>
-                <div>{option.label}</div>
-                {dropdownOpen && ( // Only show status when dropdown is open
-                  <div style={{ fontSize: 12, color: '#666' }}>
-                    {option.finished
-                      ? '✅ Ολοκληρωμένη'
-                      : option.started
-                        ? '🚧 Σε επεξεργασια'
-                        : '⏱️ Προγραμματισμένη'}
-                  </div>
-                )}
-              </div>
-            </Select.Option>
+          <Select.Option
+  key={option.value}
+  value={option.value}
+  label={option.label}
+  disabled={option.finished}
+>
+  <div>
+    <div>{option.label}</div>
+    <div
+      style={{
+        fontSize: 12,
+        color: '#666',
+        height: 16,
+        opacity: dropdownOpen ? 1 : 0, // 👈 instead of conditionally rendering
+        transition: "opacity 0.2s",
+      }}
+    >
+      {option.finished
+        ? '✅ Ολοκληρωμένη'
+        : option.started
+          ? '🚧 Σε επεξεργασια'
+          : '⏱️ Προγραμματισμένη'}
+    </div>
+  </div>
+</Select.Option>
           ))}
         </Select>
 

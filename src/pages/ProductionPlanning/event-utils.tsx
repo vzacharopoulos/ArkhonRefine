@@ -16,6 +16,8 @@ interface EventTooltipProps {
   children: React.ReactNode; 
 }
 
+
+
 export const EventTooltip: React.FC<EventTooltipProps> = ({ tooltip, status, children }) => (
   <Tooltip
     title={
@@ -28,7 +30,17 @@ export const EventTooltip: React.FC<EventTooltipProps> = ({ tooltip, status, chi
         )}
       </div>
     }
-    overlayStyle={{ maxWidth: 600 }}
+    
+    styles={{ body: { maxHeight: 200,
+      overflowY: "auto",
+      paddingRight: 8,
+      whiteSpace: "pre-line",} ,
+      root: {maxWidth: 600}// controls outer container size
+    
+    }
+    
+    }
+    
   >
     <div
       style={{
@@ -42,7 +54,6 @@ export const EventTooltip: React.FC<EventTooltipProps> = ({ tooltip, status, chi
     </div>
   </Tooltip>
 );
-
 
 
 
@@ -60,5 +71,16 @@ export const calculateTotalTime= (orderLines: PPOrderLine[]) => {
     formatted: `${duration.hours()}h ${duration.minutes()}m`
   };
 }
+export const calculateTotalLength= (orderLines: PPOrderLine[]) => {
+  const totalttm = orderLines.reduce((sum, line) => {
+    return sum + (line.prodOrdersView?.ttm ?? 0);
+  }, 0);
 
+  // Create duration object
+
+  return totalttm;
+  
+    
+
+}
 

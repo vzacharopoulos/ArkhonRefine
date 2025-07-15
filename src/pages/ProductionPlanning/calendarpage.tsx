@@ -17,7 +17,7 @@ import { Sidebar } from "./sidebar";
 import { EditOutlined } from "@ant-design/icons";
 import isBetween from 'dayjs/plugin/isBetween';
 import { addWorkingMinutes, addWorkingMinutesDynamic, calculateWorkingMinutesBetween, findLastEventEndTime, findNextWorkingTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, mergeSameDayEventParts, splitEventIntoWorkingHours } from "./dateschedule-utils";
-import { calculateTotalTime, EventTooltip } from "./event-utils";
+import { calculateTotalLength, calculateTotalTime, EventTooltip } from "./event-utils";
 import { WorkingHoursModal } from "@/components/modals/workinghoursmodal";
 import { EditEventModal } from "@/components/modals/editeventmodal";
 import { handleDropFactory } from "./utilities/usehandledrop";
@@ -28,6 +28,7 @@ import { eventNames } from "process";
 import { handleDateSelect, handleSaveWorkingHours } from "./workinghours-utils";
 import { offTimeMap } from "./utilities/offtime-map";
 import { wsClient } from "@/providers";
+import { TotalTimeProvider } from "@/contexts/TotalTimeContext";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -141,9 +142,7 @@ export const ProductionCalendar: React.FC = () => {
         const previousCode = currentOrder.prevpanelcode?.replace(/-001$/, "");
         const currentCode = nextOrder.panelcode?.replace(/-001$/, "");
         const offtimeduration = offTimeMap?.[previousCode ?? 0]?.[currentCode ?? 0] ?? 30;
-        console.log(currentOrder.prevpanelcode)
-        console.log(nextOrder.panelcode)
-        console.log(offtimeduration)
+       
 
         await updatePporder({
           resource: "pporders",
@@ -206,7 +205,6 @@ export const ProductionCalendar: React.FC = () => {
   useEffect(() => {
 
     if (!wsClient) return;
-    console.log("subscription srartd")
 
     const dispose = wsClient.subscribe(
 
@@ -322,7 +320,6 @@ export const ProductionCalendar: React.FC = () => {
   const orderLines = orderLinesData?.data?.pporderlines2 ?? [];
   const finished = finishedData?.data?.masterlengths ?? [];
   const orders = ppordersData?.data?.pporders ?? [];
-
   const unscheduledorders = useMemo(
     () =>
       orders.filter(order => {
@@ -335,7 +332,22 @@ export const ProductionCalendar: React.FC = () => {
 
 
 
+const totalTimeByOrderId = useMemo(() => {
+  const map: Record<number, { hours: number; minutes: number; formatted: string; totalMinutes: number }> = {};
 
+  unscheduledorders.forEach(order => {
+    const lines = orderLines.filter(line => line.pporderno === order.pporderno);
+    const time = calculateTotalTime(lines);
+    const totalMinutes = time.hours * 60 + time.minutes;
+
+    map[order.id] = {
+      ...time,
+      totalMinutes,
+    };
+  });
+
+  return map;
+}, [unscheduledorders, orderLines]);
 
 
   useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
@@ -374,11 +386,9 @@ export const ProductionCalendar: React.FC = () => {
         let offStart = dayjs(order.offtimestartdate as Date);
         // If the previous event ended later than the planned offtime start,
         // begin the offtime after the previous event
-        console.log("unupdated offStart", offStart)
         if (prevEnd && !prevEnd.isSame(offStart)) {
           offStart = prevEnd
         }
-        console.log("offStart", offStart)
         const offtimeSegments = splitEventIntoWorkingHours(
           offStart,
           offtimeduration,
@@ -434,7 +444,6 @@ export const ProductionCalendar: React.FC = () => {
 
       processed.push(...segments);
       prevEnd = dayjs(segments[segments.length - 1].end as Date);
-      console.log("prevend", prevEnd)
 
     });
     const mergedEvents = mergeSameDayEventParts(processed);
@@ -445,10 +454,11 @@ export const ProductionCalendar: React.FC = () => {
 
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
+const totalMeter =useMemo(() => calculateTotalLength(orderLines), [orderLines]);      
 
 
 
-  const finishedEvents: EventInput[] = finished.map((order) => {
+const finishedEvents: EventInput[] = finished.map((order) => {
     const theoreticalTime =
       order.time != null
         ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
@@ -530,7 +540,7 @@ export const ProductionCalendar: React.FC = () => {
       if (!ev.id || !ev.start || !ev.end) return;
 
       const idStr = ev.id.toString();
-
+   
       // Handle offtime events - use the already split segments from handleDrop
       if (ev.extendedProps?.isOfftime) {
         const currId = ev.extendedProps.currId;
@@ -539,7 +549,6 @@ export const ProductionCalendar: React.FC = () => {
         const prevPanelCode = ev.extendedProps.prevpanelcode;
 
         if (currId) {
-          console.log("currId", currId);
           const currIdStr = currId.toString();
 
           // If this is the first offtime segment for this currId, initialize offInfo
@@ -597,7 +606,6 @@ export const ProductionCalendar: React.FC = () => {
 
       const extra = offInfo[baseId];
       let updatedOffInfo = extra;
-      console.log("extra", extra)
       // If there's an offtime duration, recalculate and split using working hours
       if (extra?.offtimeduration && extra.offtimestartdate) {
         const offtimeSegments = splitEventIntoWorkingHours(
@@ -652,10 +660,10 @@ export const ProductionCalendar: React.FC = () => {
         console.error(`Failed to update PPOrder ${baseId}:`, error);
       }
     }
-
+    handleStartEvent()
     console.log('All updates completed');
   };
-/* handleStartEvent()
+
   const handleStartEvent = async (eventsArg?: EventInput[]) => {
     const rawEvents = eventsArg ?? currentEvents;
 
@@ -669,9 +677,9 @@ export const ProductionCalendar: React.FC = () => {
     // Process all events and group them (similar to handleDrop logic)
     rawEvents.forEach(ev => {
       if (!ev.id || !ev.start || !ev.end) return;
-
+ 
       const idStr = ev.id.toString();
-
+      
       // Handle offtime events - use the already split segments from handleDrop
       if (ev.extendedProps?.isOfftime) {
         const currId = ev.extendedProps.currId;
@@ -721,7 +729,7 @@ export const ProductionCalendar: React.FC = () => {
         grouped[baseId].push(ev);
       }
 
-      function getEventProperties(ev) {
+      function getEventProperties(ev:EventInput) {
         return {
           id: String(ev.id),
           title: `${ev.pporderno} - ${ev.panelcode}`,
@@ -737,6 +745,8 @@ export const ProductionCalendar: React.FC = () => {
       }
       const teststart = dayjs(ev.start as Date);
 
+console.log("totalMinutes",totalMinutes)
+console.log("teststart",teststart)
 
       // Then use it like this:
       const testsegments = splitEventIntoWorkingHours(
@@ -746,6 +756,7 @@ export const ProductionCalendar: React.FC = () => {
         defaultWorkingHours,
         getEventProperties(ev)
       );
+      console.log("testsegments.end",testsegments.entries)
       const testfinish = dayjs(testsegments[testsegments.length - 1].end as Date);
 
       console.log("start", teststart, "-", "finish", testfinish)
@@ -756,9 +767,10 @@ export const ProductionCalendar: React.FC = () => {
 
   };
 
-*/
+
 
   return (
+      <TotalTimeProvider value={{ totalTimeByOrderId }}>
     <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
       <Sider width={300} style={{ background: "#fff", padding: 24 }}>
         <Sidebar
@@ -776,6 +788,7 @@ export const ProductionCalendar: React.FC = () => {
           orderLines={orderLines}
           orderLinesLoading={orderLinesLoading}
           totalTime={totalTime}
+          totalMeter={totalMeter}
         />
 
         <Divider />
@@ -971,6 +984,7 @@ export const ProductionCalendar: React.FC = () => {
         ενημέρωση όλων
       </Button>
     </Layout>
+     </TotalTimeProvider>
   );
 };
 

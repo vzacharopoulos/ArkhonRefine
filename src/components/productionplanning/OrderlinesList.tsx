@@ -22,7 +22,7 @@ export const OrderlinesList: React.FC<OrderLinesListProps> = ({orderLines,orderL
                   renderItem={(line) => (
                     <List.Item key={line.id}>
                      <span>{line.custporderno}-{line?.prodOrdersView?.time != null 
-                     ? dayjs.duration(line.prodOrdersView.time, 'minutes').format("H[h] m[m]") : "0h 0m"}</span>
+                     ? dayjs.duration(line.prodOrdersView.time, 'minutes').format("H[ω] m[λ]") : "0ω 0λ"}- {line.prodOrdersView?.ttm ?line.prodOrdersView?.ttm.toFixed(0):0}μ</span>
                       <StatusTag status={line.status} />
                     </List.Item>
                   )}

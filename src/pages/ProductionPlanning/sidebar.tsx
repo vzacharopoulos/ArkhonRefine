@@ -25,6 +25,7 @@ const { Title,Text  } = Typography;
     minutes: number;
     formatted: string;
   };
+  totalMeter:number;
   }
   
   
@@ -37,7 +38,7 @@ const { Title,Text  } = Typography;
     selectedOrderId,
     onSelectOrder,
     totalTime,
-     
+     totalMeter,
     orderLines,
     orderLinesLoading
 
@@ -84,6 +85,7 @@ const { Title,Text  } = Typography;
            selectedOrderId={selectedOrderId}
              onSelectOrder={onSelectOrder}
              totalTime={totalTime}
+             totalMeter={totalMeter}
              />
              
         </div>

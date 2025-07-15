@@ -77,9 +77,7 @@ query GetPpOrders($filter: PpordersFilterInput) {
     offtimeduration
     offtimestartdate
     offtimeenddate
-    totalTime
-    totalTtm
-  
+   
     
   }
 }`;
@@ -116,6 +114,7 @@ upDate
     }
  
     pporders{
+      id
       pporderno
       panelcode
       startDate

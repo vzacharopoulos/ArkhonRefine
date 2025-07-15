@@ -98,7 +98,7 @@ const SimpleList: React.FC = () => {
   console.log("useList error:", error);
 
   // Use the actual data from the API, fallback to mock if needed
-  const records = data?.data ?? mockArray;
+    const records = (data ?? []) as PanelProductionOrderExt2[];
 
   return (
     <List title="Panel Production Orders Ext2">
