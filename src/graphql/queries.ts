@@ -12,6 +12,7 @@ export const PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION = gql`
       status
       pporders {
         id
+        pporderno
       }
     }
   }

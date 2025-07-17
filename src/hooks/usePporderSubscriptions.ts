@@ -1,0 +1,80 @@
+import { useEffect } from "react";
+import { print } from "graphql";
+import { message } from "antd";
+import { PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, PPORDER_UPDATED_SUBSCRIPTION } from "@/graphql/queries";
+import { wsClient } from "@/providers";
+import { PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
+import { useStartPporder } from "@/hooks/useStartPporder";
+import { useDataProvider } from "@refinedev/core";
+
+interface UsePporderSubscriptionsProps {
+  refetchPporders: () => void;
+  finishedOrders: PPOrder[];
+  dailyWorkingHours: Record<string, WorkingHoursConfig>;
+  defaultWorkingHours: Record<number, WorkingHoursConfig>;
+  setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
+}
+
+export const usePporderSubscriptions = ({
+  refetchPporders,
+  finishedOrders,
+  dailyWorkingHours,
+  defaultWorkingHours,
+  setCurrentEvents,
+}: UsePporderSubscriptionsProps) => {
+  const { handleStart } = useStartPporder({
+    finishedOrders,
+    dailyWorkingHours,
+    defaultWorkingHours,
+    setCurrentEvents,
+  });
+
+  useEffect(() => {
+    if (!wsClient) return;
+
+    const dispose = wsClient.subscribe(
+      { query: print(PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION) },
+      {
+        next: async (value: any) => {
+          const line = value?.data?.pporderlineStatusChanged;
+          if (line?.status !== 2) return;
+                  console.log("value",value);
+                   console.log("line");
+
+          const order = line?.pporders;
+          if (order?.id && order?.pporderno) {
+            await handleStart(order);
+            message.success("Παραγγελία ξεκίνησε");
+          }
+        },
+        error: (err) => console.error(err),
+        complete: () => {},
+      }
+    );
+
+    return () => {
+      dispose();
+    };
+  }, [handleStart]);
+
+  useEffect(() => {
+    if (!wsClient) return;
+
+    const dispose = wsClient.subscribe(
+      { query: print(PPORDER_UPDATED_SUBSCRIPTION) },
+      {
+        next: () => {
+          refetchPporders();
+        },
+        error: (err) => console.error(err),
+        complete: () => {
+          console.log("refetched");
+        },
+      }
+    );
+
+    return () => {
+      dispose();
+    };
+  }, [refetchPporders]);
+};

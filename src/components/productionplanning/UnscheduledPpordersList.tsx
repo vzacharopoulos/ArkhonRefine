@@ -29,7 +29,6 @@ export const OrderList: React.FC<OrderListProps> = ({
   totalMeter
 }) => {
   const { totalTimeByOrderId } = useTotalTimeContext();
-  console.log(totalTimeByOrderId);
 
 
   

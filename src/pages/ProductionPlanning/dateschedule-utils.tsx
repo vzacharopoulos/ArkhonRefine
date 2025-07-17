@@ -2,6 +2,7 @@ import dayjs, { Dayjs } from "dayjs";
 import { EventInput } from "@fullcalendar/core";
 import { WorkingHoursConfig } from "./productioncalendartypes";
 
+import { isDayjs } from "dayjs";
 export const findLastEventEndTime = (events: EventInput[]): Dayjs | null => {
   if (events.length === 0) return null;
 
@@ -244,40 +245,42 @@ export function addWorkingMinutes(
   return current;
 }
 
-// Helper function to split events across working hours
+
+
+
 export function splitEventIntoWorkingHours(
-  start: Dayjs,
-  totalMinutes: number,
+  rawStart: Dayjs,
+  rawTotalMinutes: number,
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
   defaultWorkingHours: Record<number, WorkingHoursConfig>,
   eventData: any
 ): EventInput[] {
   const events: EventInput[] = [];
-  let current = start.clone();
-  let remaining = totalMinutes;
-  let partIndex = 1;
 
-  while (remaining > 0) {
+  let current = isDayjs(rawStart) ? rawStart.clone() : dayjs();
+  let remaining = rawTotalMinutes > 0 ? rawTotalMinutes : 1;
+  let partIndex = 1;
+  const MAX_ITERATIONS = 1000;
+  let iterations = 0;
+
+  // Default fallback config
+  const fallbackConfig: WorkingHoursConfig = {
+    startHour: 6,
+    startMinute: 0,
+    endHour: 14,
+    endMinute: 0,
+    workingDays: [1, 2, 3, 4, 5],
+  };
+
+  while (remaining > 0 && iterations < MAX_ITERATIONS) {
+    iterations++;
+
     const dateKey = current.format("YYYY-MM-DD");
     const day = current.day();
-    const config = dailyWorkingHours[dateKey] ?? defaultWorkingHours[day];
+    const config = dailyWorkingHours[dateKey] ?? defaultWorkingHours[day] ?? fallbackConfig;
 
-    if (!config || !config.workingDays.includes(day)) {
-      // Move to next working day
-      const nextDay = current.add(1, "day");
-      const nextDateKey = nextDay.format("YYYY-MM-DD");
-      const nextDayOfWeek = nextDay.day();
-      const nextDayConfig = dailyWorkingHours[nextDateKey] ?? defaultWorkingHours[nextDayOfWeek];
-
-      if (nextDayConfig) {
-        current = nextDay
-          .hour(nextDayConfig.startHour)
-          .minute(nextDayConfig.startMinute)
-          .second(0);
-      } else {
-        // Ultimate fallback if no config exists
-        current = nextDay.hour(6).minute(0).second(0);
-      }
+    if (!config.workingDays.includes(day)) {
+      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
       continue;
     }
 
@@ -290,28 +293,20 @@ export function splitEventIntoWorkingHours(
     }
 
     if (currentTime >= endTime) {
-      // Move to next working day
-      const nextDay = current.add(1, "day");
-      const nextDateKey = nextDay.format("YYYY-MM-DD");
-      const nextDayOfWeek = nextDay.day();
-      const nextDayConfig = dailyWorkingHours[nextDateKey] ?? defaultWorkingHours[nextDayOfWeek];
-
-      if (nextDayConfig) {
-        current = nextDay
-          .hour(nextDayConfig.startHour)
-          .minute(nextDayConfig.startMinute)
-          .second(0);
-      } else {
-        // Ultimate fallback if no config exists
-        current = nextDay.hour(6).minute(0).second(0);
-      }
+      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
       continue;
     }
 
     const availableMinutes = endTime - currentTime;
     const chunk = Math.min(availableMinutes, remaining);
-    const segmentEnd = current.add(chunk, "minute");
-     const idStr = eventData.id?.toString() ?? "";
+    const segmentEnd = current.clone().add(chunk, "minute");
+
+    // fallback if start == end (just for safety)
+    if (segmentEnd.isSame(current)) {
+      segmentEnd.add(1, "minute");
+    }
+
+    const idStr = eventData.id?.toString() ?? "";
     const baseId = idStr.split("-part-")[0];
 
     events.push({
@@ -331,27 +326,28 @@ export function splitEventIntoWorkingHours(
     remaining -= chunk;
     partIndex++;
 
-    // When moving to the next day, use the next day's configuration
+    // Prepare next day if needed
     if (remaining > 0) {
       const nextDay = current.add(1, "day");
-      const nextDateKey = nextDay.format("YYYY-MM-DD");
-      const nextDayOfWeek = nextDay.day();
-      const nextDayConfig = dailyWorkingHours[nextDateKey] ?? defaultWorkingHours[nextDayOfWeek];
+      const nextConfig =
+        dailyWorkingHours[nextDay.format("YYYY-MM-DD")] ??
+        defaultWorkingHours[nextDay.day()] ??
+        fallbackConfig;
 
-      if (nextDayConfig) {
-        current = nextDay
-          .hour(nextDayConfig.startHour)
-          .minute(nextDayConfig.startMinute)
-          .second(0);
-      } else {
-        // Ultimate fallback if no config exists
-        current = nextDay.hour(6).minute(0).second(0);
-      }
+      current = nextDay
+        .hour(nextConfig.startHour)
+        .minute(nextConfig.startMinute)
+        .second(0);
     }
+  }
+
+  if (iterations >= MAX_ITERATIONS) {
+    console.error("splitEventIntoWorkingHours: Reached max iterations. Check configs or loops.");
   }
 
   return events;
 }
+
 
 export function addWorkingMinutesDynamic(
     start: Dayjs,
