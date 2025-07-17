@@ -38,6 +38,7 @@ import { usePporders } from "@/hooks/usePporders";
 import { useFinishedPporders } from "@/hooks/useFinishedPporders";
 import { useUpdatePporder } from "@/hooks/useUpdatePporder";
 import { useStartPporder } from "@/hooks/useStartPporder";
+import { handleUpdateAllEvents } from "./handlers/handleupdateall";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -421,146 +422,16 @@ export const ProductionCalendar: React.FC = () => {
     setWeekendsVisible(!weekendsVisible);
   };
 
-  const handleUpdateAllEvents = async (eventsArg?: EventInput[]) => {
-    const rawEvents = eventsArg ?? currentEvents;
 
-    if (!eventsArg) {
-      setCurrentEvents(rawEvents);
-    }
+const handleUpdateAll = async () => {
+  await handleUpdateAllEvents({
+    events: currentEvents,
+    dailyWorkingHours,
+    defaultWorkingHours,
+    updatePporder: handleUpdatePporder,
+  });
+};
 
-    const grouped: Record<string, EventInput[]> = {};
-    const offInfo: Record<string, Partial<PPOrder>> = {};
-
-    // Process all events and group them (similar to handleDrop logic)
-    rawEvents.forEach(ev => {
-      if (!ev.id || !ev.start || !ev.end) return;
-
-      const idStr = ev.id.toString();
-
-      // Handle offtime events - use the already split segments from handleDrop
-      if (ev.extendedProps?.isOfftime) {
-        const currId = ev.extendedProps.currId;
-        const strPrevId = ev.extendedProps.prevId?.toString();
-        const prevId = strPrevId?.split('-part-')[0];
-        const prevPanelCode = ev.extendedProps.prevpanelcode;
-
-        if (currId) {
-          const currIdStr = currId.toString();
-
-          // If this is the first offtime segment for this currId, initialize offInfo
-          if (!offInfo[currIdStr]) {
-            offInfo[currIdStr] = {
-              previd: Number(prevId),
-              prevpanelcode: prevPanelCode,
-              offtimeduration: ev.extendedProps.offtimeduration,
-              // Use the individual segment's start/end from extendedProps (set by handleDrop)
-              offtimestartdate: ev.extendedProps.offtimeStartDate
-                ? new Date(ev.extendedProps.offtimeStartDate)
-                : new Date(ev.start as Date),
-              offtimeenddate: ev.extendedProps.offtimeEndDate
-                ? new Date(ev.extendedProps.offtimeEndDate)
-                : new Date(ev.end as Date),
-            };
-          } else {
-            // Update the end date if this segment ends later
-            const currentEnd = new Date(ev.extendedProps.offtimeEndDate || ev.end as Date);
-            const existingEnd = offInfo[currIdStr].offtimeenddate;
-            if (existingEnd && currentEnd > existingEnd) {
-              offInfo[currIdStr].offtimeenddate = currentEnd;
-            }
-          }
-        }
-        return;
-      }
-
-      // Handle regular events - extract base ID (same as before)
-      const baseId = idStr.includes('-part-') ? idStr.split('-part-')[0] : idStr;
-
-      // Only process events with status 1, 2, 3, or 14
-      const eventStatus = ev.extendedProps?.status;
-      if (eventStatus && [1, 2, 3, 14].includes(eventStatus)) {
-        if (!grouped[baseId]) {
-          grouped[baseId] = [];
-        }
-        grouped[baseId].push(ev);
-      }
-    });
-
-    console.log('Grouped events:', Object.keys(grouped));
-    console.log('OffInfo:', offInfo);
-
-    // Second pass: Process each group and update PPOrders (same as before)
-    for (const [baseId, events] of Object.entries(grouped)) {
-      if (events.length === 0) continue;
-
-      const sortedEvents = events.sort((a, b) =>
-        new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime()
-      );
-
-      const firstStart = new Date(sortedEvents[0].start as Date);
-      const lastEnd = new Date(sortedEvents[sortedEvents.length - 1].end as Date);
-
-      const extra = offInfo[baseId];
-      let updatedOffInfo = extra;
-      // If there's an offtime duration, recalculate and split using working hours
-      if (extra?.offtimeduration && extra.offtimestartdate) {
-        const offtimeSegments = splitEventIntoWorkingHours(
-          dayjs(extra.offtimestartdate),
-          extra.offtimeduration,
-          dailyWorkingHours,
-          defaultWorkingHours,
-          {
-            id: `${baseId}-offtime`,
-            title: "προετοιμασία μηχανής",
-            color: "gray",
-            extendedProps: {
-              isOfftime: true,
-              currId: baseId,
-              prevId: extra.previd?.toString(),
-              prevpanelcode: extra.prevpanelcode,
-              offtimeduration: extra.offtimeduration,
-            },
-          }
-        );
-
-        const first = offtimeSegments[0];
-        const last = offtimeSegments[offtimeSegments.length - 1];
-
-        // Replace offtime range in `updatedOffInfo`
-        updatedOffInfo = {
-          ...updatedOffInfo,
-          offtimestartdate: new Date(first.start as Date),
-          offtimeenddate: new Date(last.end as Date),
-        };
-      }
-
-      console.log(`Updating PPOrder ${baseId}:`, {
-        start: firstStart,
-        end: lastEnd,
-        offInfo: updatedOffInfo,
-      });
-
-      try {
-     await handleUpdatePporder(
-  Number(baseId),
-  firstStart,
-  lastEnd,
-  {
-    ...updatedOffInfo,
-    status:
-      events[0]?.extendedProps?.status === 1
-        ? 14
-        : events[0]?.extendedProps?.status,
-  }
-);
-        console.log(`Successfully updated PPOrder ${baseId}`);
-      } catch (error) {
-        console.error(`Failed to update PPOrder ${baseId}:`, error);
-      }
-    }
-    handleStart
-    console.log('All updates completed');
-  };
   const { handleStart } = useStartPporder({
     finishedOrders: finished,
     dailyWorkingHours,
@@ -915,7 +786,7 @@ export const ProductionCalendar: React.FC = () => {
 
           )}
         />
-        <UpdateAllButton onClick={() => handleUpdateAllEvents()} />
+        <UpdateAllButton onClick={() => handleUpdateAll()} />
       </Layout>
     </TotalTimeProvider>
   );

@@ -37,7 +37,7 @@ export const usePporderSubscriptions = ({
       {
         next: async (value: any) => {
           const line = value?.data?.pporderlineStatusChanged;
-          if (line?.status !== 2) return;
+          if (line?.status !== 4) return;
                   console.log("value",value);
                    console.log("line");
 

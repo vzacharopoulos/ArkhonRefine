@@ -11,11 +11,14 @@ import {
   addWorkingMinutesDynamic
 } from "@/pages/ProductionPlanning/dateschedule-utils";
 import { statusColorMap, STATUS_MAP } from "@/utilities/map-status-id-to-name";
+import { HandleUpdateAllEventsParams } from "@/pages/ProductionPlanning/handlers/handleupdateall";
+
 interface UseStartPporderParams {
   finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
+  handleUpdateAllEvents: HandleUpdateAllEventsParams
 }
 
 export const useStartPporder = ({
@@ -23,16 +26,14 @@ export const useStartPporder = ({
   dailyWorkingHours,
   defaultWorkingHours,
   setCurrentEvents,
+  handleUpdateAllEvents,
 }: UseStartPporderParams) => {
   const dataProvider = useDataProvider()();
-  console.log("DP has custom:", typeof dataProvider.custom);
 
   const { mutate: updatePporder } = useUpdate<PPOrder>();
+  
   const handleStart = async (order: PPOrder) => {
     if (!order.pporderno) return;
-                        console.log("data");
-                                                 console.log("data",order.pporderno);
-
 
     try {
       const { data } = await dataProvider.custom<{ pporderlines2: PPOrderLine[] }>({
@@ -45,8 +46,8 @@ export const useStartPporder = ({
       });
 
       const pporderlines2 = data?.pporderlines2 ?? [];
-                         console.log("capporderlines2lled",pporderlines2);
-                         console.log("data",data);
+      console.log("capporderlines2lled", pporderlines2);
+      console.log("data", data);
 
       const totalMinutes = pporderlines2.reduce(
         (sum, line) => sum + (line.prodOrdersView?.time ?? 0),
@@ -75,8 +76,9 @@ export const useStartPporder = ({
             defaultWorkingHours
           )
         : 0;
-    console.log("offDuration",offDuration)
-        console.log("offStart",offStart)
+      
+      console.log("offDuration", offDuration);
+      console.log("offStart", offStart);
 
       const offSegments = offDuration && offStart
         ? splitEventIntoWorkingHours(
@@ -101,10 +103,8 @@ export const useStartPporder = ({
 
       let jobStart;
 
-
-  console.warn("offSegments is empty, using current time for jobStart");
-  jobStart = now;
-
+      console.warn("offSegments is empty, using current time for jobStart");
+      jobStart = now;
 
       const jobSegments = splitEventIntoWorkingHours(
         jobStart,
@@ -150,7 +150,23 @@ export const useStartPporder = ({
         },
       });
 
-      setCurrentEvents(prev => [...prev, ...offSegments, ...jobSegments]);
+      // Update the current events state
+      setCurrentEvents(prev => {
+        const newEvents = [...prev, ...offSegments, ...jobSegments];
+        
+        // Call handleUpdateAllEvents after state is updated
+        setTimeout(async () => {
+          await handleUpdateAllEvents({
+            events: newEvents,
+            dailyWorkingHours,
+            defaultWorkingHours,
+            updatePporder,
+          });
+        }, 0);
+        
+        return newEvents;
+      });
+
     } catch (error) {
       console.error("Failed to start order:", error);
     }
