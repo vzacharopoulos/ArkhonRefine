@@ -39,10 +39,10 @@ mutation updatePporder($input: UpdatePporderInput!) {
   updatePporder(input: $input) {
     pporderno
     id
-    startDate
+    
     status
     startDateDatetime
-    finishDate
+    
     finishDateDatetime
     estStartDate
     estFinishDate
@@ -118,7 +118,7 @@ upDate
       id
       pporderno
       panelcode
-      startDate
+      
       startDateDatetime
       finishDateDatetime
       

@@ -228,6 +228,7 @@ export const ProductionCalendar: React.FC = () => {
     dailyWorkingHours,
     defaultWorkingHours,
     setCurrentEvents,
+    handleUpdateAllEvents,
   });
 
   const totalTimeByOrderId = useMemo(() => {
@@ -423,12 +424,17 @@ export const ProductionCalendar: React.FC = () => {
   };
 
 
+
+
+
+
 const handleUpdateAll = async () => {
   await handleUpdateAllEvents({
     events: currentEvents,
     dailyWorkingHours,
     defaultWorkingHours,
     updatePporder: handleUpdatePporder,
+    
   });
 };
 
@@ -437,6 +443,7 @@ const handleUpdateAll = async () => {
     dailyWorkingHours,
     defaultWorkingHours,
     setCurrentEvents,
+    handleUpdateAllEvents,
   });
   //  const handleStart = async (order: PPOrder) => {
   //   if (!order.pporderno) return;

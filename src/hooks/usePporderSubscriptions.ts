@@ -6,6 +6,7 @@ import { wsClient } from "@/providers";
 import { PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
 import { useStartPporder } from "@/hooks/useStartPporder";
 import { useDataProvider } from "@refinedev/core";
+import { HandleUpdateAllEventsParams } from "@/pages/ProductionPlanning/handlers/handleupdateall";
 
 interface UsePporderSubscriptionsProps {
   refetchPporders: () => void;
@@ -13,6 +14,7 @@ interface UsePporderSubscriptionsProps {
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
+   handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
 }
 
 export const usePporderSubscriptions = ({
@@ -21,12 +23,15 @@ export const usePporderSubscriptions = ({
   dailyWorkingHours,
   defaultWorkingHours,
   setCurrentEvents,
+  handleUpdateAllEvents,
+  
 }: UsePporderSubscriptionsProps) => {
   const { handleStart } = useStartPporder({
     finishedOrders,
     dailyWorkingHours,
     defaultWorkingHours,
     setCurrentEvents,
+    handleUpdateAllEvents,
   });
 
   useEffect(() => {

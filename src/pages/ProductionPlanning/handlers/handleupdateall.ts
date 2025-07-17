@@ -6,7 +6,7 @@ import { PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/producti
 import { splitEventIntoWorkingHours } from "@/pages/ProductionPlanning/dateschedule-utils";
 import { STATUS_MAP, statusColorMap } from "@/utilities/map-status-id-to-name";
 
-type UpdateFn = (
+export  type UpdateFn = (
   id: number,
   start: Date,
   end: Date,
@@ -77,10 +77,21 @@ export const handleUpdateAllEvents = async ({
   });
 
   for (const [baseId, group] of Object.entries(grouped)) {
-    const sorted = group.sort((a, b) => new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime());
+ const sorted = group.sort((a, b) => {
+    // Define status priority: in-process (2) comes before scheduled (14)
+    const statusPriority: { [key: number]: number } = { 2: 0, 14: 1 };
+    
+    // First, sort by status priority
+    if (a.status !== b.status) {
+        return statusPriority[a.status] - statusPriority[b.status];
+    }
+    
+    // If same status, sort by start date (earliest first)
+    return new Date(a.start as Date).getTime() - new Date(b.start as Date).getTime();
+});
     const firstStart = new Date(sorted[0].start as Date);
     const lastEnd = new Date(sorted[sorted.length - 1].end as Date);
-
+console.log(sorted)
     const extra = offInfo[baseId];
     let updatedOffInfo = extra;
 
