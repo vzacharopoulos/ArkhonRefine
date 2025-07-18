@@ -39,6 +39,7 @@ import { useFinishedPporders } from "@/hooks/useFinishedPporders";
 import { useUpdatePporder } from "@/hooks/useUpdatePporder";
 import { useStartPporder } from "@/hooks/useStartPporder";
 import { handleUpdateAllEvents } from "./handlers/handleupdateall";
+import { usePporderLines } from "@/hooks/usePporderLines";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -192,22 +193,11 @@ export const ProductionCalendar: React.FC = () => {
   // When the start time is edited, shift the end time by the same delta
   useSyncEditEnd(selectedEvent, editStart, setEditEnd);
 
-
-  const { data: orderLinesData, isLoading: orderLinesLoading } = useCustom<{ pporderlines2: PPOrderLine[] }>({
-    url: "",
-    method: "get",
-    meta: {
-      gqlQuery: GET_PPORDERLINES_OF_PPORDER,
-      variables: {
-        filter: {
-          ppordernos: selectedPporderno,
-        },
-      },
-    },
-    queryOptions: {
-      enabled: !!selectedPporderno,
-    },
-  });
+  const {
+    data: orderLinesData,
+    isLoading: orderLinesLoading,
+    refetch: refetchPporderlines,
+  } = usePporderLines(selectedPporderno);
 
   const orderLines = orderLinesData?.data?.pporderlines2 ?? [];
   const finished = finishedData?.data?.masterlengths ?? [];
@@ -224,6 +214,7 @@ export const ProductionCalendar: React.FC = () => {
 
   usePporderSubscriptions({
     refetchPporders,
+    refetchPporderlines ,
     finishedOrders: finished,
     dailyWorkingHours,
     defaultWorkingHours,

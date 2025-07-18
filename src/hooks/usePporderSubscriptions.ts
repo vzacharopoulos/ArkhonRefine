@@ -13,6 +13,7 @@ import { useFinishPporder } from "./useFinishPporders";
 
 interface UsePporderSubscriptionsProps {
   refetchPporders: () => void;
+    refetchPporderlines: () => void;
   finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
@@ -24,6 +25,7 @@ interface UsePporderSubscriptionsProps {
 
 export const usePporderSubscriptions = ({
   refetchPporders,
+   refetchPporderlines,
   finishedOrders,
   dailyWorkingHours,
   defaultWorkingHours,
@@ -45,6 +47,7 @@ export const usePporderSubscriptions = ({
  
   const { handleFinish } = useFinishPporder({
     currentEvents,
+        setCurrentEvents,
     setEditEnd,
     dailyWorkingHours,
     defaultWorkingHours,
