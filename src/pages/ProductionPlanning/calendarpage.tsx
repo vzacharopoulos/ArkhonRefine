@@ -229,6 +229,7 @@ export const ProductionCalendar: React.FC = () => {
     defaultWorkingHours,
     currentEvents,
     setCurrentEvents,
+        setEditEnd,
     handleUpdateAllEvents
   });
 
