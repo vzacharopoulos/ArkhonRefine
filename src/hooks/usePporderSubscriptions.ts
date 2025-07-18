@@ -7,12 +7,14 @@ import { PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/producti
 import { useStartPporder } from "@/hooks/useStartPporder";
 import { useDataProvider } from "@refinedev/core";
 import { HandleUpdateAllEventsParams } from "@/pages/ProductionPlanning/handlers/handleupdateall";
+import { EventInput } from "fullcalendar";
 
 interface UsePporderSubscriptionsProps {
   refetchPporders: () => void;
   finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
+  currentEvents:EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
    handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
 }
@@ -22,6 +24,7 @@ export const usePporderSubscriptions = ({
   finishedOrders,
   dailyWorkingHours,
   defaultWorkingHours,
+  currentEvents,
   setCurrentEvents,
   handleUpdateAllEvents,
   
@@ -30,6 +33,7 @@ export const usePporderSubscriptions = ({
     finishedOrders,
     dailyWorkingHours,
     defaultWorkingHours,
+    currentEvents,
     setCurrentEvents,
     handleUpdateAllEvents,
   });
@@ -49,7 +53,7 @@ export const usePporderSubscriptions = ({
           const order = line?.pporders;
           if (order?.id && order?.pporderno) {
             await handleStart(order);
-            message.success("Παραγγελία ξεκίνησε");
+            message.success(`Η Master ${order?.pporderno} ξεκίνησε`);
           }
         },
         error: (err) => console.error(err),

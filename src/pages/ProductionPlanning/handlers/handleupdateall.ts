@@ -28,7 +28,7 @@ export const handleUpdateAllEvents = async ({
 }: HandleUpdateAllEventsParams) => {
   const grouped: Record<string, EventInput[]> = {};
   const offInfo: Record<string, Partial<PPOrder>> = {};
-
+console.log("✅ handleUpdateAllEvents was called with events:", events);
   events.forEach(ev => {
     if (!ev.id || !ev.start || !ev.end) return;
 
@@ -91,7 +91,7 @@ export const handleUpdateAllEvents = async ({
 });
     const firstStart = new Date(sorted[0].start as Date);
     const lastEnd = new Date(sorted[sorted.length - 1].end as Date);
-console.log(sorted)
+console.log("sorted",sorted)
     const extra = offInfo[baseId];
     let updatedOffInfo = extra;
 
