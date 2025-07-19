@@ -64,6 +64,7 @@ export const ProductionCalendar: React.FC = () => {
   const {
     data: finishedData,
     isLoading: finishedLoading,
+        refetch: refetchFinished,
   } = useFinishedPporders();
 
 
@@ -148,7 +149,8 @@ export const ProductionCalendar: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editStart, setEditStart] = useState<Dayjs | null>(null);
   const [editEnd, setEditEnd] = useState<Dayjs | null>(null);
-  const initialSyncRef = useRef(false);
+  const manualSyncRef = useRef<boolean >(false);
+  
   // Keep your current defaultWorkingHours structure
   const [defaultWorkingHours, setDefaultWorkingHours] = useState<Record<number, WorkingHoursConfig>>({
     1: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] }, // Monday
@@ -214,14 +216,16 @@ export const ProductionCalendar: React.FC = () => {
 
   usePporderSubscriptions({
     refetchPporders,
-    refetchPporderlines ,
+    refetchPporderlines,
+    refetchFinished,
     finishedOrders: finished,
     dailyWorkingHours,
     defaultWorkingHours,
     currentEvents,
     setCurrentEvents,
-        setEditEnd,
-    handleUpdateAllEvents
+    setEditEnd,
+    handleUpdateAllEvents,
+      manualSyncRef,
   });
 
   const totalTimeByOrderId = useMemo(() => {
@@ -339,7 +343,7 @@ export const ProductionCalendar: React.FC = () => {
     });
     const mergedEvents = mergeSameDayEventParts(processed);
     setCurrentEvents(mergedEvents);
-    initialSyncRef.current = true;
+    manualSyncRef.current = true;
   }
     , [unscheduledorders, dailyWorkingHours, defaultWorkingHours]);
 
@@ -409,6 +413,9 @@ export const ProductionCalendar: React.FC = () => {
 
   const handleWeekendsToggle = () => {
     setWeekendsVisible(!weekendsVisible);
+     refetchFinished();
+ 
+    
     console.log(currentEvents)
   };
 

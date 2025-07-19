@@ -30,7 +30,7 @@ export const handleUpdateAllEvents = async ({
   const offInfo: Record<string, Partial<PPOrder>> = {};
 console.log("✅ handleUpdateAllEvents was called with events:", events);
   events.forEach(ev => {
-    if (!ev.id || !ev.start || !ev.end) return;
+    if (!ev.id || !ev.start || !ev.end||ev.extendedProps?.status===4) return;
 
     const idStr = ev.id.toString();
 

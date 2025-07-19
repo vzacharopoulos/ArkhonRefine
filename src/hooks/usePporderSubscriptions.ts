@@ -14,6 +14,7 @@ import { useFinishPporder } from "./useFinishPporders";
 interface UsePporderSubscriptionsProps {
   refetchPporders: () => void;
     refetchPporderlines: () => void;
+      refetchFinished: () => void;
   finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
@@ -21,11 +22,14 @@ interface UsePporderSubscriptionsProps {
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
   setEditEnd: (date: Dayjs | null) => void;
    handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
+     manualSyncRef: React.MutableRefObject<boolean>;
+
 }
 
 export const usePporderSubscriptions = ({
   refetchPporders,
    refetchPporderlines,
+     refetchFinished,
   finishedOrders,
   dailyWorkingHours,
   defaultWorkingHours,
@@ -33,6 +37,8 @@ export const usePporderSubscriptions = ({
   setCurrentEvents,
     setEditEnd,
   handleUpdateAllEvents,
+    manualSyncRef,
+
   
 }: UsePporderSubscriptionsProps) => {
   const { handleStart } = useStartPporder({
@@ -42,6 +48,7 @@ export const usePporderSubscriptions = ({
     currentEvents,
     setCurrentEvents,
     handleUpdateAllEvents,
+    
   });
 
  
@@ -52,6 +59,9 @@ export const usePporderSubscriptions = ({
     dailyWorkingHours,
     defaultWorkingHours,
     handleUpdateAllEvents,
+      refetchFinished,
+        manualSyncRef,
+
   });
 
   const dataProvider = useDataProvider()();
@@ -103,7 +113,7 @@ export const usePporderSubscriptions = ({
     return () => {
       dispose();
     };
-  }, [handleStart]);
+  }, [handleStart, refetchPporderlines, handleFinish]);
 
   useEffect(() => {
     if (!wsClient) return;
@@ -113,6 +123,7 @@ export const usePporderSubscriptions = ({
       {
         next: () => {
           refetchPporders();
+                    refetchFinished();
         },
         error: (err) => console.error(err),
         complete: () => {
@@ -124,5 +135,5 @@ export const usePporderSubscriptions = ({
     return () => {
       dispose();
     };
-  }, [refetchPporders]);
+  }, [refetchPporders, refetchFinished]);
 };
