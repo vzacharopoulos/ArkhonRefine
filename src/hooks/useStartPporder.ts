@@ -89,7 +89,7 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs('2025-07-21T06:10:00');
+      const now = dayjs('2025-07-22T07:10:00');
 
       const lastFinished = [...finishedOrders]
         .filter((f) => f.finishDateDatetime)

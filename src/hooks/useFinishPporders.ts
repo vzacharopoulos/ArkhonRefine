@@ -56,126 +56,80 @@ export const useFinishPporder = ({
     });
   };
 
+const handleFinish = async (order: PPOrder) => {
+  const now = dayjs('2025-07-22T08:00:00'); // or use dayjs('2025-07-22T08:00:00') for testing
+  manualSyncRef.current = true;
 
-  const handleFinish = async (order: PPOrder) => {
-    const now = dayjs('2025-07-21T21:55:00');
-    manualSyncRef.current = true;
-    setEditEnd(now);
+  const baseId = String(order.id);
 
-    const baseId = String(order.id);
+  // Find all job segments (non-offtime)
+  const jobSegments = currentEvents
+    .filter(
+      (ev) =>
+        ev.id?.toString().startsWith(baseId + "-part-") &&
+        !ev.extendedProps?.isOfftime
+    )
+    .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
 
-    // 1️⃣ Find the earliest job segment for this order
-    const jobEvents = currentEvents
-      .filter(
-        (ev) =>
-          ev.id &&
-          ev.id.toString().split("-part-")[0] === baseId &&
-          !ev.extendedProps?.isOfftime,
-      )
-      .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
+  const firstSegment = jobSegments[0];
+  if (!firstSegment) return;
+console.log("firstSegment",firstSegment)
+console.log("currentEvents before",currentEvents)
 
-    const selectedEvent = jobEvents[0];
-    if (!selectedEvent) return;
+  setCurrentEvents(prevEvents =>
+              handleSaveEdit(
+                firstSegment,
+                dayjs(firstSegment.start as Date),
+                now,
+                prevEvents,
+                dailyWorkingHours,
+                defaultWorkingHours
+              )
+            );
+console.log("currentEvents",currentEvents)
 
-    const editStart = dayjs(selectedEvent.start as Date);
+ 
+  // 🟢 Remove old segments and set new ones
+  const cleanedEvents = currentEvents.filter(
+    (ev) => !ev.id?.toString().startsWith(baseId + "-part-")
+  );
+  const finalEvents = [...cleanedEvents];
+  setCurrentEvents(finalEvents);
 
-    // 2️⃣ Build the new events array
-    const updatedEvents = handleSaveEdit(
-      selectedEvent,
-      editStart,
-      now,
-      currentEvents,
-      dailyWorkingHours,
-      defaultWorkingHours,
-    ).map((ev) => {
-      const evBase = ev.id?.toString().split("-part-")[0];
-      return evBase === baseId && !ev.extendedProps?.isOfftime
-        ? {
-          ...ev,
-          color: statusColorMap[4] || ev.color,
-          extendedProps: {
-            ...ev.extendedProps,
-            tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""
-              }\nκατάσταση: ${STATUS_MAP[4]}`,
-          },
-        }
-        : ev;
-    });
-    // Remove all existing events with same baseId (e.g. "123-part-0", "123-part-1", etc)
-    const filteredEvents = updatedEvents.filter(
-      (ev) => !ev.id?.toString().startsWith(baseId)
-    );
+  // 🟢 Update order in DB
+  await updatePporder({
+    resource: "pporders",
+    id: order.id,
+    values: {
+      estFinishDate: now.toISOString(),
+      finishDateDatetime: now.toISOString(),
+      status: 4,
+    },
+    meta: {
+      gqlMutation: UPDATE_PPORDERS,
+    },
+  });
 
-    // 🟢 3. Sort updated segments by start date
-    const sorted = filteredEvents
-      .filter((ev) => ev.start)
-      .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
+  // 🟢 Optional: refetch finished orders
+  if (refetchFinished) {
+    await refetchFinished();
+  }
 
+  // 🟢 Persist final updated events to backend
+  await handleUpdateAllEvents({
+    events: finalEvents,
+    dailyWorkingHours,
+    defaultWorkingHours,
+    updatePporder: updatePporderFn,
+  });
 
-    const firstSegment = sorted[0];
+  message.success(`Η Master ${order.pporderno} ολοκληρώθηκε`);
 
-
-
-         const finalupdatedEvents = handleSaveEdit(
-        firstSegment,
-        now, // new start
-        dayjs(firstSegment.end as Date), // keep original end of the first segment
-        filteredEvents,
-        dailyWorkingHours,
-        defaultWorkingHours,
-      );
-            setCurrentEvents(finalupdatedEvents);
-
-    
-      // Merge with updated finished events
-      console.log("updatedEvents", updatedEvents)
-      console.log("filteredEvents", filteredEvents)
-
-
-      // 3️⃣ Update UI state
-      //console.log("updatedEvents",updatedEvents)
-      // 4️⃣ Persist finished order immediately
-      await updatePporder({
-        resource: "pporders",
-        id: order.id,
-        values: {
-          estFinishDate: now.toISOString(),
-          finishDateDatetime: now.toISOString(),
-          status: 4,
-        },
-        meta: {
-          gqlMutation: UPDATE_PPORDERS,
-        },
-      });
-
-          if (refetchPporders) {
-      await refetchPporders();
-    }
-
-
-      if (refetchFinished) {
-        await refetchFinished();
-
-        setTimeout(() => {
-          manualSyncRef.current = false;
-        }, 15000);
-        return;
-      }
-      console.log("currentEvents", currentEvents)
-
-
-      // 5️⃣ Update remaining events & DB
-      await handleUpdateAllEvents({
-        events: finalupdatedEvents,
-        dailyWorkingHours,
-        defaultWorkingHours,
-        updatePporder: updatePporderFn,
-      });
-
-      // 6️⃣ Notify user
-      message.success(`Η Master ${order.pporderno} ολοκληρώθηκε`);
-    };
-
+  // 🟢 Turn off sync flag after a delay to prevent unintended updates
+  setTimeout(() => {
+    manualSyncRef.current = false;
+  }, 15000);
+};
     return { handleFinish };
   };
 
