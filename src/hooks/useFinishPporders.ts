@@ -7,21 +7,26 @@ import { HandleUpdateAllEventsParams, UpdateFn } from "@/pages/ProductionPlannin
 import { EventInput } from "fullcalendar";
 import { STATUS_MAP, statusColorMap } from "@/utilities";
 import { handleSaveEdit } from "@/pages/ProductionPlanning/utilities/usehandleedit";
+import { addWorkingMinutesDynamic } from "@/pages/ProductionPlanning/dateschedule-utils";
 
 interface UseFinishPporderParams {
   currentEvents: EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<EventInput[]>>;
+  setEditStart: (date: Dayjs | null) => void;
   setEditEnd: (date: Dayjs | null) => void;
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
-  refetchFinished?: () => void;
+  refetchFinished?: () => Promise<any>;
+    refetchPporders?: () => void;
   manualSyncRef: React.MutableRefObject<boolean>;
 }
 
 export const useFinishPporder = ({
   currentEvents,
   setCurrentEvents,
+        refetchPporders,
+  setEditStart,
   setEditEnd,
   dailyWorkingHours,
   defaultWorkingHours,
@@ -51,16 +56,15 @@ export const useFinishPporder = ({
     });
   };
 
+
   const handleFinish = async (order: PPOrder) => {
-     manualSyncRef.current = true;
-    const now = dayjs('2025-07-21T08:00:00');
+    const now = dayjs('2025-07-21T21:55:00');
+    manualSyncRef.current = true;
     setEditEnd(now);
-
-
 
     const baseId = String(order.id);
 
-   // 1️⃣ Find the earliest job segment for this order
+    // 1️⃣ Find the earliest job segment for this order
     const jobEvents = currentEvents
       .filter(
         (ev) =>
@@ -72,10 +76,9 @@ export const useFinishPporder = ({
 
     const selectedEvent = jobEvents[0];
     if (!selectedEvent) return;
-    
 
     const editStart = dayjs(selectedEvent.start as Date);
- console.log(editStart)
+
     // 2️⃣ Build the new events array
     const updatedEvents = handleSaveEdit(
       selectedEvent,
@@ -88,32 +91,154 @@ export const useFinishPporder = ({
       const evBase = ev.id?.toString().split("-part-")[0];
       return evBase === baseId && !ev.extendedProps?.isOfftime
         ? {
-            ...ev,
-            color: ev.color ||statusColorMap[4] ,
-            extendedProps: {
-              ...ev.extendedProps,
-              
-              tooltip: `${order.pporderno ?? ""} - ${
-                order.panelcode ?? ""
+          ...ev,
+          color: statusColorMap[4] || ev.color,
+          extendedProps: {
+            ...ev.extendedProps,
+            tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""
               }\nκατάσταση: ${STATUS_MAP[4]}`,
-            },
-          }
+          },
+        }
         : ev;
     });
-console.log("updatedEvents",updatedEvents)
-    // 3️⃣ Update UI state
-    setCurrentEvents(updatedEvents);
+    // Remove all existing events with same baseId (e.g. "123-part-0", "123-part-1", etc)
+    const filteredEvents = updatedEvents.filter(
+      (ev) => !ev.id?.toString().startsWith(baseId)
+    );
+
+    // 🟢 3. Sort updated segments by start date
+    const sorted = filteredEvents
+      .filter((ev) => ev.start)
+      .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
 
 
-  //  5️⃣ Update remaining events & DB
-    await handleUpdateAllEvents({
-      events: updatedEvents,
-      dailyWorkingHours,
-      defaultWorkingHours,
-      updatePporder: updatePporderFn,
+    const firstSegment = sorted[0];
+
+
+
+         const finalupdatedEvents = handleSaveEdit(
+        firstSegment,
+        now, // new start
+        dayjs(firstSegment.end as Date), // keep original end of the first segment
+        filteredEvents,
+        dailyWorkingHours,
+        defaultWorkingHours,
+      );
+            setCurrentEvents(finalupdatedEvents);
+
+    
+      // Merge with updated finished events
+      console.log("updatedEvents", updatedEvents)
+      console.log("filteredEvents", filteredEvents)
+
+
+      // 3️⃣ Update UI state
+      //console.log("updatedEvents",updatedEvents)
+      // 4️⃣ Persist finished order immediately
+      await updatePporder({
+        resource: "pporders",
+        id: order.id,
+        values: {
+          estFinishDate: now.toISOString(),
+          finishDateDatetime: now.toISOString(),
+          status: 4,
+        },
+        meta: {
+          gqlMutation: UPDATE_PPORDERS,
+        },
+      });
+
+          if (refetchPporders) {
+      await refetchPporders();
+    }
+
+
+      if (refetchFinished) {
+        await refetchFinished();
+
+        setTimeout(() => {
+          manualSyncRef.current = false;
+        }, 15000);
+        return;
+      }
+      console.log("currentEvents", currentEvents)
+
+
+      // 5️⃣ Update remaining events & DB
+      await handleUpdateAllEvents({
+        events: finalupdatedEvents,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        updatePporder: updatePporderFn,
+      });
+
+      // 6️⃣ Notify user
+      message.success(`Η Master ${order.pporderno} ολοκληρώθηκε`);
+    };
+
+    return { handleFinish };
+  };
+
+/*import { useUpdate } from "@refinedev/core";
+import { message } from "antd";
+import dayjs, { Dayjs } from "dayjs";
+import { PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
+import { UPDATE_PPORDERS } from "@/graphql/queries";
+import { HandleUpdateAllEventsParams, UpdateFn } from "@/pages/ProductionPlanning/handlers/handleupdateall";
+import { EventInput } from "fullcalendar";
+import { STATUS_MAP, statusColorMap } from "@/utilities";
+import { handleSaveEdit } from "@/pages/ProductionPlanning/utilities/usehandleedit";
+import { addWorkingMinutesDynamic } from "@/pages/ProductionPlanning/dateschedule-utils";
+
+interface UseFinishPporderParams {
+  currentEvents: EventInput[];
+  setCurrentEvents: React.Dispatch<React.SetStateAction<EventInput[]>>;
+  setEditStart: (date: Dayjs | null) => void;
+  setEditEnd: (date: Dayjs | null) => void;
+  dailyWorkingHours: Record<string, WorkingHoursConfig>;
+  defaultWorkingHours: Record<number, WorkingHoursConfig>;
+  handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
+  refetchFinished?: () => Promise<any>;
+  manualSyncRef: React.MutableRefObject<boolean>;
+}
+
+export const useFinishPporder = ({
+  currentEvents,
+  setCurrentEvents,
+  setEditStart,
+  setEditEnd,
+  dailyWorkingHours,
+  defaultWorkingHours,
+  handleUpdateAllEvents,
+  refetchFinished,
+  manualSyncRef,
+}: UseFinishPporderParams) => {
+  const { mutate: updatePporder } = useUpdate<PPOrder>();
+
+  const updatePporderFn: UpdateFn = async (
+    id: number,
+    start: Date,
+    end: Date,
+    extraValues: Partial<PPOrder> = {},
+  ) => {
+    await updatePporder({
+      resource: "pporders",
+      id,
+      values: {
+        estFinishDate: end.toISOString(),
+        ...extraValues,
+      },
+      meta: {
+        gqlMutation: UPDATE_PPORDERS,
+      },
     });
+  };
 
-        // 4️⃣ Persist finished order immediately
+
+  const handleFinish = async (order: PPOrder) => {
+    manualSyncRef.current = true;
+    const now = dayjs();
+
     await updatePporder({
       resource: "pporders",
       id: order.id,
@@ -127,22 +252,77 @@ console.log("updatedEvents",updatedEvents)
       },
     });
 
-  if (refetchFinished) {
-  const result = await refetchFinished();
- 
-    console.log("✅ result from refetch:", result);
-    
+    let lastEnd = now;
+    if (refetchFinished) {
+      try {
+        const result = await refetchFinished();
+        const finished = result?.data?.masterlengths ?? [];
+        const last = finished
+          .filter((f: any) => f.finishDateDatetime)
+          .sort((a: any, b: any) =>
+            dayjs(a.finishDateDatetime).diff(dayjs(b.finishDateDatetime))
+          )
+          .pop();
+        if (last?.finishDateDatetime) {
+          lastEnd = dayjs(last.finishDateDatetime);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
-}
+    setEditStart(lastEnd);
 
-    // 6️⃣ Notify user
+    const nextEvent = currentEvents
+      .filter(
+        (ev) => ev.extendedProps?.status === 14 && !ev.extendedProps?.isOfftime
+      )
+      .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)))[0];
+
+    if (!nextEvent) {
+      message.success(`Η Master ${order.pporderno} ολοκληρώθηκε`);
+      setTimeout(() => {
+        manualSyncRef.current = false;
+      }, 15000);
+      return;
+    }
+
+    const duration = 
+     nextEvent.extendedProps?.totalTime  
+    ;
+    const newEnd = addWorkingMinutesDynamic(
+      lastEnd,
+      duration,
+      dailyWorkingHours,
+      defaultWorkingHours
+    );
+
+    setEditEnd(newEnd);
+
+    const updatedEvents = handleSaveEdit(
+      nextEvent,
+      lastEnd,
+      newEnd,
+      currentEvents,
+      dailyWorkingHours,
+      defaultWorkingHours
+    );
+
+    setCurrentEvents(updatedEvents);
+
+    await handleUpdateAllEvents({
+      events: updatedEvents,
+      dailyWorkingHours,
+      defaultWorkingHours,
+      updatePporder: updatePporderFn,
+    });
+
     message.success(`Η Master ${order.pporderno} ολοκληρώθηκε`);
-  }
-    // Reset flag after small delay to ensure UI update settles
+
     setTimeout(() => {
       manualSyncRef.current = false;
     }, 15000);
-  
+  };
 
   return { handleFinish };
-};
+};*/ 

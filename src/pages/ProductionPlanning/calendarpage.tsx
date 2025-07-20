@@ -223,6 +223,7 @@ export const ProductionCalendar: React.FC = () => {
     defaultWorkingHours,
     currentEvents,
     setCurrentEvents,
+        setEditStart,
     setEditEnd,
     handleUpdateAllEvents,
       manualSyncRef,
@@ -246,6 +247,7 @@ export const ProductionCalendar: React.FC = () => {
 
 
   useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
+      if (manualSyncRef.current) return;   // skip rebuild during manual updates
     const preScheduled = unscheduledorders
       .filter(o => o.estStartDate && o.estFinishDate && !(o.status === 1))
       .sort((a, b) =>
@@ -343,9 +345,9 @@ export const ProductionCalendar: React.FC = () => {
     });
     const mergedEvents = mergeSameDayEventParts(processed);
     setCurrentEvents(mergedEvents);
-    manualSyncRef.current = true;
+    manualSyncRef.current = false;
   }
-    , [unscheduledorders, dailyWorkingHours, defaultWorkingHours]);
+    , [unscheduledorders, dailyWorkingHours, defaultWorkingHours,manualSyncRef]);
 
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);

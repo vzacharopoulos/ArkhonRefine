@@ -14,12 +14,12 @@ import { useFinishPporder } from "./useFinishPporders";
 interface UsePporderSubscriptionsProps {
   refetchPporders: () => void;
     refetchPporderlines: () => void;
-      refetchFinished: () => void;
-  finishedOrders: PPOrder[];
+      refetchFinished: () => Promise<any>;  finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   currentEvents:EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
+    setEditStart: (date: Dayjs | null) => void;
   setEditEnd: (date: Dayjs | null) => void;
    handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
      manualSyncRef: React.MutableRefObject<boolean>;
@@ -35,9 +35,10 @@ export const usePporderSubscriptions = ({
   defaultWorkingHours,
   currentEvents,
   setCurrentEvents,
-    setEditEnd,
+    setEditStart,
+  setEditEnd,
   handleUpdateAllEvents,
-    manualSyncRef,
+  manualSyncRef,
 
   
 }: UsePporderSubscriptionsProps) => {
@@ -55,11 +56,13 @@ export const usePporderSubscriptions = ({
   const { handleFinish } = useFinishPporder({
     currentEvents,
         setCurrentEvents,
+            setEditStart,
     setEditEnd,
     dailyWorkingHours,
     defaultWorkingHours,
     handleUpdateAllEvents,
       refetchFinished,
+            refetchPporders,
         manualSyncRef,
 
   });
