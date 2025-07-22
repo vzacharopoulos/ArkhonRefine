@@ -48,7 +48,13 @@ export interface finishedPporders extends Omit<PPOrder, 'estDateOfProd' | 'panel
   speed?: number;
   code: string;
   time?: number;
+    offtimeduration?: number;
+  offtimestartdate?: Date;
+  offtimeenddate?: Date;
+  previd?: number;
+  prevpanelcode?: string;
 }
+
 
 
  

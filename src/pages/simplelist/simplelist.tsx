@@ -90,7 +90,7 @@ const SimpleList: React.FC = () => {
       
     
       <div>
-        <p><strong>Data Provider Exists:</strong> {dataProvider ? "✅ Yes" : "❌ No"}</p>
+     
      
         <p><strong>Error:</strong> {error ? error.message : "None"}</p>
         <p><strong>Data Length:</strong> {data?.data?.length || 0}</p>

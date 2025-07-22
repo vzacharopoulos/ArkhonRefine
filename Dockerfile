@@ -36,4 +36,4 @@ USER refine
 
 CMD ["serve"]
 
-EXPOSE 3000
+EXPOSE 5173

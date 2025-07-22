@@ -353,36 +353,151 @@ export const ProductionCalendar: React.FC = () => {
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
   const totalMeter = useMemo(() => calculateTotalLength(orderLines), [orderLines]);
 
+ const finishedEvents: EventInput[] = useMemo(() => {
+    const events: EventInput[] = [];
+    const sorted = [...finished].sort((a, b) =>
+      dayjs(a.startDateDatetime as Date).diff(dayjs(b.startDateDatetime as Date))
+    );
+
+    sorted.forEach(order => {
+      if (!order.startDateDatetime) return;
+
+      const theoreticalTime =
+        order.time != null
+          ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
+          : "0h 0m";
+      const status = order.status ?? -1;
+      const color = statusColorMap[status] || "gray";
+
+      let start = dayjs(order.startDateDatetime as Date);
+      if (!isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)) {
+        start = findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
+      }
+
+      const duration = 
+        (order.finishDateDatetime
+          ? calculateWorkingMinutesBetween(
+              start,
+              dayjs(order.finishDateDatetime as Date),
+              dailyWorkingHours,
+              defaultWorkingHours
+            )
+          : 0);
 
 
-  const finishedEvents: EventInput[] = finished.map((order) => {
-    const theoreticalTime =
-      order.time != null
-        ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
-        : "0h 0m";
-    const status = order.status ?? -1;
-    const color = statusColorMap[status] || "gray";
+          
+    if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
+      const offStart = dayjs(order.offtimestartdate as Date);
+      const offSegments = splitEventIntoWorkingHours(
+        offStart,
+        order.offtimeduration,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        {
+          id: `${order.id}-offtime`,
+          title: "προετοιμασία μηχανής",
+          color: "gray",
+          extendedProps: {
+            isOfftime: true,
+            prevId: order.previd?.toString(),
+            currId: order.id.toString(),
+            prevpanelcode: order.prevpanelcode,
+            offtimeduration: order.offtimeduration,
+            offtimeStartDate: order.offtimestartdate,
+            offtimeEndDate: order.offtimeenddate,
+          },
+        }
+      );
+      events.push(...offSegments);
+    }
 
-    return {
-      id: String(order.id),
-      title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
-      start: order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
-      end: order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
-      duration: order.time,
-      color,
-      extendedProps: {
-        panelcode: order.code,
-        status: order.status,
-        totalMeter: order.totalMeter,
-        speed: order.speed,
-        tooltip: `${order.pporderno} - ${order.code}\n - μήκος παραγγελίας: ${(order.totalMeter ?? 0).toFixed(2) || 0}m\n` +
-          `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
-          `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
-          `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
-          `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
-      },
-    };
-  });
+   const segments = splitEventIntoWorkingHours(
+        start,
+        duration,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        {
+          id: String(order.id),
+          title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
+          color,
+          extendedProps: {
+            panelcode: order.code,
+            status: order.status,
+            totalMeter: order.totalMeter,
+            speed: order.speed,
+            tooltip:
+              `${order.pporderno} - ${order.code}\n - μήκος παραγγελίας: ${(order.totalMeter ?? 0).toFixed(2) || 0}m\n` +
+              `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
+              `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+              `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+              `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
+          },
+        }
+      );
+
+      events.push(...segments);
+    });
+
+    return events;
+  }, [finished, dailyWorkingHours, defaultWorkingHours]);
+
+  // const finishedEvents: EventInput[] = finished.flatMap((order) => {
+  //   const theoreticalTime =
+  //     order.time != null
+  //       ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
+  //       : "0h 0m";
+  //   const status = order.status ?? -1;
+  //   const color = statusColorMap[status] || "gray";
+
+  //   const events: EventInput[] = [];
+
+  //   if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
+  //     const offStart = dayjs(order.offtimestartdate as Date);
+  //     const offSegments = splitEventIntoWorkingHours(
+  //       offStart,
+  //       order.offtimeduration,
+  //       dailyWorkingHours,
+  //       defaultWorkingHours,
+  //       {
+  //         id: `${order.id}-offtime`,
+  //         title: "προετοιμασία μηχανής",
+  //         color: "gray",
+  //         extendedProps: {
+  //           isOfftime: true,
+  //           prevId: order.previd?.toString(),
+  //           currId: order.id.toString(),
+  //           prevpanelcode: order.prevpanelcode,
+  //           offtimeduration: order.offtimeduration,
+  //           offtimeStartDate: order.offtimestartdate,
+  //           offtimeEndDate: order.offtimeenddate,
+  //         },
+  //       }
+  //     );
+  //     events.push(...offSegments);
+  //   }
+
+  //   events.push({
+  //     id: String(order.id),
+  //     title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
+  //     start: order.startDateDatetime ? new Date(order.startDateDatetime) : undefined,
+  //     end: order.finishDateDatetime ? new Date(order.finishDateDatetime) : undefined,
+  //     duration: order.time,
+  //     color,
+  //     extendedProps: {
+  //       panelcode: order.code,
+  //       status: order.status,
+  //       totalMeter: order.totalMeter,
+  //       speed: order.speed,
+  //       tooltip: `${order.pporderno} - ${order.code}\n - μήκος παραγγελίας: ${(order.totalMeter ?? 0).toFixed(2) || 0}m\n` +
+  //         `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
+  //         `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+  //         `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+  //         `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
+  //     },
+  //   });
+
+  //   return events;
+  // });
 
   const totalMinutes = totalTime.hours * 60 + totalTime.minutes;
   const [droppedIds, setDroppedIds] = useState<Set<string>>(new Set());

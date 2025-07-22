@@ -94,6 +94,12 @@ query GetMasterlength($filter:MasterlengthFilterInput)  {
     totalMeter
     status
     time
+        previd
+    prevpanelcode
+    offtimeduration
+    offtimestartdate
+    offtimeenddate
+
     
 }
 }`
