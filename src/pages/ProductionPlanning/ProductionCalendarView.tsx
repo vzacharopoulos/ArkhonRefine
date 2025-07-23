@@ -8,6 +8,8 @@ import { Button, Tooltip } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { EditOutlined } from "@ant-design/icons";
 import { EventTooltip } from "@/pages/ProductionPlanning/event-utils";
+import elLocale from '@fullcalendar/core/locales/el'; // Greek
+
 
 interface ProductionCalendarViewProps {
   events: EventInput[];
@@ -38,9 +40,26 @@ export const ProductionCalendarView: React.FC<ProductionCalendarViewProps> = ({
     selectMirror
     editable
     droppable
+    
+      eventOverlap={false}            // 🔒 prevent visual overlap
+  slotEventOverlap={false}        // 🔒 force slot-based stacking
+  eventMaxStack={999}             // 🧱 allow many stacked events
+  eventMinHeight={5}   
+    slotMinTime="00:00:00"
+  slotMaxTime="24:00:00"
+  slotDuration="00:30:00"
+  slotLabelInterval="01:00"
+  slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+height="auto"
+  contentHeight="auto"
+
     selectable
+    allDaySlot={false}
     drop={dropHandler}
+       locale={elLocale}
+       
     dayHeaderContent={(arg) => {
+      
       const date = dayjs(arg.date);
       const handleClick = (e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -55,7 +74,7 @@ export const ProductionCalendarView: React.FC<ProductionCalendarViewProps> = ({
         </div>
       );
     }}
-    height="100%"
+    
     eventDataTransform={(event) => {
       const duration = event.duration;
       return {
@@ -73,6 +92,7 @@ export const ProductionCalendarView: React.FC<ProductionCalendarViewProps> = ({
       >
         <div
           style={{
+            marginBottom: "2px", // spacing between stacked events
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "normal",

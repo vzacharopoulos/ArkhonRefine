@@ -10,7 +10,7 @@ import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction
 import { Button, Card, Checkbox, Divider, Typography, List, Space, Layout, Menu, Tooltip, TimePicker, Modal, DatePicker, message } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { getDateColor, getlast80days } from "@/utilities";
-import { STATUS_MAP, statusColorMap, StatusTag } from "@/utilities/map-status-id-to-name";
+import { STATUS_MAP, statusColorMap, StatusTag } from "@/utilities/map-status-id-to-color";
 import duration from "dayjs/plugin/duration";
 import { finishedPporders, PPOrder, PPOrderLine, WorkingHoursConfig } from "./productioncalendartypes";
 import { Sidebar } from "./sidebar";
@@ -40,6 +40,7 @@ import { useUpdatePporder } from "@/hooks/useUpdatePporder";
 import { useStartPporder } from "@/hooks/useStartPporder";
 import { handleUpdateAllEvents } from "./handlers/handleupdateall";
 import { usePporderLines } from "@/hooks/usePporderLines";
+import { createOfftimeTitle } from "./helpers/offtimetitle";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -79,8 +80,8 @@ export const ProductionCalendar: React.FC = () => {
   ) => {
     try {
       await updatePporder(id, {
-        estStartDate: startDate ? startDate.toISOString() : null,
-        estFinishDate: finishDate ? finishDate.toISOString() : null,
+        estStartDate: startDate ? dayjs(startDate).format('YYYY-MM-DDTHH:mm:ss') : null,
+        estFinishDate: finishDate ? dayjs(finishDate).format('YYYY-MM-DDTHH:mm:ss') : null,
         
         ...extraValues,
       });
@@ -286,20 +287,25 @@ export const ProductionCalendar: React.FC = () => {
         if (prevEnd && !prevEnd.isSame(offStart)) {
           offStart = prevEnd
         }
-        const offtimeSegments = splitEventIntoWorkingHours(
+    const offtimeSegments = splitEventIntoWorkingHours(
           offStart,
           offtimeduration,
           dailyWorkingHours,
           defaultWorkingHours,
           {
             id: `${order.id}-offtime`,
-            title: "προετοιμασία μηχανής",
+            title: createOfftimeTitle(
+              order.offtimeduration,
+              order.panelcode,
+              order.prevpanelcode,
+            ),
             color: "gray",
             extendedProps: {
               isOfftime: true,
               prevId: order.previd?.toString(),
               currId: order.id.toString(),
               prevpanelcode: order.prevpanelcode,
+              panelcode: order.panelcode,
               offtimeduration: order.offtimeduration,
             },
           }
@@ -309,8 +315,8 @@ export const ProductionCalendar: React.FC = () => {
         offtimeSegments.forEach(seg => {
           seg.extendedProps = {
             ...seg.extendedProps,
-            offtimeStartDate: (seg.start as Date).toISOString(),
-            offtimeEndDate: (seg.end as Date).toISOString(),
+            offtimeStartDate: dayjs(seg.start as Date).format('YYYY-MM-DDTHH:mm:ss'),
+            offtimeEndDate: dayjs(seg.end as Date).format('YYYY-MM-DDTHH:mm:ss'),
           };
         });
 
@@ -395,13 +401,18 @@ export const ProductionCalendar: React.FC = () => {
         defaultWorkingHours,
         {
           id: `${order.id}-offtime`,
-          title: "προετοιμασία μηχανής",
+          title: createOfftimeTitle(
+            order.offtimeduration,
+            order.code,
+            order.prevpanelcode,
+          ),
           color: "gray",
           extendedProps: {
             isOfftime: true,
             prevId: order.previd?.toString(),
             currId: order.id.toString(),
             prevpanelcode: order.prevpanelcode,
+            panelcode: order.code,
             offtimeduration: order.offtimeduration,
             offtimeStartDate: order.offtimestartdate,
             offtimeEndDate: order.offtimeenddate,
@@ -410,6 +421,7 @@ export const ProductionCalendar: React.FC = () => {
       );
       events.push(...offSegments);
     }
+
 
    const segments = splitEventIntoWorkingHours(
         start,
@@ -563,133 +575,7 @@ const handleUpdateAll = async () => {
     currentEvents,
     handleUpdateAllEvents,
   });
-  //  const handleStart = async (order: PPOrder) => {
-  //   if (!order.pporderno) return;
-
-  //   try {
-  //     const   {data, isLoading } = useCustom<{ pporderlines2: PPOrderLine[] }>({
-  //     url: "",
-  //     method: "get",
-  //     meta: {
-  //       gqlQuery: GET_PPORDERLINES_OF_PPORDER,
-  //       variables: {
-  //         filter: { ppordernos: order.pporderno },
-  //       },
-  //                queryOptions: {
-  //   enabled: !!order.pporderno,
-  //     }
-  //     },
-  //   });
-
-  //   const pporderlines2 = data?.data?.pporderlines2 ?? [];
-
-  //     const totalMinutes = pporderlines2.reduce(
-  //       (sum: number, line: PPOrderLine) => sum + (line.prodOrdersView?.time ?? 0),
-  //       0
-  //     );
-
-  //     const now = dayjs();
-
-  //     // Determine previous finished order end time
-  //     const lastFinished = [...finished]
-  //       .filter(f => f.finishDateDatetime)
-  //       .sort((a, b) =>
-  //         dayjs(a.finishDateDatetime as Date).diff(dayjs(b.finishDateDatetime as Date))
-  //       )
-  //       .pop();
-
-  //     const offStart = lastFinished?.finishDateDatetime
-  //       ? dayjs(lastFinished.finishDateDatetime as Date)
-  //       : null;
-  //     const offEnd = now.clone();
-  //     const offDuration = offStart
-  //       ? calculateWorkingMinutesBetween(
-  //           offStart,
-  //           offEnd,
-  //           dailyWorkingHours,
-  //           defaultWorkingHours
-  //         )
-  //       : 0;
-
-
-
-  //      const offSegments = offDuration && offStart
-  //       ? splitEventIntoWorkingHours(
-  //           offStart,
-  //           offDuration,
-  //           dailyWorkingHours,
-  //           defaultWorkingHours,
-  //           {
-  //             id: `${order.id}-offtime`,
-  //             title: "προετοιμασία μηχανής",
-  //             color: "gray",
-  //             extendedProps: {
-  //               isOfftime: true,
-  //               currId: order.id.toString(),
-  //               offtimeduration: offDuration,
-  //               offtimeStartDate: offStart.toISOString(),
-  //               offtimeEndDate: offEnd.toISOString(),
-  //             },
-  //           }
-  //         )
-  //       : [];
-
-
-  //       const jobstart=offSegments[offSegments.length-1].extendedProps?.offtimeEndDate ?? now
-
-  // const jobSegments = splitEventIntoWorkingHours(
-  //       jobstart,
-  //       totalMinutes,
-  //       dailyWorkingHours,
-  //       defaultWorkingHours,
-  //       {
-  //         id: String(order.id),
-  //         title: `${order.pporderno} - ${order.panelcode}`,
-  //         color: statusColorMap[order?.status||2] || "gray",
-  //         extendedProps: {
-  //           panelcode: order.panelcode,
-  //           status: 2,
-  //           tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\nκατάσταση: ${
-  //             STATUS_MAP[2] || "Άγνωστη"
-  //           }`,
-  //         },
-  //       }
-  //     );
-  //   const jobEnd = addWorkingMinutesDynamic( 
-  //     now,
-  //   totalMinutes,
-  //   dailyWorkingHours,
-  //   defaultWorkingHours,  )
-
-
-
-
-
-  //     await updatePporder(order.id,{
-
-  //       values: {
-  //         startDateDatetime: jobstart.toISOString(),
-  //         estStartDate: jobstart.toISOString(),
-  //         finishDateDatetime: jobEnd.toISOString(),
-  //         estFinishDate: jobEnd.toISOString(),
-  //         offtimestartdate: offStart ? offStart.toISOString() : null,
-  //         offtimeenddate: offEnd.toISOString(),
-  //         offtimeduration: offDuration,
-  //         status: 2,
-  //       },
-  //       meta: { gqlMutation: UPDATE_PPORDERS },
-  //     });
-
-  //     // Build calendar events using working-hour split
-
-
-
-
-  //     setCurrentEvents(prev => [...prev, ...offSegments, ...jobSegments]);
-  //   } catch (error) {
-  //     console.error("Failed to start order", error);
-  //   }
-  // };
+ 
 
   const handleStartEvent = async (eventsArg?: EventInput[]) => {
     const rawEvents = eventsArg ?? currentEvents;
@@ -798,8 +684,8 @@ const handleUpdateAll = async () => {
 
   return (
     <TotalTimeProvider value={{ totalTimeByOrderId }}>
-      <Layout style={{ padding: 24, display: "flex", gap: 24 }}>
-        <Sider width={300} style={{ background: "#fff", padding: 24 }}>
+      <Layout style={{ padding: 12, display: "flex", gap: 24 }}>
+        <Sider width={300} style={{ background: "#fff", padding: 12 }}>
           <Sidebar
             weekendsVisible={weekendsVisible}
             onToggleWeekends={handleWeekendsToggle}

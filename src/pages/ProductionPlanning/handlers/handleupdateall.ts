@@ -4,7 +4,8 @@ import { EventInput } from "@fullcalendar/core";
 import dayjs from "dayjs";
 import { PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
 import { splitEventIntoWorkingHours } from "@/pages/ProductionPlanning/dateschedule-utils";
-import { STATUS_MAP, statusColorMap } from "@/utilities/map-status-id-to-name";
+import { STATUS_MAP, statusColorMap } from "@/utilities/map-status-id-to-color";
+import { createOfftimeTitle } from "../helpers/offtimetitle";
 
 export  type UpdateFn = (
   id: number,
@@ -46,13 +47,16 @@ console.log("✅ handleUpdateAllEvents was called with events:", events);
           offInfo[currIdStr] = {
             previd: Number(prevId),
             prevpanelcode: prevPanelCode,
+            panelcode: ev.extendedProps.panelcode,
             offtimeduration: ev.extendedProps.offtimeduration,
-            offtimestartdate: ev.extendedProps.offtimeStartDate
-              ? new Date(ev.extendedProps.offtimeStartDate)
-              : new Date(ev.start as Date),
-            offtimeenddate: ev.extendedProps.offtimeEndDate
-              ? new Date(ev.extendedProps.offtimeEndDate)
-              : new Date(ev.end as Date),
+       offtimestartdate: ev.extendedProps.offtimeStartDate
+  ? dayjs(ev.extendedProps.offtimeStartDate).toDate()
+  : dayjs(ev.start as Date).toDate(),
+
+offtimeenddate: ev.extendedProps.offtimeEndDate
+  ? dayjs(ev.extendedProps.offtimeEndDate).toDate()
+  : dayjs(ev.end as Date).toDate(),
+
           };
         } else {
           const currentEnd = new Date(ev.extendedProps.offtimeEndDate || ev.end as Date);
@@ -103,27 +107,35 @@ console.log("sorted",sorted)
         defaultWorkingHours,
         {
           id: `${baseId}-offtime`,
-          title: "προετοιμασία μηχανής",
+          title: createOfftimeTitle(
+            extra.offtimeduration,
+            extra.panelcode,
+            extra.prevpanelcode,
+          ),
           color: "gray",
           extendedProps: {
             isOfftime: true,
             currId: baseId,
             prevId: extra.previd?.toString(),
             prevpanelcode: extra.prevpanelcode,
+            panelcode: extra.panelcode,
             offtimeduration: extra.offtimeduration,
           },
         }
       );
-
+      console.log("segments:", segments);
+console.log("segment start:", segments[0]?.start);
+console.log("segment end:", segments[segments.length - 1]?.end);
       updatedOffInfo = {
         ...updatedOffInfo,
-        offtimestartdate: new Date(segments[0].start as Date),
-        offtimeenddate: new Date(segments[segments.length - 1].end as Date),
+         offtimestartdate: dayjs(segments[0].start).toDate(),
+offtimeenddate: dayjs(segments[segments.length - 1].end).toDate(),
       };
     }
 
     try {
-      await updatePporder(Number(baseId), firstStart, lastEnd, {
+      await updatePporder(Number(baseId), dayjs(firstStart).toDate(),
+  dayjs(lastEnd).toDate(), {
         ...updatedOffInfo,
         status: group[0]?.extendedProps?.status === 1 ? 14 : group[0]?.extendedProps?.status,
       });

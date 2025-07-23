@@ -11,6 +11,7 @@ import {
 } from "../dateschedule-utils";
 import { WorkingHoursConfig } from "../productioncalendartypes";
 import { offTimeMap } from "./offtime-map";
+import { createOfftimeTitle } from "../helpers/offtimetitle";
 
 export function handleDropFactory(
   currentEvents: EventInput[],
@@ -69,7 +70,11 @@ export function handleDropFactory(
       defaultWorkingHours,
       {
         id: `${draggedEvent.id}-offtime`,
-        title: "προετοιμασία μηχανής",
+         title: createOfftimeTitle(
+          offtimeduration,
+          draggedEvent.extendedProps.panelcode,
+          previousEvent?.extendedProps?.panelcode,
+        ),
         color: "gray",
         extendedProps: {
           isOfftime: true,
@@ -86,8 +91,8 @@ export function handleDropFactory(
     offtimeSegments.forEach(seg => {
       seg.extendedProps = {
         ...seg.extendedProps,
-        offtimeStartDate: (seg.start as Date).toISOString(),
-        offtimeEndDate: (seg.end as Date).toISOString(),
+       offtimeStartDate: dayjs(seg.start as Date).format('YYYY-MM-DDTHH:mm:ss'),
+        offtimeEndDate: dayjs(seg.end as Date).format('YYYY-MM-DDTHH:mm:ss'),
       };
     });
 

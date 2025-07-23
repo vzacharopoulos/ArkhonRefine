@@ -1,5 +1,4 @@
 // hooks/useStartPporder.ts
-
 import { useCustom, useDataProvider, useUpdate } from "@refinedev/core";
 import { print } from "graphql";
 import dayjs from "dayjs";
@@ -17,12 +16,13 @@ import {
   splitEventIntoWorkingHours,
   addWorkingMinutesDynamic,
 } from "@/pages/ProductionPlanning/dateschedule-utils";
-import { statusColorMap, STATUS_MAP } from "@/utilities/map-status-id-to-name";
+import { statusColorMap, STATUS_MAP } from "@/utilities/map-status-id-to-color";
 import {
   HandleUpdateAllEventsParams,
   UpdateFn,
 } from "@/pages/ProductionPlanning/handlers/handleupdateall";
 import { EventInput } from "fullcalendar";
+import { createOfftimeTitle } from ".././pages/ProductionPlanning/helpers/offtimetitle";
 
 interface UseStartPporderParams {
   finishedOrders: PPOrder[];
@@ -55,8 +55,9 @@ export const useStartPporder = ({
       resource: "pporders",
       id,
       values: {
-        estStartDate: start.toISOString(),
-        estFinishDate: end.toISOString(),
+        estStartDate: dayjs(start).format("YYYY-MM-DDTHH:mm:ss"),
+        estFinishDate: dayjs(end).format("YYYY-MM-DDTHH:mm:ss"),
+
         ...extraValues,
       },
       meta: {
@@ -89,7 +90,7 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs('2025-07-21T20:00:00');
+      const now = dayjs();
 
       const lastFinished = [...finishedOrders]
         .filter((f) => f.finishDateDatetime)
@@ -107,11 +108,11 @@ export const useStartPporder = ({
       const offEnd = now;
       const offDuration = offStart
         ? calculateWorkingMinutesBetween(
-            offStart,
-            offEnd,
-            dailyWorkingHours,
-            defaultWorkingHours,
-          )
+          offStart,
+          offEnd,
+          dailyWorkingHours,
+          defaultWorkingHours,
+        )
         : 0;
       const prevpanelcode = (lastFinished as any)?.code;
       console.log("offDuration", offDuration);
@@ -121,25 +122,31 @@ export const useStartPporder = ({
       const offSegments =
         offDuration && offStart
           ? splitEventIntoWorkingHours(
-              offStart,
-              offDuration,
-              dailyWorkingHours,
-              defaultWorkingHours,
-              {
-                id: `${order.id}-offtime`,
-                title: "προετοιμασία μηχανής",
-                color: "gray",
-                extendedProps: {
-                  isOfftime: true,
-                  prevpanelcode: prevpanelcode,
-                  prevId: lastFinished?.id,
-                  currId: order.id.toString(),
-                  offtimeduration: offDuration,
-                  offtimeStartDate: offStart.toISOString(),
-                  offtimeEndDate: offEnd.toISOString(),
-                },
+            offStart,
+            offDuration,
+            dailyWorkingHours,
+            defaultWorkingHours,
+            {
+              id: `${order.id}-offtime`,
+              title: createOfftimeTitle(
+                offDuration,
+                order.panelcode,
+                prevpanelcode,
+              ),
+              color: "gray",
+              extendedProps: {
+                isOfftime: true,
+                panelcode: order.panelcode,
+                prevpanelcode: prevpanelcode,
+                prevId: lastFinished?.id,
+                currId: order.id.toString(),
+                offtimeduration: offDuration,
+                
+  offtimeStartDate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ss'),
+  offtimeEndDate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ss'),
               },
-            )
+            },
+          )
           : [];
 
       let jobStart = now;
@@ -156,9 +163,8 @@ export const useStartPporder = ({
           extendedProps: {
             panelcode: order.panelcode,
             status: 2,
-            tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\nκατάσταση: ${
-              STATUS_MAP[2] || "Άγνωστη"
-            }`,
+            tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\nκατάσταση: ${STATUS_MAP[2] || "Άγνωστη"
+              }`,
           },
         },
       );
@@ -173,13 +179,13 @@ export const useStartPporder = ({
       await updatePporder({
         resource: "pporders",
         id: order.id,
-        values: {
-          startDateDatetime: jobStart.toISOString(),
-          estStartDate: jobStart.toISOString(),
-          finishDateDatetime: jobEnd.toISOString(),
-          estFinishDate: jobEnd.toISOString(),
-          offtimestartdate: offStart ? offStart.toISOString() : null,
-          offtimeenddate: offEnd.toISOString(),
+     values: {
+          startDateDatetime: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ss'),
+          estStartDate: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ss'),
+          finishDateDatetime: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ss'),
+          estFinishDate: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ss'),
+          offtimestartdate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ss'),
+          offtimeenddate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ss'),
           offtimeduration: offDuration,
           status: 2,
         },
@@ -189,11 +195,11 @@ export const useStartPporder = ({
       });
 
       console.log("currentEvents", currentEvents);
-      
+
       setCurrentEvents((prev) => {
         // The updated/new events (offtime + job segments)
         const updatedEvents = [...offSegments, ...jobSegments];
-        
+
         // Get IDs of the updated events
         const updatedIds = new Set(updatedEvents.map((ev) => ev.id?.toString()));
         const updatedBaseIds = new Set(
@@ -232,10 +238,10 @@ export const useStartPporder = ({
         const groupedEventsToReschedule: Record<string, EventInput[]> = {};
         eventsToReschedule.forEach((ev) => {
           if (!ev.id) return;
-          
+
           const evId = ev.id.toString();
           const baseId = evId.includes("-part-") ? evId.split("-part-")[0] : evId;
-          
+
           if (!groupedEventsToReschedule[baseId]) {
             groupedEventsToReschedule[baseId] = [];
           }
@@ -265,7 +271,7 @@ export const useStartPporder = ({
 
           // Check if this is an offtime event
           const isOfftimeEvent = events.some(ev => ev.extendedProps?.isOfftime);
-          
+
           if (isOfftimeEvent) {
             // For offtime events, use the original segments structure
             const rescheduledOfftimeSegments = splitEventIntoWorkingHours(
@@ -275,7 +281,11 @@ export const useStartPporder = ({
               defaultWorkingHours,
               {
                 id: `${baseId}-offtime`,
-                title: events[0]?.title || "προετοιμασία μηχανής",
+                title: createOfftimeTitle(
+                  groupDuration,
+                  events[0]?.extendedProps?.panelcode,
+                  events[0]?.extendedProps?.prevpanelcode,
+                ),
                 color: "gray",
                 extendedProps: {
                   ...events[0]?.extendedProps,
@@ -317,12 +327,12 @@ export const useStartPporder = ({
           ...rescheduledEvents    // Events rescheduled to start after the updated event
         ];
 
- handleUpdateAllEvents({
-        events: newEvents,
-        dailyWorkingHours,
-        defaultWorkingHours,
-        updatePporder: updatePporderFn,
-      });
+        handleUpdateAllEvents({
+          events: newEvents,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          updatePporder: updatePporderFn,
+        });
 
 
         console.log("🟡 newEvents being passed to update all:", newEvents);

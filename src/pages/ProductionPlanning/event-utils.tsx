@@ -7,7 +7,7 @@ import React, { useState } from "react";
 import { Tooltip } from "antd";
 
 
-import { StatusTag } from "@/utilities/map-status-id-to-name";
+import { StatusTag } from "@/utilities/map-status-id-to-color";
 
 
 interface EventTooltipProps {

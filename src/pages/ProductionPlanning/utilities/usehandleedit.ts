@@ -47,8 +47,8 @@ export function handleSaveEdit(
     updatedEvent.extendedProps = {
       ...sorted[idx].extendedProps,
       offtimeduration: newDuration,
-      offtimeStartDate: editStart.toISOString(),
-      offtimeEndDate: editEnd.toISOString(),
+      offtimeStartDate: dayjs(editStart).format('YYYY-MM-DDTHH:mm:ss'),
+      offtimeEndDate: dayjs(editEnd).format('YYYY-MM-DDTHH:mm:ss'),
     };
   }
 

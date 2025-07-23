@@ -80,17 +80,21 @@ function App() {
                       icon: <FormatListBulletedIcon />,
                     },
                   },
-                           {
-                    name: "panelProductionOrdersExt2s",
-                    list: "/panelProductionOrdersExt2s",
-                    meta: {
-                      label: "panelProductionOrdersExt2s",
-                      icon: <ShopOutlined />,
-                    },
-                  },
+                  //          {
+                  //   name: "panelProductionOrdersExt2s",
+                  //   list: "/panelProductionOrdersExt2s",
+                  //   meta: {
+                  //     label: "panelProductionOrdersExt2s",
+                  //     icon: <ShopOutlined />,
+                  //   },
+                  // },
                   {
-                    name: "pporders",
-                    list:"/pporders",
+                    name: "scheduling",
+                    list:"/scheduling",
+                     meta: {
+                      label: "Προγραμματισμος",
+                      icon: <CalendarMonthOutlined />,
+                    },
 
 
 
@@ -110,16 +114,15 @@ function App() {
                 <Routes>
                   {/* PUBLIC route → Coil_List */}
                   <Route element={<Layout />}>
-                    <Route index element={<NavigateToResource resource="CoilPage" />} />
+                    <Route index element={<NavigateToResource resource="scheduling" />} />
                     <Route path="/coil" element={<CoilPage />} />
                    <Route path="/coil/show/:id" element={<CoilShow />} />
                       <Route path="/coil/edit/:id" element={< CoilEdit />} />         
                                            <Route path="/panelProductionOrdersExt2s" element={<SimpleListPage />} />
 
-                     <Route index element={<NavigateToResource resource="pporders" />} />
-                     <Route path= '/pporders' element ={<ProductionCalendar/>}/>
+                     <Route path= '/scheduling' element ={<ProductionCalendar/>}/>
 
-                     <Route path="/simple-list" element={<SimpleListPage />} />
+                     {/* <Route path="/simple-list" element={<SimpleListPage />} /> */}
                       
                       <Route index element={<NavigateToResource resource="PanelMachine" />} />
                       <Route path= '/PanelMachine' element ={<PanelMachineDashboard/>}/>
