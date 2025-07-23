@@ -85,13 +85,17 @@ height="auto"
             : event.title ?? "",
       };
     }}
-    eventContent={(args) => (
+    eventContent={(args) =>{ const isMonthView = args.view.type === "dayGridMonth";
+ return (
+      
       <EventTooltip
         tooltip={String(args.event.extendedProps?.tooltip || "")}
         status={args.event.extendedProps?.status}
       >
         <div
+          className={isMonthView ? "fc-month-text-yellow" : ""}
           style={{
+            
             marginBottom: "2px", // spacing between stacked events
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -107,6 +111,6 @@ height="auto"
           {args.event.textColor}
         </div>
       </EventTooltip>
-    )}
+    )}}
   />
 );

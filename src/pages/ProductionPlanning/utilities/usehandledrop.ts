@@ -35,7 +35,7 @@ export function handleDropFactory(
         updated.delete(draggedEvent.id);
         return updated;
       });
-    }, 100);
+    }, 10);
 
     const dropDate = dayjs(info.date);
     const durationInMinutes = draggedEvent.extendedProps?.duration ?? totalTimeMinutes;
@@ -91,8 +91,8 @@ export function handleDropFactory(
     offtimeSegments.forEach(seg => {
       seg.extendedProps = {
         ...seg.extendedProps,
-       offtimeStartDate: dayjs(seg.start as Date).format('YYYY-MM-DDTHH:mm:ss'),
-        offtimeEndDate: dayjs(seg.end as Date).format('YYYY-MM-DDTHH:mm:ss'),
+       offtimeStartDate: dayjs(seg.start as Date).format('YYYY-MM-DDTHH:mm:ssZ'),
+        offtimeEndDate: dayjs(seg.end as Date).format('YYYY-MM-DDTHH:mm:ssZ'),
       };
     });
 

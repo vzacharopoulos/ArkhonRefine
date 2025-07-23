@@ -10,27 +10,22 @@ export interface PPOrder {
   estStartDate?: Date;
   estFinishDate?: Date;
   createDate?: Date;
-  totalTime?:number;
-  totalTtm?:number
-   previd?: number;
-   pporderlines?:PPOrderLine;
+  totalTime?: number;
+  totalTtm?: number;
+  previd?: number;
+  pporderlines?: PPOrderLine;
   prevpanelcode?: string;
   offtimeduration?: number;
   offtimestartdate?: Date;
   offtimeenddate?: Date;
-
-
 }
-
 
 export interface ProdOrdersView {
   isCanceled: number;
-
   speed: number;
   ttm: number;
-  time?: number;       
+  time?: number;
 }
-
 
 export interface PPOrderLine {
   id: number;
@@ -40,28 +35,31 @@ export interface PPOrderLine {
   custporderno?: string;
   upDate?: Date;
   prodOrdersView?: ProdOrdersView;
-  pporders:PPOrder;
+  pporders: PPOrder;
 }
 
-export interface finishedPporders extends Omit<PPOrder, 'estDateOfProd' | 'panelcode'> {
+export interface finishedPporders
+  extends Omit<PPOrder, "estDateOfProd" | "panelcode"> {
   totalMeter?: number;
   speed?: number;
   code: string;
   time?: number;
-    offtimeduration?: number;
+  offtimeduration?: number;
   offtimestartdate?: Date;
   offtimeenddate?: Date;
   previd?: number;
   prevpanelcode?: string;
 }
 
-
-
- 
 export interface WorkingHoursConfig {
   startHour: number;
   startMinute: number;
   endHour: number;
   endMinute: number;
-  workingDays: number[]; // 0 = Sunday, 6 = Saturday
+  /**
+   * Indicates whether the given date is considered a working day.
+   * When used in the default configuration this value corresponds
+   * to the specific day of week.
+   */
+  isWorkingDay: boolean;
 }

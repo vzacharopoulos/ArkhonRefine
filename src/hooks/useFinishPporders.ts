@@ -59,7 +59,7 @@ export const useFinishPporder = ({
 
 
   const handleFinish = async (order: PPOrder) => {
-    const now = dayjs('2025-07-23T11:00:00');
+    const now = dayjs();
     manualSyncRef.current = true;
     setEditEnd(now);
 
@@ -144,8 +144,13 @@ console.log("finishDateDatetime value:", last.finishDateDatetime);
       .filter((ev) => ev.start)
       .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
 
-
+console.log("sorted",sorted)
     const firstSegment = sorted[0];
+
+    if (!firstSegment || !firstSegment.start || !firstSegment.end) {
+  console.warn("First segment is missing start or end date.");
+  return;
+}
 
 const originalStart = dayjs(firstSegment.start as Date);
 const originalEnd = dayjs(firstSegment.end as Date);

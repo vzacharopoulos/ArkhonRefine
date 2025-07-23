@@ -3,6 +3,7 @@ import React from "react";
 import { Modal, TimePicker, Typography, Checkbox } from "antd";
 import { Dayjs } from "dayjs";
 import { WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
+import { dayToGreekName } from "@/pages/ProductionPlanning/helpers/daymaptonumber";
 
 
 
@@ -26,7 +27,7 @@ export const WorkingHoursModal: React.FC<WorkingHoursModalProps> = ({
   onOk,
 }) => (
   <Modal
-    title={`Set Working Hours for ${date?.format("YYYY-MM-DD")}`}
+    title={`ώρισε ώρες εργασίας ${date?.format("YYYY-MM-DD")} (${dayToGreekName(date?.day()??0)})`}
     open={open}
     onCancel={onCancel}
     onOk={onOk}
@@ -34,7 +35,7 @@ export const WorkingHoursModal: React.FC<WorkingHoursModalProps> = ({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 12 }}>
         <div>
-          <Text>Start Time:</Text>
+          <Text>έναρξη εργασίας:</Text>
           <TimePicker
             value={date?.hour(config.startHour).minute(config.startMinute)}
             format="HH:mm"
@@ -50,7 +51,7 @@ export const WorkingHoursModal: React.FC<WorkingHoursModalProps> = ({
           />
         </div>
         <div>
-          <Text>End Time:</Text>
+          <Text>λήξη εργασίας:</Text>
           <TimePicker
             value={date?.hour(config.endHour).minute(config.endMinute)}
             format="HH:mm"
@@ -68,23 +69,14 @@ export const WorkingHoursModal: React.FC<WorkingHoursModalProps> = ({
       </div>
 
       <div>
-        <Text>Working Days:</Text>
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-            <Checkbox
-              key={index}
-              checked={config.workingDays.includes(index)}
-              onChange={(e) => {
-                const newDays = e.target.checked
-                  ? [...config.workingDays, index]
-                  : config.workingDays.filter((d) => d !== index);
-                onChange({ ...config, workingDays: newDays });
-              }}
-            >
-              {day}
-            </Checkbox>
-          ))}
-        </div>
+        <Checkbox
+          checked={config.isWorkingDay}
+          onChange={(e) =>
+            onChange({ ...config, isWorkingDay: e.target.checked })
+          }
+        >
+          εργασιμη μέρα 
+        </Checkbox>
       </div>
     </div>
   </Modal>

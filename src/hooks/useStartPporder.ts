@@ -55,8 +55,8 @@ export const useStartPporder = ({
       resource: "pporders",
       id,
       values: {
-        estStartDate: dayjs(start).format("YYYY-MM-DDTHH:mm:ss"),
-        estFinishDate: dayjs(end).format("YYYY-MM-DDTHH:mm:ss"),
+        estStartDate: dayjs(start).format("YYYY-MM-DDTHH:mm:ssZ"),
+        estFinishDate: dayjs(end).format("YYYY-MM-DDTHH:mm:ssZ"),
 
         ...extraValues,
       },
@@ -142,8 +142,8 @@ export const useStartPporder = ({
                 currId: order.id.toString(),
                 offtimeduration: offDuration,
                 
-  offtimeStartDate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ss'),
-  offtimeEndDate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ss'),
+  offtimeStartDate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+  offtimeEndDate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
               },
             },
           )
@@ -180,12 +180,12 @@ export const useStartPporder = ({
         resource: "pporders",
         id: order.id,
      values: {
-          startDateDatetime: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ss'),
-          estStartDate: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ss'),
-          finishDateDatetime: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ss'),
-          estFinishDate: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ss'),
-          offtimestartdate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ss'),
-          offtimeenddate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ss'),
+          startDateDatetime: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+          estStartDate: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+          finishDateDatetime: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+          estFinishDate: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+          offtimestartdate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+          offtimeenddate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
           offtimeduration: offDuration,
           status: 2,
         },

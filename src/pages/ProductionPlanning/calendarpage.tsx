@@ -80,8 +80,8 @@ export const ProductionCalendar: React.FC = () => {
   ) => {
     try {
       await updatePporder(id, {
-        estStartDate: startDate ? dayjs(startDate).format('YYYY-MM-DDTHH:mm:ss') : null,
-        estFinishDate: finishDate ? dayjs(finishDate).format('YYYY-MM-DDTHH:mm:ss') : null,
+        estStartDate: startDate ? dayjs(startDate).format('YYYY-MM-DDTHH:mm:ssZ') : null,
+        estFinishDate: finishDate ? dayjs(finishDate).format('YYYY-MM-DDTHH:mm:ssZ') : null,
         
         ...extraValues,
       });
@@ -153,28 +153,73 @@ export const ProductionCalendar: React.FC = () => {
   const manualSyncRef = useRef<boolean >(false);
   
   // Keep your current defaultWorkingHours structure
-  const [defaultWorkingHours, setDefaultWorkingHours] = useState<Record<number, WorkingHoursConfig>>({
-    1: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] }, // Monday
-    2: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] }, // Tuesday
-    3: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] }, // Wednesday
-    4: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] }, // Thursday
-    5: { startHour: 6, startMinute: 0, endHour: 23, endMinute: 59, workingDays: [1, 2, 3, 4, 5, 6] }, // Friday (ends at midnight)
-    6: { startHour: 0, startMinute: 0, endHour: 15, endMinute: 0, workingDays: [1, 2, 3, 4, 5, 6] },//saturday
-    0: { startHour: 0, startMinute: 0, endHour: 0, endMinute: 0, workingDays: [] }, // Sunday is off
+   const [defaultWorkingHours, setDefaultWorkingHours] = useState<
+    Record<number, WorkingHoursConfig>
+  >({
+    1: {
+      startHour: 6,
+      startMinute: 0,
+      endHour: 22,
+      endMinute: 0,
+      isWorkingDay: true,
+    }, // Monday
+    2: {
+      startHour: 6,
+      startMinute: 0,
+      endHour: 22,
+      endMinute: 0,
+      isWorkingDay: true,
+    }, // Tuesday
+    3: {
+      startHour: 6,
+      startMinute: 0,
+      endHour: 22,
+      endMinute: 0,
+      isWorkingDay: true,
+    }, // Wednesday
+    4: {
+      startHour: 6,
+      startMinute: 0,
+      endHour: 22,
+      endMinute: 0,
+      isWorkingDay: true,
+    }, // Thursday
+    5: {
+      startHour: 6,
+      startMinute: 0,
+      endHour: 23,
+      endMinute: 59,
+      isWorkingDay: true,
+    }, // Friday (ends at midnight)
+    6: {
+      startHour: 0,
+      startMinute: 0,
+      endHour: 15,
+      endMinute: 0,
+      isWorkingDay: true,
+    }, // Saturday
+    0: {
+      startHour: 0,
+      startMinute: 0,
+      endHour: 0,
+      endMinute: 0,
+      isWorkingDay: false,
+    }, // Sunday is off
   });
 
 
 
   // Daily working hours overrides
-  const [dailyWorkingHours, setDailyWorkingHours] = useState<Record<string, WorkingHoursConfig>>({});
-
+   const [dailyWorkingHours, setDailyWorkingHours] = useState<
+    Record<string, WorkingHoursConfig>
+  >({});
   // Temporary state for modal
   const [tempWorkingHours, setTempWorkingHours] = useState<WorkingHoursConfig>({
     startHour: 6,
     startMinute: 0,
     endHour: 22,
     endMinute: 0,
-    workingDays: [1, 2, 3, 4, 5],
+  isWorkingDay: true,
   });
 
 
@@ -315,8 +360,8 @@ export const ProductionCalendar: React.FC = () => {
         offtimeSegments.forEach(seg => {
           seg.extendedProps = {
             ...seg.extendedProps,
-            offtimeStartDate: dayjs(seg.start as Date).format('YYYY-MM-DDTHH:mm:ss'),
-            offtimeEndDate: dayjs(seg.end as Date).format('YYYY-MM-DDTHH:mm:ss'),
+            offtimeStartDate: dayjs(seg.start as Date).format('YYYY-MM-DDTHH:mm:ssZ'),
+            offtimeEndDate: dayjs(seg.end as Date).format('YYYY-MM-DDTHH:mm:ssZ'),
           };
         });
 

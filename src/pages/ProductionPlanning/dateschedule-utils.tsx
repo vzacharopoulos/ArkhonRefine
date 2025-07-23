@@ -7,7 +7,7 @@ export const findLastEventEndTime = (events: EventInput[]): Dayjs | null => {
   if (events.length === 0) return null;
 
   const sortedEvents = events
-    .filter(event => event.end) // Include ALL events with end times (including offtime)
+    .filter((event) => event.end) // Include ALL events with end times (including offtime)
     .sort((a, b) => {
       const endA = dayjs(a.end as Date);
       const endB = dayjs(b.end as Date);
@@ -29,7 +29,7 @@ function getDateRange(days: number): Dayjs[] {
 // Helper function to generate non-working hour background events
 export function generateNonWorkingHourBackgroundEvents(
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
-  defaultWorkingHours: Record<number, WorkingHoursConfig>
+  defaultWorkingHours: Record<number, WorkingHoursConfig>,
 ): EventInput[] {
   const allDays = getDateRange(60);
   const events: EventInput[] = [];
@@ -45,29 +45,29 @@ export function generateNonWorkingHourBackgroundEvents(
     if (!config) continue;
 
     // If it's not a working day, block the full day
-    if (!config.workingDays.includes(dayOfWeek)) {
+    if (!config.isWorkingDay) {
       events.push({
         start: `${dateStr}T00:00:00`,
         end: `${dateStr}T23:59:59`,
-        display: 'background',
-        color: 'rgb(158, 128, 128)',
-        title: 'αργία',
+        display: "background",
+        color: "rgb(158, 128, 128)",
+        title: "αργία",
       });
       continue;
     }
 
     // Format time strings with proper padding
-    const startTimeStr = `${String(config.startHour).padStart(2, '0')}:${String(config.startMinute).padStart(2, '0')}:00`;
-    const endTimeStr = `${String(config.endHour).padStart(2, '0')}:${String(config.endMinute).padStart(2, '0')}:00`;
+    const startTimeStr = `${String(config.startHour).padStart(2, "0")}:${String(config.startMinute).padStart(2, "0")}:00`;
+    const endTimeStr = `${String(config.endHour).padStart(2, "0")}:${String(config.endMinute).padStart(2, "0")}:00`;
 
     // Before working hours - only if start time is after 00:00
     if (config.startHour > 0 || config.startMinute > 0) {
       events.push({
         start: `${dateStr}T00:00:00`,
         end: `${dateStr}T${startTimeStr}`,
-        display: 'background',
-        color: 'rgba(188, 99, 99, 0.51)',
-        title: 'πριν την έναρξη',
+        display: "background",
+        color: "rgba(188, 99, 99, 0.51)",
+        title: "πριν την έναρξη",
       });
     }
 
@@ -76,9 +76,9 @@ export function generateNonWorkingHourBackgroundEvents(
       events.push({
         start: `${dateStr}T${endTimeStr}`,
         end: `${dateStr}T23:59:59`,
-        display: 'background',
-        color: 'rgba(188, 99, 99, 0.51)',
-        title: 'λήξη εργασίας',
+        display: "background",
+        color: "rgba(188, 99, 99, 0.51)",
+        title: "λήξη εργασίας",
       });
     } else if (config.endHour === 24 && config.endMinute > 0) {
       // Handle cases where endHour is 24 but endMinute is not 0
@@ -91,18 +91,28 @@ export function generateNonWorkingHourBackgroundEvents(
   return events;
 }
 
-export const findNextWorkingTime = (startTime: Dayjs, dailyWorkingHours: Record<string, WorkingHoursConfig>, defaultWorkingHours: Record<number, WorkingHoursConfig>): Dayjs => {
+export const findNextWorkingTime = (
+  startTime: Dayjs,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>,
+): Dayjs => {
   let currentTime = startTime;
   let maxDaysToCheck = 30; // Prevent infinite loops
 
   while (maxDaysToCheck > 0) {
-    const workingHoursConfig = getWorkingHours(currentTime, dailyWorkingHours, defaultWorkingHours);
+    const workingHoursConfig = getWorkingHours(
+      currentTime,
+      dailyWorkingHours,
+      defaultWorkingHours,
+    );
 
     if (workingHoursConfig.isBusinessDay) {
-      const dayStart = currentTime.startOf('day')
+      const dayStart = currentTime
+        .startOf("day")
         .hour(workingHoursConfig.startHour)
         .minute(workingHoursConfig.startMinute);
-      const dayEnd = currentTime.startOf('day')
+      const dayEnd = currentTime
+        .startOf("day")
         .hour(workingHoursConfig.endHour)
         .minute(workingHoursConfig.endMinute);
 
@@ -112,7 +122,7 @@ export const findNextWorkingTime = (startTime: Dayjs, dailyWorkingHours: Record<
       }
 
       // If current time is within working hours, use current time
-      if (currentTime.isBetween(dayStart, dayEnd, null, '[]')) {
+      if (currentTime.isBetween(dayStart, dayEnd, null, "[]")) {
         return currentTime;
       }
 
@@ -120,7 +130,7 @@ export const findNextWorkingTime = (startTime: Dayjs, dailyWorkingHours: Record<
     }
 
     // Move to the next day
-    currentTime = currentTime.add(1, 'day').startOf('day');
+    currentTime = currentTime.add(1, "day").startOf("day");
     maxDaysToCheck--;
   }
 
@@ -132,38 +142,37 @@ export const findNextWorkingTime = (startTime: Dayjs, dailyWorkingHours: Record<
 export const getWorkingHours = (
   date: Dayjs,
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
-  defaultWorkingHours: Record<number, WorkingHoursConfig>
+  defaultWorkingHours: Record<number, WorkingHoursConfig>,
 ): WorkingHoursConfig & { isBusinessDay: boolean } => {
   const dateKey = date.format("YYYY-MM-DD");
-  
 
   const day = date.day();
- 
+
   // First check if there's a specific override for this date
   const specificConfig = dailyWorkingHours[dateKey];
   if (specificConfig) {
     return {
       ...specificConfig,
-      isBusinessDay: specificConfig.workingDays.includes(day),
+      isBusinessDay: specificConfig.isWorkingDay,
     };
   }
-  
+
   // Otherwise use the default for this day of week
   const defaultConfig = defaultWorkingHours[day];
   if (defaultConfig) {
     return {
       ...defaultConfig,
-      isBusinessDay: defaultConfig.workingDays.includes(day),
+      isBusinessDay: defaultConfig.isWorkingDay,
     };
   }
-  
+
   // Fallback to non-working day
   return {
     startHour: 6,
     startMinute: 0,
-    endHour:22 ,
+    endHour: 22,
     endMinute: 0,
-    workingDays: [],
+    isWorkingDay: false,
     isBusinessDay: false,
   };
 };
@@ -173,13 +182,10 @@ export const getWorkingHours = (
 export const isWithinWorkingHours = (
   date: Dayjs,
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
-  defaultWorkingHours: Record<number, WorkingHoursConfig>
+  defaultWorkingHours: Record<number, WorkingHoursConfig>,
 ): boolean => {
-  const { isBusinessDay, startHour, startMinute, endHour, endMinute } = getWorkingHours(
-    date,
-    dailyWorkingHours,
-    defaultWorkingHours
-  );
+  const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+    getWorkingHours(date, dailyWorkingHours, defaultWorkingHours);
 
   if (!isBusinessDay) return false;
 
@@ -194,7 +200,7 @@ export const isWithinWorkingHours = (
 export function addWorkingMinutes(
   start: Dayjs,
   minutesToAdd: number,
-  config: WorkingHoursConfig
+  config: WorkingHoursConfig,
 ): Dayjs {
   let current = start.clone();
   let remaining = minutesToAdd;
@@ -203,8 +209,12 @@ export function addWorkingMinutes(
     const day = current.day();
 
     // Skip non-working days
-    if (!config.workingDays.includes(day)) {
-      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
+    if (!config.isWorkingDay) {
+      current = current
+        .add(1, "day")
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
       continue;
     }
 
@@ -214,12 +224,19 @@ export function addWorkingMinutes(
 
     // Before work hours - adjust to start time
     if (currentTime < startTime) {
-      current = current.hour(config.startHour).minute(config.startMinute).second(0);
+      current = current
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
     }
 
     // After work hours - move to next working day
     if (currentTime >= endTime) {
-      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
+      current = current
+        .add(1, "day")
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
       continue;
     }
 
@@ -228,7 +245,11 @@ export function addWorkingMinutes(
     const availableMinutes = endTime - currentMinutes;
 
     if (availableMinutes <= 0) {
-      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
+      current = current
+        .add(1, "day")
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
       continue;
     }
 
@@ -238,7 +259,11 @@ export function addWorkingMinutes(
 
     // If we've used all available time for today, move to next day
     if (remaining > 0) {
-      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
+      current = current
+        .add(1, "day")
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
     }
   }
 
@@ -253,7 +278,7 @@ export function splitEventIntoWorkingHours(
   rawTotalMinutes: number,
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
   defaultWorkingHours: Record<number, WorkingHoursConfig>,
-  eventData: any
+  eventData: any,
 ): EventInput[] {
   const events: EventInput[] = [];
 
@@ -269,7 +294,7 @@ export function splitEventIntoWorkingHours(
     startMinute: 0,
     endHour: 14,
     endMinute: 0,
-    workingDays: [1, 2, 3, 4, 5],
+    isWorkingDay: true,
   };
 
   while (remaining > 0 && iterations < MAX_ITERATIONS) {
@@ -277,10 +302,15 @@ export function splitEventIntoWorkingHours(
 
     const dateKey = current.format("YYYY-MM-DD");
     const day = current.day();
-    const config = dailyWorkingHours[dateKey] ?? defaultWorkingHours[day] ?? fallbackConfig;
+    const config =
+      dailyWorkingHours[dateKey] ?? defaultWorkingHours[day] ?? fallbackConfig;
 
-    if (!config.workingDays.includes(day)) {
-      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
+    if (!config.isWorkingDay) {
+      current = current
+        .add(1, "day")
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
       continue;
     }
 
@@ -289,11 +319,18 @@ export function splitEventIntoWorkingHours(
     const endTime = config.endHour * 60 + config.endMinute;
 
     if (currentTime < startTime) {
-      current = current.hour(config.startHour).minute(config.startMinute).second(0);
+      current = current
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
     }
 
     if (currentTime >= endTime) {
-      current = current.add(1, "day").hour(config.startHour).minute(config.startMinute).second(0);
+      current = current
+        .add(1, "day")
+        .hour(config.startHour)
+        .minute(config.startMinute)
+        .second(0);
       continue;
     }
 
@@ -342,7 +379,9 @@ export function splitEventIntoWorkingHours(
   }
 
   if (iterations >= MAX_ITERATIONS) {
-    console.error("splitEventIntoWorkingHours: Reached max iterations. Check configs or loops.");
+    console.error(
+      "splitEventIntoWorkingHours: Reached max iterations. Check configs or loops.",
+    );
   }
 
   return events;
@@ -350,136 +389,136 @@ export function splitEventIntoWorkingHours(
 
 
 export function addWorkingMinutesDynamic(
-    start: Dayjs,
-    minutesToAdd: number,
-    dailyWorkingHours: Record<string, WorkingHoursConfig>,
-    defaultWorkingHours: Record<number, WorkingHoursConfig>
-  ): Dayjs {
-    let current = start.clone();
-    let remaining = minutesToAdd;
+  start: Dayjs,
+  minutesToAdd: number,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>,
+): Dayjs {
+  let current = start.clone();
+  let remaining = minutesToAdd;
 
-    while (remaining > 0) {
-      const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
-        getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+  while (remaining > 0) {
+    const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+      getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
 
-      if (!isBusinessDay) {
-        current = current.add(1, 'day').startOf('day');
-        continue;
-      }
-
-      const dayStart = current
-        .startOf('day')
-        .hour(startHour)
-        .minute(startMinute)
-        .second(0);
-      const dayEnd = current
-        .startOf('day')
-        .hour(endHour)
-        .minute(endMinute)
-        .second(0);
-
-      if (current.isBefore(dayStart)) {
-        current = dayStart;
-      }
-
-      if (current.isAfter(dayEnd) || current.isSame(dayEnd)) {
-        current = current.add(1, 'day').startOf('day');
-        continue;
-      }
-
-      const availableMinutes = dayEnd.diff(current, 'minute');
-      const chunk = Math.min(availableMinutes, remaining);
-      current = current.add(chunk, 'minute');
-      remaining -= chunk;
-
-      if (remaining > 0) {
-        current = current.add(1, 'day').startOf('day');
-      }
+    if (!isBusinessDay) {
+      current = current.add(1, "day").startOf("day");
+      continue;
     }
 
-    return current;
+    const dayStart = current
+      .startOf("day")
+      .hour(startHour)
+      .minute(startMinute)
+      .second(0);
+    const dayEnd = current
+      .startOf("day")
+      .hour(endHour)
+      .minute(endMinute)
+      .second(0);
+
+    if (current.isBefore(dayStart)) {
+      current = dayStart;
+    }
+
+    if (current.isAfter(dayEnd) || current.isSame(dayEnd)) {
+      current = current.add(1, "day").startOf("day");
+      continue;
+    }
+
+    const availableMinutes = dayEnd.diff(current, "minute");
+    const chunk = Math.min(availableMinutes, remaining);
+    current = current.add(chunk, "minute");
+    remaining -= chunk;
+
+    if (remaining > 0) {
+      current = current.add(1, "day").startOf("day");
+    }
   }
 
-   export function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
-      const eventGroups = new Map<string, EventInput[]>();
-  
-      // Group events by date and base ID
-      events.forEach(event => {
-        if (!event.start || !event.id) return;
-  
-        const eventDate = dayjs(event.start as Date).format('YYYY-MM-DD');
-        const baseId = event.id.toString().split('-part-')[0]; // Extract base ID
-        const groupKey = `${eventDate}-${baseId}`;
-  
-        if (!eventGroups.has(groupKey)) {
-          eventGroups.set(groupKey, []);
-        }
-        eventGroups.get(groupKey)!.push(event);
-      });
-  
-      const mergedEvents: EventInput[] = [];
-  
-      eventGroups.forEach((group, groupKey) => {
-        if (group.length === 1) {
-          // Single event, no merging needed
-          mergedEvents.push(group[0]);
-        } else {
-          // Multiple parts to merge
-          const sortedParts = group.sort((a, b) =>
-            dayjs(a.start as Date).diff(dayjs(b.start as Date))
-          );
-  
-          const firstPart = sortedParts[0];
-          const lastPart = sortedParts[sortedParts.length - 1];
-  
-          // Create merged event
-          const mergedEvent: EventInput = {
-            ...firstPart,
-            id: firstPart.id!.split('-part-')[0], // Use base ID
-            start: firstPart.start,
-            end: lastPart.end,
-            title: firstPart.title?.replace(/ - μέρος \d+$/, '') || firstPart.title, // Remove part suffix if exists
-          };
-  
-          mergedEvents.push(mergedEvent);
-        }
-      });
-  
-      return mergedEvents;
+  return current;
+}
+
+export function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
+  const eventGroups = new Map<string, EventInput[]>();
+
+  // Group events by date and base ID
+  events.forEach((event) => {
+    if (!event.start || !event.id) return;
+
+    const eventDate = dayjs(event.start as Date).format("YYYY-MM-DD");
+    const baseId = event.id.toString().split("-part-")[0]; // Extract base ID
+    const groupKey = `${eventDate}-${baseId}`;
+
+    if (!eventGroups.has(groupKey)) {
+      eventGroups.set(groupKey, []);
     }
-  
-    export function calculateWorkingMinutesBetween(
-        start: Dayjs,
-        end: Dayjs,
-        dailyWorkingHours: Record<string, WorkingHoursConfig>,
-        defaultWorkingHours: Record<number, WorkingHoursConfig>
-      ): number {
-        if (end.isBefore(start)) return 0;
-    
-        let current = start.clone();
-        let total = 0;
-    
-        while (current.isBefore(end)) {
-          const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
-            getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
-    
-          if (isBusinessDay) {
-            const dayStart = current
-              .startOf('day')
-              .hour(startHour)
-              .minute(startMinute);
-            const dayEnd = current.startOf('day').hour(endHour).minute(endMinute);
-    
-            const intervalStart = current.isBefore(dayStart) ? dayStart : current;
-            const intervalEnd = end.isBefore(dayEnd) ? end : dayEnd;
-    
-            if (intervalEnd.isAfter(intervalStart)) {
-              total += intervalEnd.diff(intervalStart, 'minute');
-            }
-          }
-    
-          current = current.add(1, 'day').startOf('day');
-        }
-    
-        return total;
+    eventGroups.get(groupKey)!.push(event);
+  });
+
+  const mergedEvents: EventInput[] = [];
+
+  eventGroups.forEach((group, groupKey) => {
+    if (group.length === 1) {
+      // Single event, no merging needed
+      mergedEvents.push(group[0]);
+    } else {
+      // Multiple parts to merge
+      const sortedParts = group.sort((a, b) =>
+        dayjs(a.start as Date).diff(dayjs(b.start as Date)),
+      );
+
+      const firstPart = sortedParts[0];
+      const lastPart = sortedParts[sortedParts.length - 1];
+
+      // Create merged event
+      const mergedEvent: EventInput = {
+        ...firstPart,
+        id: firstPart.id!.split("-part-")[0], // Use base ID
+        start: firstPart.start,
+        end: lastPart.end,
+        title: firstPart.title?.replace(/ - μέρος \d+$/, "") || firstPart.title, // Remove part suffix if exists
+      };
+
+      mergedEvents.push(mergedEvent);
+    }
+  });
+
+  return mergedEvents;
+}
+
+export function calculateWorkingMinutesBetween(
+  start: Dayjs,
+  end: Dayjs,
+  dailyWorkingHours: Record<string, WorkingHoursConfig>,
+  defaultWorkingHours: Record<number, WorkingHoursConfig>,
+): number {
+  if (end.isBefore(start)) return 0;
+
+  let current = start.clone();
+  let total = 0;
+
+  while (current.isBefore(end)) {
+    const { isBusinessDay, startHour, startMinute, endHour, endMinute } =
+      getWorkingHours(current, dailyWorkingHours, defaultWorkingHours);
+
+    if (isBusinessDay) {
+      const dayStart = current
+        .startOf("day")
+        .hour(startHour)
+        .minute(startMinute);
+      const dayEnd = current.startOf("day").hour(endHour).minute(endMinute);
+
+      const intervalStart = current.isBefore(dayStart) ? dayStart : current;
+      const intervalEnd = end.isBefore(dayEnd) ? end : dayEnd;
+
+      if (intervalEnd.isAfter(intervalStart)) {
+        total += intervalEnd.diff(intervalStart, "minute");
       }
+    }
+
+    current = current.add(1, "day").startOf("day");
+  }
+
+  return total;
+}
