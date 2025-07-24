@@ -27,7 +27,7 @@ export const WorkingHoursModal: React.FC<WorkingHoursModalProps> = ({
   onOk,
 }) => (
   <Modal
-    title={`ώρισε ώρες εργασίας ${date?.format("YYYY-MM-DD")} (${dayToGreekName(date?.day()??0)})`}
+    title={`ώρισε ώρες εργασίας ${date?.format("YYYY-MM-DD")} (${dayToGreekName(date?.day()??0)}){$date.hour()}`}
     open={open}
     onCancel={onCancel}
     onOk={onOk}

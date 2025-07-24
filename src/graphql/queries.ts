@@ -378,3 +378,42 @@ export const CoilShowDocument = gql`
   }
 }
     `;    
+
+    export const GET_DAILY_WORKING_HOURS = gql`
+  query GetDailyWorkingHours($date:String!) {
+    workingHours (date:$date){
+      date
+      startHour
+      startMinute
+      endHour
+      endMinute
+      isWorkingDay
+    }
+  }
+`;
+
+    export const GET_WORKING_HOURS = gql`
+ query GetWorkingHours{
+  workingHoursAll {
+    date
+    startHour
+    startMinute
+    endHour
+    endMinute
+    isWorkingDay
+  }
+}
+`;
+
+export const UPDATE_DAILY_WORKING_HOURS = gql`
+  mutation UpdateDailyWorkingHours($date: String!, $update: UpdateWorkingHoursInput!) {
+    updateWorkingHours(  date: $date, update: $update ) {
+      date
+      startHour
+      startMinute
+      endHour
+      endMinute
+      isWorkingDay
+    }
+  }
+`;

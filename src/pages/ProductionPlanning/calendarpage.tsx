@@ -41,6 +41,7 @@ import { useStartPporder } from "@/hooks/useStartPporder";
 import { handleUpdateAllEvents } from "./handlers/handleupdateall";
 import { usePporderLines } from "@/hooks/usePporderLines";
 import { createOfftimeTitle } from "./helpers/offtimetitle";
+import { useDailyWorkingHoursQuery, useUpdateDailyWorkingHours } from "@/hooks/useWorkingHours";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -68,6 +69,8 @@ export const ProductionCalendar: React.FC = () => {
         refetch: refetchFinished,
   } = useFinishedPporders();
 
+    const { data: workingHoursData } = useDailyWorkingHoursQuery();
+  const { updateDailyWorkingHours } = useUpdateDailyWorkingHours();
 
   const { updatePporder } = useUpdatePporder();
 
@@ -89,6 +92,15 @@ export const ProductionCalendar: React.FC = () => {
       console.error("Η εντολή δεν ενημερώθηκε:", error);
     }
   };
+
+    const handlePersistWorkingHours = async (date: Dayjs, config: WorkingHoursConfig) => {
+    try {
+      await updateDailyWorkingHours(date.format('YYYY-MM-DD'), config);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
 
 
   const handleUnschedulePporder = async (
@@ -213,6 +225,25 @@ export const ProductionCalendar: React.FC = () => {
    const [dailyWorkingHours, setDailyWorkingHours] = useState<
     Record<string, WorkingHoursConfig>
   >({});
+
+  useEffect(() => {
+    if (workingHoursData?.data?.dailyWorkingHours) {
+      const mapped = workingHoursData.data.dailyWorkingHours.reduce(
+        (acc, cur) => {
+          acc[cur.date] = {
+            startHour: cur.startHour,
+            startMinute: cur.startMinute,
+            endHour: cur.endHour,
+            endMinute: cur.endMinute,
+            isWorkingDay: cur.isWorkingDay,
+          };
+          return acc;
+        },
+        {} as Record<string, WorkingHoursConfig>
+      );
+      setDailyWorkingHours(mapped);
+    }
+  }, [workingHoursData]);
   // Temporary state for modal
   const [tempWorkingHours, setTempWorkingHours] = useState<WorkingHoursConfig>({
     startHour: 6,
@@ -839,6 +870,7 @@ const handleUpdateAll = async () => {
             setDailyWorkingHours,
             setCurrentEvents,
             setWorkingHoursModalOpen,
+            handlePersistWorkingHours,
 
           )}
         />

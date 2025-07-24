@@ -51,3 +51,13 @@ ADD
     offtimeduration INT NULL,                         -- Duration in some unit
     offtimestartdate DATETIME NULL,                   -- Start date and time
     offtimeenddate DATETIME NULL;    
+
+
+    CREATE TABLE WorkingHours (
+    [Date] DATE PRIMARY KEY,       -- Unique working hours per date
+    StartHour INT NOT NULL,        -- e.g., 9
+    StartMinute INT NOT NULL,      -- e.g., 0
+    EndHour INT NOT NULL,          -- e.g., 17
+    EndMinute INT NOT NULL,        -- e.g., 30
+    IsWorkingDay BIT NOT NULL      -- 1 for working, 0 for not
+);

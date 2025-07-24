@@ -51,6 +51,7 @@ export const handleSaveWorkingHours = (
   setDailyWorkingHours: (cfg: Record<string, WorkingHoursConfig>) => void,
   setCurrentEvents: React.Dispatch<React.SetStateAction<EventInput[]>>, // Replace 'any' with your actual event type
   setWorkingHoursModalOpen: (open: boolean) => void,
+ persistWorkingHours?: (date: Dayjs, config: WorkingHoursConfig) => Promise<void>,
 ) => {
   if (!selectedDate) return;
 
@@ -62,6 +63,12 @@ export const handleSaveWorkingHours = (
   };
 
   setDailyWorkingHours(newDailyWorkingHours);
+
+  if (persistWorkingHours) {
+    persistWorkingHours(selectedDate, tempWorkingHours).catch(err =>
+      console.error(err)
+    );
+  }
 
   setCurrentEvents((prevEvents) => {
     const sorted = [...prevEvents].sort((a, b) =>
