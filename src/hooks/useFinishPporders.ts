@@ -96,6 +96,7 @@ console.log("finishDateDatetime value:", last.finishDateDatetime);
     }
   }
 
+    console.log("currentEvents", currentEvents);
 
     // 1️⃣ Find the earliest job segment for this order
     const jobEvents = currentEvents

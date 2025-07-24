@@ -1,9 +1,15 @@
 import { useCustom } from "@refinedev/core";
 import { Select, Form, Spin, Alert, Button, message } from "antd";
 import gql from "graphql-tag";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { client } from "@/providers";
 import { UPDATE_PPORDERS } from "@/graphql/queries";
+import { useStartPporder } from "@/hooks/useStartPporder";
+import { useFinishedPporders } from "@/hooks/useFinishedPporders";
+import { useFinishPporder } from "@/hooks/useFinishPporders";
+import { Dayjs } from "dayjs";
+import { EventInput } from "fullcalendar";
+import { useCurrentEvents } from "@/contexts/currentEventsProvider";
 
 const GET_PPORDERS = gql`
   query GetPpOrders($filter: PpordersFilterInput) {
@@ -59,7 +65,7 @@ const PanelMachineDashboard: React.FC<{
         },
       },
     },
-  });
+   });
 // 1  created     ΔΗΜΙΟΥΡΓΗΘΗΚΕ  
 // 2  processing  ΣΕ ΕΠΕΞΕΡΓΑΣΙΑ
 // 3  onhold      ΣΕ ΠΑΥΣΗ
@@ -84,6 +90,48 @@ const PanelMachineDashboard: React.FC<{
     return map;
   }, [data]);
 
+  // States required for start/finish hooks but not shown in this view
+  const { currentEvents, setCurrentEvents } = useCurrentEvents(); 
+   const [editStart, setEditStart] = useState<Dayjs | null>(null);
+  const [editEnd, setEditEnd] = useState<Dayjs | null>(null);
+  const manualSyncRef = useRef(false);
+  const defaultWorkingHours: Record<number, any> = {
+    1: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+    2: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+    3: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+    4: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+    5: { startHour: 6, startMinute: 0, endHour: 23, endMinute: 59, isWorkingDay: true },
+    6: { startHour: 0, startMinute: 0, endHour: 15, endMinute: 0, isWorkingDay: true },
+    0: { startHour: 0, startMinute: 0, endHour: 0, endMinute: 0, isWorkingDay: false },
+  };
+  const dailyWorkingHours = {} as Record<string, any>;
+
+  // Fetch finished orders for offtime calculation
+  const { data: finishedData, refetch: refetchFinished } = useFinishedPporders();
+  const finishedOrders = finishedData?.data?.masterlengths ?? [];
+
+  const { handleStart } = useStartPporder({
+    finishedOrders,
+    dailyWorkingHours,
+    defaultWorkingHours,
+    currentEvents,
+    setCurrentEvents,
+    handleUpdateAllEvents: async () => {},
+  });
+
+  const { handleFinish } = useFinishPporder({
+    currentEvents,
+    setCurrentEvents,
+    setEditStart,
+    setEditEnd,
+    dailyWorkingHours,
+    defaultWorkingHours,
+    handleUpdateAllEvents: async () => {},
+    refetchFinished,
+    refetchPporders: () => { refetch(); },
+    manualSyncRef,
+  });
+
   const handleStartOrder = async () => {
     if (!selectedId) {
       messageApi.warning("Παρακαλώ επιλέξτε μια εντολή πρώτα");
@@ -91,16 +139,9 @@ const PanelMachineDashboard: React.FC<{
     }
 
     try {
-      const currentDate = new Date().toISOString();
-      const result = await client.request(UPDATE_PPORDERS, {
-        input: {
-                  id: selectedId,
- update: {
-          startDateDatetime: currentDate,
-          status: 2, // Set status to "In Progress"
-         } },
-      });
-
+      const order = ordersById.get(selectedId);
+      if (!order) return;
+      await handleStart(order);
       messageApi.success("Η εντολή ξεκίνησε!");
       refetch();
     } catch (error) {
@@ -121,30 +162,21 @@ const PanelMachineDashboard: React.FC<{
       return;
     }
 
-    // Check if order has already been started
-    if (order.status!=2) {
+    if (order.status != 2) {
       messageApi.warning("Η εντολή πρέπει να έχει ξεκινήσει πρώτα");
       return;
     }
 
     try {
-      const currentDate = new Date().toISOString();
-      const result = await client.request(UPDATE_PPORDERS, {
-        id: selectedId,
-        input: {
-          finishDateDatetime: currentDate,
-          status: 4, // Set status to "Completed"
-        },
-      });
+      await handleFinish(order);
 
-      messageApi.success("Η εντολή ολοκληρώθηκε!");
+          messageApi.success("Η εντολή ολοκληρώθηκε!");
       refetch();
     } catch (error) {
       console.error("Finish order error", error);
       messageApi.error("Σφάλμα ολοκλήρωσης εντολής");
     }
   };
-
   const options = React.useMemo(
     () =>
       data?.data?.pporders?.map((order) => ({

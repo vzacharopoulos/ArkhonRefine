@@ -20,22 +20,17 @@ export function handleDropFactory(
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
   defaultWorkingHours: Record<number, WorkingHoursConfig>,
   setCurrentEvents: React.Dispatch<React.SetStateAction<EventInput[]>>,
-  droppedIds: Set<string>,
-  setDroppedIds: React.Dispatch<React.SetStateAction<Set<string>>>,
+ droppedIdsRef: React.MutableRefObject<Set<string>>
   
 ) {
   return function handleDrop(info: DropArg) {
     const draggedEvent = JSON.parse(info.draggedEl.dataset.event || "{}");
-    if (droppedIds.has(draggedEvent.id)) return;
-
-    setDroppedIds(prev => new Set(prev).add(draggedEvent.id));
-    setTimeout(() => {
-      setDroppedIds(prev => {
-        const updated = new Set(prev);
-        updated.delete(draggedEvent.id);
-        return updated;
-      });
-    }, 10);
+  if (droppedIdsRef.current.has(draggedEvent.id)) return;
+console.log("✅ Event dropped:", draggedEvent.id, "at", info.date);
+droppedIdsRef.current.add(draggedEvent.id);
+setTimeout(() => {
+  droppedIdsRef.current.delete(draggedEvent.id);
+}, 2000);
 
     const dropDate = dayjs(info.date);
     const durationInMinutes = draggedEvent.extendedProps?.duration ?? totalTimeMinutes;

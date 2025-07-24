@@ -1,4 +1,4 @@
-import { useCustom, useUpdate } from "@refinedev/core";
+import { useCustom, useDataProvider } from "@refinedev/core";
 import { GET_DAILY_WORKING_HOURS, GET_WORKING_HOURS, UPDATE_DAILY_WORKING_HOURS } from "@/graphql/queries";
 import { WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
 
@@ -12,7 +12,7 @@ export interface DailyWorkingHours {
 }
 
 export const useDailyWorkingHoursQuery = () =>
-  useCustom<{ dailyWorkingHours: DailyWorkingHours[] }>({
+  useCustom<{ workingHoursAll: DailyWorkingHours[] }>({
     url: "",
     method: "get",
     meta: {
@@ -21,22 +21,28 @@ export const useDailyWorkingHoursQuery = () =>
   });
 
 export const useUpdateDailyWorkingHours = () => {
-  const { mutate } = useUpdate<any>();
+  const dataProvider = useDataProvider()();
 
-const updateDailyWorkingHours = async (date: string, values: WorkingHoursConfig) => {
-  await mutate({
-    resource: "dailyWorkingHours",
-    id: date,
-    values: { date, values } as any,
-    meta: {
-      gqlMutation: UPDATE_DAILY_WORKING_HOURS,
-      variables: {
-        date,
-        update: values,
+  const updateDailyWorkingHours = async (
+    date: string,
+    values: WorkingHoursConfig,
+  ) => {
+    const { data } = await dataProvider.custom!<{
+      updateWorkingHours: DailyWorkingHours;
+    }>({
+      url: "",
+      method: "post",
+      meta: {
+        gqlMutation: UPDATE_DAILY_WORKING_HOURS,
+        variables: {
+          date,
+          update: values,
+        },
       },
-    },
-  });
-};
+    });
+
+    return data?.updateWorkingHours;
+  };
 
   return { updateDailyWorkingHours };
 };

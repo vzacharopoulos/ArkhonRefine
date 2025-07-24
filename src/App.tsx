@@ -41,9 +41,13 @@ import { Calendar } from "antd";
 import { ProductionCalendar } from "./pages/ProductionPlanning/calendarpage";
 import PanelMachineDashboard from "./pages/panelmachine/panelmachinedashboard";
 import SimpleListPage from "./pages/simplelist/simplelist";
+import { useState } from "react";
+import { EventInput } from "fullcalendar";
+import { CurrentEventsProvider } from "./contexts/currentEventsProvider";
 
 
 function App() {
+   const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
   return (
     <BrowserRouter>
       <RefineKbarProvider>
@@ -52,6 +56,7 @@ function App() {
           <GlobalStyles styles={{ html: { WebkitFontSmoothing: "auto" } }} />
           <RefineSnackbarProvider>
             <DevtoolsProvider>
+               <CurrentEventsProvider value={{ currentEvents, setCurrentEvents }}>
               <Refine
                 dataProvider={dataProvider}
                 liveProvider={liveProvider}
@@ -155,6 +160,7 @@ function App() {
                 <UnsavedChangesNotifier />
                 <DocumentTitleHandler />
               </Refine>
+              </CurrentEventsProvider>
               <DevtoolsPanel />
             </DevtoolsProvider>
           </RefineSnackbarProvider>

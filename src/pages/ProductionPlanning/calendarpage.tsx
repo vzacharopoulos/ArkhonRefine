@@ -42,6 +42,7 @@ import { handleUpdateAllEvents } from "./handlers/handleupdateall";
 import { usePporderLines } from "@/hooks/usePporderLines";
 import { createOfftimeTitle } from "./helpers/offtimetitle";
 import { useDailyWorkingHoursQuery, useUpdateDailyWorkingHours } from "@/hooks/useWorkingHours";
+import { useCurrentEvents } from "@/contexts/currentEventsProvider";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -66,10 +67,11 @@ export const ProductionCalendar: React.FC = () => {
   const {
     data: finishedData,
     isLoading: finishedLoading,
-        refetch: refetchFinished,
+    refetch: refetchFinished,
   } = useFinishedPporders();
 
-    const { data: workingHoursData } = useDailyWorkingHoursQuery();
+  const { data: workingHoursData } = useDailyWorkingHoursQuery();
+
   const { updateDailyWorkingHours } = useUpdateDailyWorkingHours();
 
   const { updatePporder } = useUpdatePporder();
@@ -85,7 +87,7 @@ export const ProductionCalendar: React.FC = () => {
       await updatePporder(id, {
         estStartDate: startDate ? dayjs(startDate).format('YYYY-MM-DDTHH:mm:ssZ') : null,
         estFinishDate: finishDate ? dayjs(finishDate).format('YYYY-MM-DDTHH:mm:ssZ') : null,
-        
+
         ...extraValues,
       });
     } catch (error) {
@@ -93,7 +95,7 @@ export const ProductionCalendar: React.FC = () => {
     }
   };
 
-    const handlePersistWorkingHours = async (date: Dayjs, config: WorkingHoursConfig) => {
+  const handlePersistWorkingHours = async (date: Dayjs, config: WorkingHoursConfig) => {
     try {
       await updateDailyWorkingHours(date.format('YYYY-MM-DD'), config);
     } catch (error) {
@@ -153,7 +155,7 @@ export const ProductionCalendar: React.FC = () => {
 
 
   const [weekendsVisible, setWeekendsVisible] = useState(true);
-  const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
+    const { currentEvents, setCurrentEvents } = useCurrentEvents();
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedPporderno, setSelectedPporderno] = useState<string | null>(null);
   const [workingHoursModalOpen, setWorkingHoursModalOpen] = useState(false);
@@ -162,10 +164,11 @@ export const ProductionCalendar: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editStart, setEditStart] = useState<Dayjs | null>(null);
   const [editEnd, setEditEnd] = useState<Dayjs | null>(null);
-  const manualSyncRef = useRef<boolean >(false);
-  
+  const manualSyncRef = useRef<boolean>(false);
+  const [droppedIds, setDroppedIds] = useState<Set<string>>(new Set());
+const droppedIdsRef = useRef<Set<string>>(new Set());
   // Keep your current defaultWorkingHours structure
-   const [defaultWorkingHours, setDefaultWorkingHours] = useState<
+  const [defaultWorkingHours, setDefaultWorkingHours] = useState<
     Record<number, WorkingHoursConfig>
   >({
     1: {
@@ -222,13 +225,13 @@ export const ProductionCalendar: React.FC = () => {
 
 
   // Daily working hours overrides
-   const [dailyWorkingHours, setDailyWorkingHours] = useState<
+  const [dailyWorkingHours, setDailyWorkingHours] = useState<
     Record<string, WorkingHoursConfig>
   >({});
 
   useEffect(() => {
-    if (workingHoursData?.data?.dailyWorkingHours) {
-      const mapped = workingHoursData.data.dailyWorkingHours.reduce(
+    if (workingHoursData?.data?.workingHoursAll) {
+      const mapped = workingHoursData.data.workingHoursAll.reduce(
         (acc, cur) => {
           acc[cur.date] = {
             startHour: cur.startHour,
@@ -243,14 +246,14 @@ export const ProductionCalendar: React.FC = () => {
       );
       setDailyWorkingHours(mapped);
     }
-  }, [workingHoursData]);
+  }, [workingHoursData?.data]);
   // Temporary state for modal
   const [tempWorkingHours, setTempWorkingHours] = useState<WorkingHoursConfig>({
     startHour: 6,
     startMinute: 0,
     endHour: 22,
     endMinute: 0,
-  isWorkingDay: true,
+    isWorkingDay: true,
   });
 
 
@@ -300,10 +303,10 @@ export const ProductionCalendar: React.FC = () => {
     defaultWorkingHours,
     currentEvents,
     setCurrentEvents,
-        setEditStart,
+    setEditStart,
     setEditEnd,
     handleUpdateAllEvents,
-      manualSyncRef,
+    manualSyncRef,
   });
 
   const totalTimeByOrderId = useMemo(() => {
@@ -324,7 +327,7 @@ export const ProductionCalendar: React.FC = () => {
 
 
   useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
-      if (manualSyncRef.current) return;   // skip rebuild during manual updates
+    if (manualSyncRef.current) return;   // skip rebuild during manual updates
     const preScheduled = unscheduledorders
       .filter(o => o.estStartDate && o.estFinishDate && !(o.status === 1))
       .sort((a, b) =>
@@ -363,7 +366,7 @@ export const ProductionCalendar: React.FC = () => {
         if (prevEnd && !prevEnd.isSame(offStart)) {
           offStart = prevEnd
         }
-    const offtimeSegments = splitEventIntoWorkingHours(
+        const offtimeSegments = splitEventIntoWorkingHours(
           offStart,
           offtimeduration,
           dailyWorkingHours,
@@ -403,7 +406,7 @@ export const ProductionCalendar: React.FC = () => {
           ? prevEnd
           : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
       }
-       duration ?duration: totalTimeByOrderId
+      duration ? duration : totalTimeByOrderId
       const segments = splitEventIntoWorkingHours(
         tentativeStart,
         duration,
@@ -429,13 +432,13 @@ export const ProductionCalendar: React.FC = () => {
     setCurrentEvents(mergedEvents);
     manualSyncRef.current = false;
   }
-    , [unscheduledorders, dailyWorkingHours, defaultWorkingHours,manualSyncRef]);
+    , [unscheduledorders, dailyWorkingHours, defaultWorkingHours, manualSyncRef]);
 
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
   const totalMeter = useMemo(() => calculateTotalLength(orderLines), [orderLines]);
 
- const finishedEvents: EventInput[] = useMemo(() => {
+  const finishedEvents: EventInput[] = useMemo(() => {
     const events: EventInput[] = [];
     const sorted = [...finished].sort((a, b) =>
       dayjs(a.startDateDatetime as Date).diff(dayjs(b.startDateDatetime as Date))
@@ -456,50 +459,50 @@ export const ProductionCalendar: React.FC = () => {
         start = findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
       }
 
-      const duration = 
+      const duration =
         (order.finishDateDatetime
           ? calculateWorkingMinutesBetween(
-              start,
-              dayjs(order.finishDateDatetime as Date),
-              dailyWorkingHours,
-              defaultWorkingHours
-            )
+            start,
+            dayjs(order.finishDateDatetime as Date),
+            dailyWorkingHours,
+            defaultWorkingHours
+          )
           : 0);
 
 
-          
-    if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
-      const offStart = dayjs(order.offtimestartdate as Date);
-      const offSegments = splitEventIntoWorkingHours(
-        offStart,
-        order.offtimeduration,
-        dailyWorkingHours,
-        defaultWorkingHours,
-        {
-          id: `${order.id}-offtime`,
-          title: createOfftimeTitle(
-            order.offtimeduration,
-            order.code,
-            order.prevpanelcode,
-          ),
-          color: "gray",
-          extendedProps: {
-            isOfftime: true,
-            prevId: order.previd?.toString(),
-            currId: order.id.toString(),
-            prevpanelcode: order.prevpanelcode,
-            panelcode: order.code,
-            offtimeduration: order.offtimeduration,
-            offtimeStartDate: order.offtimestartdate,
-            offtimeEndDate: order.offtimeenddate,
-          },
-        }
-      );
-      events.push(...offSegments);
-    }
+
+      if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
+        const offStart = dayjs(order.offtimestartdate as Date);
+        const offSegments = splitEventIntoWorkingHours(
+          offStart,
+          order.offtimeduration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: `${order.id}-offtime`,
+            title: createOfftimeTitle(
+              order.offtimeduration,
+              order.code,
+              order.prevpanelcode,
+            ),
+            color: "gray",
+            extendedProps: {
+              isOfftime: true,
+              prevId: order.previd?.toString(),
+              currId: order.id.toString(),
+              prevpanelcode: order.prevpanelcode,
+              panelcode: order.code,
+              offtimeduration: order.offtimeduration,
+              offtimeStartDate: order.offtimestartdate,
+              offtimeEndDate: order.offtimeenddate,
+            },
+          }
+        );
+        events.push(...offSegments);
+      }
 
 
-   const segments = splitEventIntoWorkingHours(
+      const segments = splitEventIntoWorkingHours(
         start,
         duration,
         dailyWorkingHours,
@@ -588,7 +591,6 @@ export const ProductionCalendar: React.FC = () => {
   // });
 
   const totalMinutes = totalTime.hours * 60 + totalTime.minutes;
-  const [droppedIds, setDroppedIds] = useState<Set<string>>(new Set());
 
 
 
@@ -600,8 +602,9 @@ export const ProductionCalendar: React.FC = () => {
       dailyWorkingHours,
       defaultWorkingHours,
       setCurrentEvents,
-      droppedIds,
-      setDroppedIds
+      droppedIdsRef
+      
+     
 
     ), [
     currentEvents,
@@ -609,7 +612,8 @@ export const ProductionCalendar: React.FC = () => {
     totalMinutes,
     dailyWorkingHours,
     defaultWorkingHours,
-    setCurrentEvents
+    setCurrentEvents,
+    droppedIdsRef
   ]);
 
   const nonWorkingTimeBackgroundEvents = useMemo(() => {
@@ -618,9 +622,9 @@ export const ProductionCalendar: React.FC = () => {
 
   const handleWeekendsToggle = () => {
     setWeekendsVisible(!weekendsVisible);
-     refetchFinished();
- 
-    
+    refetchFinished();
+
+
     console.log(currentEvents)
   };
 
@@ -633,15 +637,15 @@ export const ProductionCalendar: React.FC = () => {
 
 
 
-const handleUpdateAll = async () => {
-  await handleUpdateAllEvents({
-    events: currentEvents,
-    dailyWorkingHours,
-    defaultWorkingHours,
-    updatePporder: handleUpdatePporder,
-    
-  });
-};
+  const handleUpdateAll = async () => {
+    await handleUpdateAllEvents({
+      events: currentEvents,
+      dailyWorkingHours,
+      defaultWorkingHours,
+      updatePporder: handleUpdatePporder,
+
+    });
+  };
 
   const { handleStart } = useStartPporder({
     finishedOrders: finished,
@@ -651,7 +655,7 @@ const handleUpdateAll = async () => {
     currentEvents,
     handleUpdateAllEvents,
   });
- 
+
 
   const handleStartEvent = async (eventsArg?: EventInput[]) => {
     const rawEvents = eventsArg ?? currentEvents;
