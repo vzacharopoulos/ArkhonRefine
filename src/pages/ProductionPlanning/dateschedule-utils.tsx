@@ -344,8 +344,13 @@ export function splitEventIntoWorkingHours(
     }
 
     const idStr = eventData.id?.toString() ?? "";
-    const baseId = idStr.split("-part-")[0];
-
+    let baseId = "";
+    if (idStr.includes("-offtime-")) {
+       baseId = idStr.split("-offtime-")[0];
+       baseId=`${baseId}-offtime`;
+    }else{
+    baseId = idStr.split("-part-")[0];
+    }
     events.push({
       ...eventData,
       id: `${baseId}-part-${partIndex}`,

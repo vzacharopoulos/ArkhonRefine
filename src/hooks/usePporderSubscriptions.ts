@@ -16,6 +16,8 @@ interface UsePporderSubscriptionsProps {
     refetchPporderlines: () => void;
       refetchFinished: () => Promise<any>;  finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
+  setDailyWorkingHours: React.Dispatch<React.SetStateAction<Record<string, WorkingHoursConfig>>>;
+  updateDailyWorkingHours: (date: string, values: WorkingHoursConfig) => Promise<WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   currentEvents:EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
@@ -32,6 +34,8 @@ export const usePporderSubscriptions = ({
      refetchFinished,
   finishedOrders,
   dailyWorkingHours,
+  setDailyWorkingHours,
+  updateDailyWorkingHours,
   defaultWorkingHours,
   currentEvents,
   setCurrentEvents,
@@ -45,6 +49,8 @@ export const usePporderSubscriptions = ({
   const { handleStart } = useStartPporder({
     finishedOrders,
     dailyWorkingHours,
+    setDailyWorkingHours,
+    updateDailyWorkingHours,
     defaultWorkingHours,
     currentEvents,
     setCurrentEvents,
@@ -59,6 +65,8 @@ export const usePporderSubscriptions = ({
             setEditStart,
     setEditEnd,
     dailyWorkingHours,
+    setDailyWorkingHours,
+    updateDailyWorkingHours,
     defaultWorkingHours,
     handleUpdateAllEvents,
       refetchFinished,

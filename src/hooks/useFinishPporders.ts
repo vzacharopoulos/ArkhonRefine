@@ -7,7 +7,9 @@ import { HandleUpdateAllEventsParams, UpdateFn } from "@/pages/ProductionPlannin
 import { EventInput } from "fullcalendar";
 import { STATUS_MAP, statusColorMap } from "@/utilities";
 import { handleSaveEdit } from "@/pages/ProductionPlanning/utilities/usehandleedit";
-import { addWorkingMinutesDynamic, calculateWorkingMinutesBetween } from "@/pages/ProductionPlanning/dateschedule-utils";
+import { addWorkingMinutesDynamic, calculateWorkingMinutesBetween, findNextWorkingTime, isWithinWorkingHours } from "@/pages/ProductionPlanning/dateschedule-utils";
+import { useUpdateDailyWorkingHours } from "./useWorkingHours";
+import { co } from "@fullcalendar/core/internal-common";
 
 interface UseFinishPporderParams {
   currentEvents: EventInput[];
@@ -15,10 +17,12 @@ interface UseFinishPporderParams {
   setEditStart: (date: Dayjs | null) => void;
   setEditEnd: (date: Dayjs | null) => void;
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
+  setDailyWorkingHours: React.Dispatch<React.SetStateAction<Record<string, WorkingHoursConfig>>>;
+  updateDailyWorkingHours: (date: string, values: WorkingHoursConfig) => Promise<WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
   refetchFinished?: () => Promise<any>;
-    refetchPporders?: () => void;
+  refetchPporders?: () => void;
   manualSyncRef: React.MutableRefObject<boolean>;
 }
 
@@ -26,10 +30,12 @@ interface UseFinishPporderParams {
 export const useFinishPporder = ({
   currentEvents,
   setCurrentEvents,
-        refetchPporders,
+  refetchPporders,
   setEditStart,
   setEditEnd,
   dailyWorkingHours,
+  setDailyWorkingHours,
+  updateDailyWorkingHours,
   defaultWorkingHours,
   handleUpdateAllEvents,
   refetchFinished,
@@ -59,42 +65,78 @@ export const useFinishPporder = ({
 
 
   const handleFinish = async (order: PPOrder) => {
-    const now = dayjs();
+    const now = dayjs("2025-07-24T21:40:00.000");
+
+    if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
+      const dateKey = now.format("YYYY-MM-DD");
+
+      const existingConfig = dailyWorkingHours[dateKey];
+      const defaultConfig = defaultWorkingHours[now.day()]; // day() gives 0–6 (Sun–Sat)
+
+      const startHour = existingConfig?.startHour ?? defaultConfig.startHour;
+      const startMinute = existingConfig?.startMinute ?? defaultConfig.startMinute;
+
+      const endHour = parseInt(now.format("HH"), 10);
+      const endMinute = parseInt(now.format("mm"), 10);
+
+      const newDailyWorkingHours = {
+        ...dailyWorkingHours,
+        [dateKey]: {
+          startHour,
+          startMinute,
+          endHour,
+          endMinute,
+          isWorkingDay: true,
+        },
+      };
+
+
+
+      await updateDailyWorkingHours(dateKey, {
+        startHour,
+        startMinute,
+        endHour,
+        endMinute,
+        isWorkingDay: true,
+      });
+
+      setDailyWorkingHours(newDailyWorkingHours);
+
+
+
+
+    }
     manualSyncRef.current = true;
-    setEditEnd(now);
+
 
     const baseId = String(order.id);
 
-     // Determine previous finished order info
-  let prevFinish: Dayjs | null = null;
-  let prevId: number | undefined;
-  let prevPanelCode: string | undefined;
-  if (refetchFinished) {
-    try {
-      const result = await refetchFinished();
-      const finished = result?.data?.data.masterlengths ?? [];
-      const last = finished
-      
-        .filter((f: any) => f.finishDateDatetime)
-        .sort((a: any, b: any) =>
-          dayjs(a.finishDateDatetime).diff(dayjs(b.finishDateDatetime))
-        )
-        .pop();
-                console.log("last object:", last);
-console.log("Full refetchFinished result:", result);
-        console.log("finished object:", finished);
-console.log("finishDateDatetime type:", typeof last.finishDateDatetime);
-console.log("finishDateDatetime value:", last.finishDateDatetime);
-      if (last?.finishDateDatetime) {
-        console.log("last?.finishDateDatetime",last?.finishDateDatetime)
-        prevFinish = dayjs(last.finishDateDatetime as Date);
-        prevId = last.id;
-        prevPanelCode = last.code;
+    // Determine previous finished order info
+    let prevFinish: Dayjs | null = null;
+    let prevId: number | undefined;
+    let prevPanelCode: string | undefined;
+    if (refetchFinished) {
+      try {
+        const result = await refetchFinished();
+        const finished = result?.data?.data.masterlengths ?? [];
+        const last = finished
+
+          .filter((f: any) => f.finishDateDatetime)
+          .sort((a: any, b: any) =>
+            dayjs(a.finishDateDatetime).diff(dayjs(b.finishDateDatetime))
+          )
+          .pop();
+       
+        if (last?.finishDateDatetime) {
+          console.log("last?.finishDateDatetime", dayjs(last.finishDateDatetime).format("YYYY-MM-DD HH:mm:ss"))
+          prevFinish = dayjs(last.finishDateDatetime as Date);
+          prevId = last.id;
+          prevPanelCode = last.code;
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     }
-  }
 
     console.log("currentEvents", currentEvents);
 
@@ -107,7 +149,6 @@ console.log("finishDateDatetime value:", last.finishDateDatetime);
           !ev.extendedProps?.isOfftime,
       )
       .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
-
     const selectedEvent = jobEvents[0];
     if (!selectedEvent) return;
 
@@ -135,6 +176,7 @@ console.log("finishDateDatetime value:", last.finishDateDatetime);
         }
         : ev;
     });
+    console.log("updatedEvents", updatedEvents);
     // Remove all existing events with same baseId (e.g. "123-part-0", "123-part-1", etc)
     const filteredEvents = updatedEvents.filter(
       (ev) => !ev.id?.toString().startsWith(baseId)
@@ -145,102 +187,113 @@ console.log("finishDateDatetime value:", last.finishDateDatetime);
       .filter((ev) => ev.start)
       .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
 
-console.log("sorted",sorted)
+    console.log("sorted", sorted)
     const firstSegment = sorted[0];
-
+ const secondSegment = sorted[1];
     if (!firstSegment || !firstSegment.start || !firstSegment.end) {
-  console.warn("First segment is missing start or end date.");
-  return;
-}
+      console.warn("First segment is missing start or end date.");
+      return;
+    }
+    let i=1
 
-const originalStart = dayjs(firstSegment.start as Date);
-const originalEnd = dayjs(firstSegment.end as Date);
-const delta = now.diff(originalStart, "minute"); // in minutes (can be negative)
 
-const adjustedEnd = delta < 0
-  ? originalEnd.subtract(Math.abs(delta), "minute")
-  : originalEnd.add(delta, "minute");
 
-         const finalupdatedEvents = handleSaveEdit(
-        firstSegment,
-        now, // new start
-        adjustedEnd,
-        filteredEvents,
-        dailyWorkingHours,
-        defaultWorkingHours,
-      );
-            setCurrentEvents(finalupdatedEvents);
 
+
+    const originalStart = dayjs(firstSegment.start as Date);
+    const originalEnd = dayjs(firstSegment.end as Date);
+//     const delta = now.diff(originalStart, "minute"); // in minutes (can be negative)
+
+//     const adjustedEnd = delta < 0
+//       ? originalEnd.subtract(Math.abs(delta), "minute")
+//       : originalEnd.add(delta, "minute");
+// console.log("adjustedEnd", adjustedEnd.format("YYYY-MM-DD HH:mm:ss"))
+console.log("originalEnd", originalEnd.format("YYYY-MM-DD HH:mm:ss"))
+console.log("originalStart", originalStart.format("YYYY-MM-DD HH:mm:ss"))
     
-      // Merge with updated finished events
-      console.log("updatedEvents", updatedEvents)
-      console.log("filteredEvents", filteredEvents)
-      console.log("prevFinish", prevFinish)
-
-
-       const start = order.startDateDatetime ? dayjs(order.startDateDatetime as Date) : null;
-             console.log("start", start)
-
-  let offDuration = 0;
-  if (prevFinish && start) {
-    offDuration = calculateWorkingMinutesBetween(
-      prevFinish,
-      start,
+const adjustedEnd =sorted[0].end ? dayjs(sorted[0].end as Date) : originalEnd;
+      const NextWorkingTimeadjustedEnd=findNextWorkingTime(
+      dayjs(adjustedEnd), // start date
       dailyWorkingHours,
       defaultWorkingHours,
     );
-  }
 
-      // 4️⃣ Persist finished order immediately
-        await updatePporder({
-        resource: "pporders",
-        id: order.id,
-        values: {
-          estFinishDate: dayjs(now).format('YYYY-MM-DDTHH:mm:ssZ'),
-          finishDateDatetime: dayjs(now).format('YYYY-MM-DDTHH:mm:ssZ'),
-          status: 4,
-           offtimestartdate: prevFinish ? dayjs(prevFinish).format('YYYY-MM-DDTHH:mm:ssZ') : null,
-      offtimeenddate: start ? dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ') : null,
-      offtimeduration: offDuration,
-      previd: prevId,
-      prevpanelcode: prevPanelCode,
-        },
-        meta: {
-          gqlMutation: UPDATE_PPORDERS,
-        },
-      });
-
-          if (refetchPporders) {
-      await refetchPporders();
-    }
+    const finalupdatedEvents = handleSaveEdit(
+      firstSegment,
+      originalStart, // new start
+      NextWorkingTimeadjustedEnd,
+      filteredEvents,
+      dailyWorkingHours,
+      defaultWorkingHours,
+    );
+    console.log("finalupdatedEvents", finalupdatedEvents);
+    setCurrentEvents(finalupdatedEvents);
 
 
-      if (refetchFinished) {
-        await refetchFinished();
+    // Merge with updated finished events
+    console.log("updatedEvents", updatedEvents)
+    console.log("filteredEvents", filteredEvents)
+    console.log("prevFinish", prevFinish)
 
-        setTimeout(() => {
-          // 5️⃣ Update remaining events & DB
-       handleUpdateAllEvents({
-        events: finalupdatedEvents,
+
+    const start = order.startDateDatetime ? dayjs(order.startDateDatetime as Date) : null;
+    console.log("start", start)
+
+    let offDuration = 0;
+    if (prevFinish && start) {
+      offDuration = calculateWorkingMinutesBetween(
+        prevFinish,
+        start,
         dailyWorkingHours,
         defaultWorkingHours,
-        updatePporder: updatePporderFn,
-      });
+      );
+    }
 
-          manualSyncRef.current = false;
-        }, 5000);
-        return;
-      }
-      console.log("currentEvents", currentEvents)
+    // 4️⃣ Persist finished order immediately
+    await updatePporder({
+      resource: "pporders",
+      id: order.id,
+      values: {
+        estFinishDate: dayjs(now).format('YYYY-MM-DDTHH:mm:ssZ'),
+        finishDateDatetime: dayjs(now).format('YYYY-MM-DDTHH:mm:ssZ'),
+        status: 4,
+        offtimestartdate: prevFinish ? dayjs(prevFinish).format('YYYY-MM-DDTHH:mm:ssZ') : null,
+        offtimeenddate: start ? dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ') : null,
+        offtimeduration: offDuration,
+        previd: prevId,
+        prevpanelcode: prevPanelCode,
+      },
+      meta: {
+        gqlMutation: UPDATE_PPORDERS,
+      },
+    });
+
+  
+
+    console.log(`Successfully updated PPOrder ${order.status}`);
+
+      setTimeout(() => {
+        // 5️⃣ Update remaining events & DB
+        handleUpdateAllEvents({
+          events: finalupdatedEvents,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          updatePporder: updatePporderFn,
+        });
+
+        manualSyncRef.current = false;
+      }, 5000);
+   
+    console.log("currentEvents", currentEvents)
 
 
 
 
-      // 6️⃣ Notify user
-      message.success(`Η Master ${order.pporderno} ολοκληρώθηκε`);
-    };
-
-    return { handleFinish };
+    // 6️⃣ Notify user
+    message.success(`Η Master ${order.pporderno} ολοκληρώθηκε`);
   };
+
+  return { handleFinish };
+};
 
 

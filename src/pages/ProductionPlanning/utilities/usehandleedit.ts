@@ -125,5 +125,52 @@ function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
     }
   });
 
-  return mergedEvents;
+  // 🔁 Renumber all part IDs and titles to ensure uniqueness
+// 🔁 Normalize work/offtime part IDs separately
+const normalizedEvents: EventInput[] = [];
+const workPartCounters = new Map<string, number>();
+const offtimePartCounters = new Map<string, number>();
+
+mergedEvents.forEach(ev => {
+  const originalId = ev.id?.toString() ?? "";
+  let baseId = "";
+
+  if (originalId.includes("-offtime-part-")) {
+    baseId = originalId.split("-offtime-part-")[0];
+  } else if (originalId.includes("-part-")) {
+    baseId = originalId.split("-part-")[0];
+  } else {
+    baseId = originalId;
+  }
+
+  const isOfftime = ev.extendedProps?.isOfftime === true;
+
+  // Separate counter for offtime and work
+  const counterMap = isOfftime ? offtimePartCounters : workPartCounters;
+  const count = counterMap.get(baseId) ?? 1;
+
+  const newId = isOfftime
+    ? `${baseId}-offtime-part-${count}`
+    : `${baseId}-part-${count}`;
+
+  counterMap.set(baseId, count + 1);
+
+  // Optional: Only update title for work segments
+  const newTitle = isOfftime
+    ? ev.title
+    : (ev.title?.replace(/ - μέρος \d+$/, '') ?? '') + ` - μέρος ${count}`;
+
+  normalizedEvents.push({
+    ...ev,
+    id: newId,
+    title: newTitle,
+    extendedProps: {
+      ...ev.extendedProps,
+      partIndex: count,
+    },
+  });
+});
+
+return normalizedEvents;
+
 }

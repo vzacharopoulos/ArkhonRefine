@@ -1,16 +1,16 @@
-import React, { useEffect } from "react";
+import React from "react";
+import { useList } from "@refinedev/core";
 import { List } from "@refinedev/antd";
-import { List as AntdList } from "antd";
-import { useDataProvider, useList } from "@refinedev/core";
+import { Table } from "antd";
 import gql from "graphql-tag";
 
-export const GET_PANEL_PRODUCTION_ORDERS_EXT2 = gql`
-  query panelProductionOrdersExt2s(
+export const GETPANELPRODUCTIONORDERSEXT2 = gql`
+  query panelProduction(
     $filter: PanelProductionOrdersExt2FilterInput
     $sorting: [PanelProductionOrdersExt2SortInput!]
     $paging: OffsetPaging
   ) {
-    panelProductionOrdersExt2s(
+    panelProduction(
       filter: $filter
       sorting: $sorting
       paging: $paging
@@ -20,17 +20,8 @@ export const GET_PANEL_PRODUCTION_ORDERS_EXT2 = gql`
         productionNo
         tradecode
         materialCode
-        cin
-        cout
-        thickin
-        thickout
-        moldin
-        moldout
         widthin
         widthout
-        importNo
-        ttm
-        count
       }
       totalCount
     }
@@ -38,78 +29,60 @@ export const GET_PANEL_PRODUCTION_ORDERS_EXT2 = gql`
 `;
 
 export type PanelProductionOrderExt2 = {
+  
   prodOrder: string;
   productionNo: string;
   tradecode: string;
   materialCode: string;
-  cin: string;
-  cout: string;
-  thickin: number | null;
-  thickout: number | null;
-  moldin: number | null;
-  moldout: number | null;
   widthin: number | null;
   widthout: number | null;
-  importNo: string;
-  ttm: number | null;
-  count: number | null;
 };
-// Test your GraphQL client separately
-import { GraphQLClient } from "graphql-request";
 
-// Call this in your component or browser console
+export const SimpleCoilList: React.FC = () => {
+  const [current, setCurrent] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(10);
 
-
-const SimpleList: React.FC = () => {
-  const dataProvider = useDataProvider();
-  
-  // Test if data provider exists
-  useEffect(() => {
-    console.log("🔧 Data provider exists:", !!dataProvider);
-    console.log("🔧 Data provider methods:", Object.keys(dataProvider));
-  }, [dataProvider]);
-
-
- // Approach 3: Specify correct GraphQL types in meta
-  const { data: data, isLoading: loading, error: error } = useList<PanelProductionOrderExt2>({
-    resource: "panelProductionOrdersExt2s",
+  const { data, isLoading, error } = useList<PanelProductionOrderExt2>({
+    resource: "panelProduction",
+    liveMode: "auto",
     pagination: {
-      current: 1,
-      pageSize: 10,
+      mode: "server",
+      current,
+      pageSize,
     },
     meta: {
-      gqlQuery: GET_PANEL_PRODUCTION_ORDERS_EXT2,
-      queryName: "panelProductionOrdersExt2s",
-      filterType: "PanelProductionOrdersExt2FilterInput",
-      sortType: "PanelProductionOrdersExt2SortInput",
+      gqlQuery: GETPANELPRODUCTIONORDERSEXT2,
+    
     },
   });
+
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Debug Information</h2>
-      
-    
-      <div>
-     
-     
-        <p><strong>Error:</strong> {error ? error.message : "None"}</p>
-        <p><strong>Data Length:</strong> {data?.data?.length || 0}</p>
-        <p><strong>Total:</strong> {data?.total || 0}</p>
-      </div>
+    <List title="Λίστα Παραγωγής Πάνελ (με σελιδοποίηση)">
+      <Table
+        dataSource={data?.data}
+        loading={isLoading}
+        rowKey="id"
+        pagination={{
+          current,
+          pageSize,
+          total: data?.total || 0,
+          onChange: (page, size) => {
+            setCurrent(page);
+            setPageSize(size);
+          },
+        }}
+      >
+        <Table.Column title="Κωδικός Παραγγελίας" dataIndex="prodOrder" />
+        <Table.Column title="Κωδικός Παραγωγής" dataIndex="productionNo" />
+        <Table.Column title="Tradecode" dataIndex="tradecode" />
+        <Table.Column title="Material Code" dataIndex="materialCode" />
+        <Table.Column title="Πλάτος Εισόδου" dataIndex="widthin" />
+        <Table.Column title="Πλάτος Εξόδου" dataIndex="widthout" />
+      </Table>
 
-      <details>
-        <summary>Raw Data</summary>
-        <pre>{JSON.stringify(data, null, 2)}</pre>
-      </details>
-
-      {error && (
-        <details>
-          <summary>Error Details</summary>
-          <pre>{JSON.stringify(error, null, 2)}</pre>
-        </details>
-      )}
-    </div>
+      {error && <p style={{ color: "red" }}>Σφάλμα: {error.message}</p>}
+    </List>
   );
 };
 
-export default SimpleList;
+export default SimpleCoilList;

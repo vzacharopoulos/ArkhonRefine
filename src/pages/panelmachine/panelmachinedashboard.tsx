@@ -10,6 +10,7 @@ import { useFinishPporder } from "@/hooks/useFinishPporders";
 import { Dayjs } from "dayjs";
 import { EventInput } from "fullcalendar";
 import { useCurrentEvents } from "@/contexts/currentEventsProvider";
+import { useUpdateDailyWorkingHours } from "@/hooks/useWorkingHours";
 
 const GET_PPORDERS = gql`
   query GetPpOrders($filter: PpordersFilterInput) {
@@ -20,7 +21,6 @@ const GET_PPORDERS = gql`
       status
       startDateDatetime
       finishDateDatetime
-      
       createDate
       
     }
@@ -38,7 +38,6 @@ type PPOrder = {
   startDateDatetime?: Date;
   finishDateDatetime?: Date;
 };
-
 
 const PanelMachineDashboard: React.FC<{
   value?: string;
@@ -105,6 +104,13 @@ const PanelMachineDashboard: React.FC<{
     0: { startHour: 0, startMinute: 0, endHour: 0, endMinute: 0, isWorkingDay: false },
   };
   const dailyWorkingHours = {} as Record<string, any>;
+  const setDailyWorkingHours = (newHours: Record<string, any>) => {
+    Object.keys(newHours).forEach(date => {
+      dailyWorkingHours[date] = newHours[date];
+    });
+  };
+
+ const {updateDailyWorkingHours} = useUpdateDailyWorkingHours();
 
   // Fetch finished orders for offtime calculation
   const { data: finishedData, refetch: refetchFinished } = useFinishedPporders();
@@ -113,6 +119,8 @@ const PanelMachineDashboard: React.FC<{
   const { handleStart } = useStartPporder({
     finishedOrders,
     dailyWorkingHours,
+     setDailyWorkingHours,
+    updateDailyWorkingHours,
     defaultWorkingHours,
     currentEvents,
     setCurrentEvents,
@@ -125,6 +133,8 @@ const PanelMachineDashboard: React.FC<{
     setEditStart,
     setEditEnd,
     dailyWorkingHours,
+     setDailyWorkingHours,
+     updateDailyWorkingHours,
     defaultWorkingHours,
     handleUpdateAllEvents: async () => {},
     refetchFinished,

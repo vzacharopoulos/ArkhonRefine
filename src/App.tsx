@@ -85,14 +85,14 @@ function App() {
                       icon: <FormatListBulletedIcon />,
                     },
                   },
-                  //          {
-                  //   name: "panelProductionOrdersExt2s",
-                  //   list: "/panelProductionOrdersExt2s",
-                  //   meta: {
-                  //     label: "panelProductionOrdersExt2s",
-                  //     icon: <ShopOutlined />,
-                  //   },
-                  // },
+                           {
+                    name: "panelProductionOrdersExt2s",
+                    list: "/panelProductionOrdersExt2s",
+                    meta: {
+                      label: "λιστες κτλ...",
+                      icon: <ShopOutlined />,
+                    },
+                  },
                   {
                     name: "scheduling",
                     list:"/scheduling",

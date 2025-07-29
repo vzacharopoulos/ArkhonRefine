@@ -106,7 +106,8 @@ export const handleUpdateAllEvents = async ({
     console.log("sorted", sorted);
     const extra = offInfo[baseId];
     let updatedOffInfo = extra;
-
+console.log("dailyWorkingHours", dailyWorkingHours);
+    console.log("defaultWorkingHours", defaultWorkingHours);
     if (extra?.offtimeduration && extra.offtimestartdate) {
       const segments = splitEventIntoWorkingHours(
         dayjs(extra.offtimestartdate),

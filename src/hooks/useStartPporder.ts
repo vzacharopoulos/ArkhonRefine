@@ -15,6 +15,7 @@ import {
   calculateWorkingMinutesBetween,
   splitEventIntoWorkingHours,
   addWorkingMinutesDynamic,
+  isWithinWorkingHours,
 } from "@/pages/ProductionPlanning/dateschedule-utils";
 import { statusColorMap, STATUS_MAP } from "@/utilities/map-status-id-to-color";
 import {
@@ -23,10 +24,13 @@ import {
 } from "@/pages/ProductionPlanning/handlers/handleupdateall";
 import { EventInput } from "fullcalendar";
 import { createOfftimeTitle } from ".././pages/ProductionPlanning/helpers/offtimetitle";
+import { useUpdateDailyWorkingHours } from "./useWorkingHours";
 
 interface UseStartPporderParams {
   finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
+  setDailyWorkingHours: React.Dispatch<React.SetStateAction<Record<string, WorkingHoursConfig>>>;
+  updateDailyWorkingHours: (date: string, values: WorkingHoursConfig) => Promise<WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   currentEvents: EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
@@ -36,6 +40,8 @@ interface UseStartPporderParams {
 export const useStartPporder = ({
   finishedOrders,
   dailyWorkingHours,
+  setDailyWorkingHours,
+  updateDailyWorkingHours,
   defaultWorkingHours,
   currentEvents,
   setCurrentEvents,
@@ -90,7 +96,41 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs("2023-07-24T15:00:00.000");
+      const now = dayjs("2025-07-23T07:00:00.000");
+    if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
+      const dateKey = now.format("YYYY-MM-DD");
+      const existingConfig = dailyWorkingHours[dateKey];
+      const defaultConfig = defaultWorkingHours[now.day()]; // 0 = Sunday, 1 = Monday...
+
+      const startHour = parseInt(now.format("HH"), 10);
+      const startMinute = parseInt(now.format("mm"), 10);
+
+      const endHour = existingConfig?.endHour ?? defaultConfig.endHour;
+      const endMinute = existingConfig?.endMinute ?? defaultConfig.endMinute;
+
+      const newDailyWorkingHours = {
+        ...dailyWorkingHours,
+        [dateKey]: {
+          startHour,
+          startMinute,
+          endHour,
+          endMinute,
+          isWorkingDay: true,
+        },
+      };
+ setDailyWorkingHours(newDailyWorkingHours);
+      await updateDailyWorkingHours(dateKey, {
+        startHour,
+        startMinute,
+        endHour,
+        endMinute,
+        isWorkingDay: true,
+      });
+
+      
+    }
+
+     
 
       const lastFinished = [...finishedOrders]
         .filter((f) => f.finishDateDatetime)
@@ -141,16 +181,14 @@ export const useStartPporder = ({
                 prevId: lastFinished?.id,
                 currId: order.id.toString(),
                 offtimeduration: offDuration,
-                
-  offtimeStartDate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ'),
-  offtimeEndDate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+
+                offtimeStartDate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+                offtimeEndDate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
               },
             },
           )
           : [];
-
       let jobStart = now;
-
       const jobSegments = splitEventIntoWorkingHours(
         jobStart,
         totalMinutes,
@@ -168,18 +206,18 @@ export const useStartPporder = ({
           },
         },
       );
-
+      console.log("jobSegments", jobSegments);
       const jobEnd = addWorkingMinutesDynamic(
         jobStart,
         totalMinutes,
         dailyWorkingHours,
         defaultWorkingHours,
       );
-
+      console.log("jobEnd", jobEnd);
       await updatePporder({
         resource: "pporders",
         id: order.id,
-     values: {
+        values: {
           startDateDatetime: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ssZ'),
           estStartDate: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ssZ'),
           finishDateDatetime: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ssZ'),

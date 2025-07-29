@@ -37,13 +37,12 @@ return Promise.reject(error as Error)
 
 });
 // Debug the import
-console.log("🔍 graphqlDataProvider type:", typeof graphqlDataProvider);
-console.log("🔍 graphqlDataProvider:", graphqlDataProvider);
+
 
 // ... your existing client setup ...
 
 // Debug before calling graphqlDataProvider
-console.log("🔍 Client before creating data provider:", client);
+
 
 
 export const wsClient =

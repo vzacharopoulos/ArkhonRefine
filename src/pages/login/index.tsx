@@ -40,7 +40,7 @@ const handleSubmit = (e: React.FormEvent) => {
       <Card sx={{ maxWidth: 400, width: '100%' }}>
         <CardContent>
           <Typography variant="h4" textAlign="center" mb={3}>
-            Sign In
+           Σύνδεση Χρήστη
           </Typography>
           <form onSubmit={handleSubmit}>
             <TextField
