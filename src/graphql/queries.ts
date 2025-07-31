@@ -30,9 +30,25 @@ export const PPORDER_UPDATED_SUBSCRIPTION = gql`
       offtimeduration
       offtimestartdate
       offtimeenddate
+       pauseduration
+    pausestartdate
+    pauseenddate
     }
   }
 `;
+
+
+export const UPDATE_PAUSE = gql`
+mutation UpdatePauseDetails($input: UpdatePauseDetailsInput!) {
+  updatePauseDetails(input: $input) {
+    id
+    pporderid
+    pausestartdate
+    pauseenddate
+    pauseduration
+    pausecomment
+  }
+}`
 
 export const UPDATE_PPORDERS = gql`
 mutation updatePporder($input: UpdatePporderInput!) {
@@ -51,6 +67,9 @@ mutation updatePporder($input: UpdatePporderInput!) {
     offtimeduration
     offtimestartdate
     offtimeenddate
+       pauseduration
+    pausestartdate
+    pauseenddate
       pporderlines{
       status
       upDate
@@ -78,7 +97,9 @@ query GetPpOrders($filter: PpordersFilterInput) {
     offtimeduration
     offtimestartdate
     offtimeenddate
-   
+       pauseduration
+    pausestartdate
+    pauseenddate
     
   }
 }`;
@@ -99,7 +120,9 @@ query GetMasterlength($filter:MasterlengthFilterInput)  {
     offtimeduration
     offtimestartdate
     offtimeenddate
-
+   pauseduration
+    pausestartdate
+    pauseenddate
     
 }
 }`

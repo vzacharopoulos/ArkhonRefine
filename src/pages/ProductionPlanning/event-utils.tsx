@@ -150,4 +150,47 @@ export function chainEventsSequentially(
   return result;
 }
 
+ export  function deduplicateEventIds(events: EventInput[]): EventInput[] {
+      const counterMap = new Map<string, Record<string, number>>();
 
+      const getType = (idOrTitle: string): 'part' | 'pause' | 'offtime' => {
+        const lower = idOrTitle.toLowerCase();
+        if (lower.includes("pause")) return "pause";
+        if (lower.includes("offtime")) return "offtime";
+        return "part";
+      };
+
+      const getBaseOrderId = (id: string): string => {
+        // Extract base order ID from something like: 1234-pause-part-1
+        const match = id.match(/^(\d+)/);
+        return match ? match[1] : id;
+      };
+
+      return events.map(event => {
+        const originalId = event.id?.toString() ?? "";
+        const type = getType(originalId || event.title || "");
+        const baseOrderId = getBaseOrderId(originalId);
+
+        if (!counterMap.has(baseOrderId)) {
+          counterMap.set(baseOrderId, { part: 0, pause: 0, offtime: 0 });
+        }
+
+        const typeCounts = counterMap.get(baseOrderId)!;
+        typeCounts[type] += 1;
+
+        const newId =
+          type === "part"
+            ? `${baseOrderId}-part-${typeCounts[type]}`
+            : `${baseOrderId}-${type}-part-${typeCounts[type]}`;
+
+        return {
+          ...event,
+          id: newId,
+          extendedProps: {
+            ...event.extendedProps,
+            partIndex: typeCounts[type],
+            isPart: typeCounts[type] > 1,
+          },
+        };
+      });
+    }

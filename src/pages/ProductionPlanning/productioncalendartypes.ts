@@ -18,6 +18,9 @@ export interface PPOrder {
   offtimeduration?: number;
   offtimestartdate?: Date;
   offtimeenddate?: Date;
+   pauseduration?: number;
+  pausestartdate?: Date;
+  pauseenddate?: Date;
 }
 
 export interface ProdOrdersView {
@@ -49,6 +52,9 @@ export interface finishedPporders
   offtimeenddate?: Date;
   previd?: number;
   prevpanelcode?: string;
+    pauseduration?: number;
+  pausestartdate?: Date;
+  pauseenddate?: Date;
 }
 
 export interface WorkingHoursConfig {

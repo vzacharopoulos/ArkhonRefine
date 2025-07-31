@@ -1,0 +1,378 @@
+
+  useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
+    if (manualSyncRef.current) return;   // skip rebuild during manual updates
+    const preScheduled = unscheduledorders
+      .filter(o => o.estStartDate && o.estFinishDate && !(o.status === 1))
+      .sort((a, b) =>
+        dayjs(a.estStartDate as Date).diff(dayjs(b.estStartDate as Date))
+      );
+
+
+    if (preScheduled.length === 0) {
+      setCurrentEvents([]);
+      return;
+    }
+
+    const processed: EventInput[] = [];
+
+
+  
+
+    let prevEnd: Dayjs | null = null;
+    preScheduled.forEach(order => {
+      const start = dayjs(order.estStartDate as Date);
+      const end = dayjs(order.estFinishDate as Date);
+      const duration = calculateWorkingMinutesBetween(start, end, dailyWorkingHours, defaultWorkingHours);
+      let tentativeStart = prevEnd
+        ? isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+          ? prevEnd
+          : findNextWorkingTime(
+            prevEnd,
+            dailyWorkingHours,
+            defaultWorkingHours
+          )
+        : isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)
+          ? start
+          : findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
+      if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
+        const offtimeduration = order.offtimeduration;
+        let offStart = dayjs(order.offtimestartdate as Date);
+        // If the previous event ended later than the planned offtime start,
+        // begin the offtime after the previous event
+        if (prevEnd && !prevEnd.isSame(offStart)) {
+          offStart = prevEnd
+        }
+
+        const offtimeSegments = splitEventIntoWorkingHours(
+          offStart,
+          offtimeduration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: `${order.id}-offtime`,
+            title: createOfftimeTitle(
+              order.offtimeduration,
+              order.panelcode,
+              order.prevpanelcode,
+            ),
+            color: "gray",
+            extendedProps: {
+              isOfftime: true,
+              prevId: order.previd?.toString(),
+              currId: order.id.toString(),
+              prevpanelcode: order.prevpanelcode,
+              panelcode: order.panelcode,
+              offtimeduration: order.offtimeduration,
+            },
+          }
+        );
+
+        // Manually apply split segment start/end to their extendedProps
+        offtimeSegments.forEach(seg => {
+          seg.extendedProps = {
+            ...seg.extendedProps,
+            offtimeStartDate: dayjs(seg.start as Date).format('YYYY-MM-DDTHH:mm:ssZ'),
+            offtimeEndDate: dayjs(seg.end as Date).format('YYYY-MM-DDTHH:mm:ssZ'),
+          };
+        });
+
+        processed.push(...offtimeSegments);
+        const lastSegment = offtimeSegments[offtimeSegments.length - 1];
+        prevEnd = dayjs(lastSegment.end as Date);
+        tentativeStart = isWithinWorkingHours(prevEnd, dailyWorkingHours, defaultWorkingHours)
+          ? prevEnd
+          : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
+      }
+      duration ? duration : totalTimeByOrderId
+      let segments: EventInput[] = [];
+      if (
+        order.pauseduration &&
+        order.pausestartdate &&
+        order.pauseenddate
+      ) {
+        const pauseStart = dayjs(order.pausestartdate as Date);
+        const pauseEnd = dayjs(order.pauseenddate as Date);
+        const beforeDuration = calculateWorkingMinutesBetween(
+          start,
+          pauseStart,
+          dailyWorkingHours,
+          defaultWorkingHours,
+        );
+        const afterDuration = calculateWorkingMinutesBetween(
+          pauseEnd,
+          end,
+          dailyWorkingHours,
+          defaultWorkingHours,
+        );
+        const beforeSegments = splitEventIntoWorkingHours(
+          start,
+          beforeDuration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            
+            id: String(order.id),
+            title: `${order.pporderno} - ${order.panelcode}`,
+            color: statusColorMap[order.status ?? 0] || "gray",
+            extendedProps: {
+              ...order,
+              panelcode: order.panelcode,
+              status: order.status,
+            },
+          },
+        );
+        const pauseSegments = splitEventIntoWorkingHours(
+          pauseStart,
+          order.pauseduration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: `${order.id}-pause`,
+            title: `pause`,
+            color: "orange",
+            extendedProps: {
+              isPause: true,
+              currId: order.id.toString(),
+              pauseDuration: order.pauseduration,
+              pauseStartDate: dayjs(pauseStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+              pauseEndDate: dayjs(pauseEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+            },
+          },
+        );
+        const afterSegments = splitEventIntoWorkingHours(
+          pauseEnd,
+          afterDuration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: String(order.id),
+            title: `${order.pporderno} - ${order.panelcode}`,
+            color: statusColorMap[order.status ?? 0] || "gray",
+            extendedProps: {
+              panelcode: order.panelcode,
+              status: order.status,
+            },
+          },
+        );
+        segments = [...beforeSegments, ...pauseSegments, ...afterSegments];
+        console.log("pause segments:", pauseSegments);
+        console.log("pause start:", pauseSegments[0]?.start);
+        console.log("pause end:", pauseSegments[pauseSegments.length - 1]?.end);
+        console.log("after segments:", afterSegments);
+        console.log("after start:", afterSegments[0]?.start);
+        console.log("after end:", afterSegments[afterSegments.length - 1]?.end);
+
+
+      } else {
+        segments = splitEventIntoWorkingHours(
+          start,
+          duration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: String(order.id),
+            title: `${order.pporderno} - ${order.panelcode}`,
+            start: order.estStartDate,
+            end: order.estFinishDate,
+            color: statusColorMap[order.status ?? 0] || "gray",
+            extendedProps: {
+              panelcode: order.panelcode,
+              status: order.status,
+              tooltip: `${order.pporderno ?? ""}
+             - ${order.panelcode ?? ""}
+             κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
+             εκτ. ωρα έναρξης${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
+              εκτ. ωρα λήξης${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
+              θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}
+              `,
+
+            },
+          }
+        );
+      }
+      const deduplicatedsegments = deduplicateEventIds(segments);
+      console.log("deduplicated segments:", deduplicatedsegments);
+      processed.push(...deduplicatedsegments);
+      prevEnd = dayjs(deduplicatedsegments[deduplicatedsegments.length - 1].end as Date) ?? Date();
+      console.log("prevEnd after processing:", prevEnd);
+      console.log("processed after processing:", processed);
+    });
+    // const mergedEvents = mergeSameDayEventParts(processed);
+
+    // setCurrentEvents(mergedEvents);
+    setCurrentEvents(processed);
+    manualSyncRef.current = false;
+  }
+    , [unscheduledorders, dailyWorkingHours, defaultWorkingHours, manualSyncRef]);
+
+
+  const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
+  const totalMeter = useMemo(() => calculateTotalLength(orderLines), [orderLines]);
+
+  const finishedEvents: EventInput[] = useMemo(() => {
+    const events: EventInput[] = [];
+    const sorted = [...finished].sort((a, b) =>
+      dayjs(a.startDateDatetime as Date).diff(dayjs(b.startDateDatetime as Date))
+    );
+
+    sorted.forEach(order => {
+      if (!order.startDateDatetime) return;
+
+      const theoreticalTime =
+        order.time != null
+          ? dayjs.duration(order.time, "minutes").format("H[h] m[m]")
+          : "0h 0m";
+      const status = order.status ?? -1;
+      const color = statusColorMap[status] || "gray";
+
+      let start = dayjs(order.startDateDatetime as Date);
+      if (!isWithinWorkingHours(start, dailyWorkingHours, defaultWorkingHours)) {
+        start = findNextWorkingTime(start, dailyWorkingHours, defaultWorkingHours);
+      }
+
+      const duration =
+        (order.finishDateDatetime
+          ? calculateWorkingMinutesBetween(
+            start,
+            dayjs(order.finishDateDatetime as Date),
+            dailyWorkingHours,
+            defaultWorkingHours
+          )
+          : 0);
+
+
+
+      if (order.offtimeduration && order.offtimestartdate && order.offtimeenddate) {
+        const offStart = dayjs(order.offtimestartdate as Date);
+        const offSegments = splitEventIntoWorkingHours(
+          offStart,
+          order.offtimeduration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: `${order.id}-offtime`,
+            title: createOfftimeTitle(
+              order.offtimeduration,
+              order.code,
+              order.prevpanelcode,
+            ),
+            color: "gray",
+            extendedProps: {
+              isOfftime: true,
+              prevId: order.previd?.toString(),
+              currId: order.id.toString(),
+              prevpanelcode: order.prevpanelcode,
+              panelcode: order.code,
+              offtimeduration: order.offtimeduration,
+              offtimeStartDate: order.offtimestartdate,
+              offtimeEndDate: order.offtimeenddate,
+            },
+          }
+        );
+        events.push(...offSegments);
+      }
+
+
+      let segments: EventInput[] = [];
+      if (
+        order.pauseduration &&
+        order.pausestartdate &&
+        order.pauseenddate
+      ) {
+        const pauseStart = dayjs(order.pausestartdate as Date);
+        const pauseEnd = dayjs(order.pauseenddate as Date);
+        const beforeDuration = calculateWorkingMinutesBetween(
+          start,
+          pauseStart,
+          dailyWorkingHours,
+          defaultWorkingHours,
+        );
+        const afterDuration = calculateWorkingMinutesBetween(
+          pauseEnd,
+          dayjs(order.finishDateDatetime as Date),
+          dailyWorkingHours,
+          defaultWorkingHours,
+        );
+        const beforeSegments = splitEventIntoWorkingHours(
+          start,
+          beforeDuration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: String(order.id),
+            title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
+            color,
+            extendedProps: {
+              panelcode: order.code,
+              status: order.status,
+              totalMeter: order.totalMeter,
+              speed: order.speed,
+            },
+          },
+        );
+        const pauseSegments = splitEventIntoWorkingHours(
+          pauseStart,
+          order.pauseduration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: `${order.id}-pause`,
+            title: `pause`,
+            color: "orange",
+            extendedProps: {
+              isPause: true,
+              currId: order.id.toString(),
+              pauseDuration: order.pauseduration,
+              pauseStartDate: dayjs(pauseStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+              pauseEndDate: dayjs(pauseEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+            },
+          },
+        );
+        const afterSegments = splitEventIntoWorkingHours(
+          pauseEnd,
+          afterDuration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: String(order.id),
+            title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
+            color,
+            extendedProps: {
+              panelcode: order.code,
+              status: order.status,
+              totalMeter: order.totalMeter,
+              speed: order.speed,
+            },
+          },
+        );
+        segments = [...beforeSegments, ...pauseSegments, ...afterSegments];
+      } else {
+        segments = splitEventIntoWorkingHours(
+          start,
+          duration,
+          dailyWorkingHours,
+          defaultWorkingHours,
+          {
+            id: String(order.id),
+            title: `${order.code} - θεωρητικός χρόνος ${theoreticalTime}`,
+            color,
+            extendedProps: {
+              panelcode: order.code,
+              status: order.status,
+              totalMeter: order.totalMeter,
+              speed: order.speed,
+              tooltip:
+                `${order.pporderno} - ${order.code}\n - μήκος παραγγελίας: ${(order.totalMeter ?? 0).toFixed(2) || 0}m\n` +
+                `Θεωρητικός χρόνος: ${theoreticalTime} \n` +
+                `Ημερομηνία έναρξης: ${order.startDateDatetime ? dayjs(order.startDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+                `Ημερομηνία ληξης: ${order.finishDateDatetime ? dayjs(order.finishDateDatetime).format("YYYY-MM-DD HH:mm") : "—"} \n` +
+                `κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}`,
+            },
+          },
+        );
+      }
+      events.push(...segments);
+    });
+
+    return events;
+  }, [finished, dailyWorkingHours, defaultWorkingHours]);

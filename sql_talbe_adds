@@ -11,8 +11,7 @@ ADD [start_datetime] DATETIME;
 
 UPDATE [PanelMESDB_testing].[dbo].[PPORDERS]
 SET [start_datetime] = CAST([start_date] AS DATETIME);
-
-CREATE VIEW dbo.Masterlength AS
+CREATE OR ALTER VIEW [dbo].[Masterlength] AS
 SELECT 
     po.id,
     pl.PPORDERNO AS PPORDERNO, 
@@ -20,19 +19,43 @@ SELECT
     SUM(ppe.ttm) AS totalMeter,
     po.start_date_datetime,
     po.finish_date_datetime,
-	po.create_date,
-	po.status
-	
+    po.create_date,
+    po.status,
+    -- New columns added:
+	   previd ,      -- Code for the current panel
+    po.prevpanelcode  ,     -- Code for the next panel
+    po.offtimeduration ,                  -- Duration in some unit
+    po.offtimestartdate ,                 -- Start date and time
+   po.offtimeenddate  ,
+    po.pauseduration,
+    po.pausestartdate,
+    po.pauseenddate
+
 FROM dbo.PPORDERLINES2 pl
 INNER JOIN [192.168.10.167].panel.dbo.PanelProductionOrdersExt ppe
-    ON ppe.ProdOrder = pl.CUSTPORDERNO   COLLATE SQL_Latin1_General_CP1_CI_AS
-
+    ON ppe.ProdOrder = pl.CUSTPORDERNO COLLATE SQL_Latin1_General_CP1_CI_AS
 INNER JOIN dbo.PPORDERS po
     ON po.PPORDERNO = pl.PPORDERNO
-GROUP BY pl.PPORDERNO,ppe.code, po.finish_date_datetime, po.start_date_datetime,po.create_date,po.status,po.id;
+GROUP BY 
+    pl.PPORDERNO,
+    ppe.code, 
+    po.finish_date_datetime, 
+    po.start_date_datetime,
+    po.create_date,
+    po.status,
+    po.id,
+    -- Added new columns to GROUP BY:
+		   previd ,      -- Code for the current panel
+    po.prevpanelcode  ,     -- Code for the next panel
+    po.offtimeduration ,                  -- Duration in some unit
+    po.offtimestartdate ,                 -- Start date and time
+    po.offtimeenddate  ,
+    po.pauseduration,
+    po.pausestartdate,
+    po.pauseenddate;
 
 
-
+    
 USE [PanelMESDB_testing]
 GO
 
@@ -51,7 +74,9 @@ ADD
     offtimeduration INT NULL,                         -- Duration in some unit
     offtimestartdate DATETIME NULL,                   -- Start date and time
     offtimeenddate DATETIME NULL;    
-
+        pauseduration INT NULL,                         -- Duration in some unit
+    pausestartdate DATETIME NULL,                   -- Start date and time
+    pauseenddate DATETIME NULL;  
 
     CREATE TABLE WorkingHours (
     [Date] DATE PRIMARY KEY,       -- Unique working hours per date
@@ -60,4 +85,20 @@ ADD
     EndHour INT NOT NULL,          -- e.g., 17
     EndMinute INT NOT NULL,        -- e.g., 30
     IsWorkingDay BIT NOT NULL      -- 1 for working, 0 for not
+);
+
+
+
+
+
+CREATE TABLE [PanelMESDB_testing].[dbo].[PanelMachinePauses] (
+    [id] INT IDENTITY(1,1) PRIMARY KEY,
+    [pporderid] INT NOT NULL,
+    [pausestartdate] DATETIME NOT NULL,
+    [pauseenddate] DATETIME NULL,
+    [pauseduration] int null,
+	[pausecomment] nvarchar (100)
+    
+    CONSTRAINT [FK_PanelMachinePauses_PPORDERS] FOREIGN KEY ([pporderid]) 
+        REFERENCES [dbo].[PPORDERS]([id])
 );

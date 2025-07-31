@@ -96,7 +96,7 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs("2025-07-23T07:00:00.000");
+      const now = dayjs("2025-07-26T04:00:00.000");
     if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
       const dateKey = now.format("YYYY-MM-DD");
       const existingConfig = dailyWorkingHours[dateKey];

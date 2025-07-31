@@ -348,8 +348,11 @@ export function splitEventIntoWorkingHours(
     if (idStr.includes("-offtime-")) {
        baseId = idStr.split("-offtime-")[0];
        baseId=`${baseId}-offtime`;
-    }else{
-    baseId = idStr.split("-part-")[0];
+    } else if (idStr.includes("-pause-")) {
+       baseId = idStr.split("-pause-")[0];
+       baseId=`${baseId}-pause`;
+    } else {
+      baseId = idStr.split("-part-")[0];
     }
     events.push({
       ...eventData,
@@ -448,7 +451,7 @@ export function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
   const eventGroups = new Map<string, EventInput[]>();
 
   // Group events by date and base ID
-  events.forEach((event) => {
+  events.forEach(event => {
     if (!event.start || !event.id) return;
 
     const eventDate = dayjs(event.start as Date).format("YYYY-MM-DD");

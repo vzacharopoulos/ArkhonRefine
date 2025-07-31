@@ -32,6 +32,7 @@ export const handleUpdateAllEvents = async ({
 }: HandleUpdateAllEventsParams) => {
   const grouped: Record<string, EventInput[]> = {};
   const offInfo: Record<string, Partial<PPOrder>> = {};
+   const pauseInfo: Record<string, Partial<PPOrder>> = {};
   console.log("✅ handleUpdateAllEvents was called with events:", events);
   events.forEach((ev) => {
     if (!ev.id || !ev.start || !ev.end || ev.extendedProps?.status === 4)
@@ -74,6 +75,32 @@ export const handleUpdateAllEvents = async ({
       return;
     }
 
+
+    if (ev.extendedProps?.isPause) {
+      const currId = ev.extendedProps.currId || idStr.split("-part-")[0];
+      const currIdStr = currId.toString();
+
+      if (!pauseInfo[currIdStr]) {
+        pauseInfo[currIdStr] = {
+          pauseduration: ev.extendedProps.pauseDuration,
+          pausestartdate: ev.extendedProps.pauseStartDate
+            ? dayjs(ev.extendedProps.pauseStartDate).toDate()
+            : dayjs(ev.start as Date).toDate(),
+          pauseenddate: ev.extendedProps.pauseEndDate
+            ? dayjs(ev.extendedProps.pauseEndDate).toDate()
+            : dayjs(ev.end as Date).toDate(),
+        };
+      } else {
+        const currentEnd = new Date(
+          ev.extendedProps.pauseEndDate || (ev.end as Date),
+        );
+        const existingEnd = pauseInfo[currIdStr].pauseenddate;
+        if (existingEnd && currentEnd > existingEnd) {
+          pauseInfo[currIdStr].pauseenddate = currentEnd;
+        }
+      }
+      return;
+    }
     const baseId = idStr.includes("-part-") ? idStr.split("-part-")[0] : idStr;
     const status = ev.extendedProps?.status;
 
@@ -105,7 +132,9 @@ export const handleUpdateAllEvents = async ({
     const lastEnd = new Date(sorted[sorted.length - 1].end as Date);
     console.log("sorted", sorted);
     const extra = offInfo[baseId];
+   const pauseExtra = pauseInfo[baseId];
     let updatedOffInfo = extra;
+    let updatedPauseInfo = pauseExtra;
 console.log("dailyWorkingHours", dailyWorkingHours);
     console.log("defaultWorkingHours", defaultWorkingHours);
     if (extra?.offtimeduration && extra.offtimestartdate) {
@@ -144,6 +173,31 @@ console.log("dailyWorkingHours", dailyWorkingHours);
       };
     }
 
+    if (pauseExtra?.pauseduration && pauseExtra.pausestartdate) {
+      const segments = splitEventIntoWorkingHours(
+        dayjs(pauseExtra.pausestartdate),
+        pauseExtra.pauseduration,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        {
+          id: `${baseId}-pause`,
+          title: `pause ${pauseExtra.pauseduration}m`,
+          color: "orange",
+          extendedProps: {
+            isPause: true,
+            currId: baseId,
+            pauseDuration: pauseExtra.pauseduration,
+          },
+        },
+      );
+      updatedPauseInfo = {
+        ...updatedPauseInfo,
+        pausestartdate: dayjs(segments[0].start as any).toDate(),
+        pauseenddate: dayjs(
+          segments[segments.length - 1].end as any,
+        ).toDate(),
+      };
+    }
     try {
       await updatePporder(
         Number(baseId),
@@ -151,6 +205,7 @@ console.log("dailyWorkingHours", dailyWorkingHours);
         dayjs(lastEnd).toDate(),
         {
           ...updatedOffInfo,
+            ...updatedPauseInfo,
           status:
             group[0]?.extendedProps?.status === 1
               ? 14
