@@ -1,5 +1,14 @@
 import { EventInput } from "fullcalendar";
 
+export interface PanelMachinePause {
+  id?: number;
+  pporderid?: number;
+  pausestartdate?: Date;
+  pauseenddate?: Date;
+  pauseduration?: number;
+  pausecomment?: string;
+}
+
 export interface PPOrder {
   id: number;
   pporderno?: string;
@@ -18,9 +27,7 @@ export interface PPOrder {
   offtimeduration?: number;
   offtimestartdate?: Date;
   offtimeenddate?: Date;
-   pauseduration?: number;
-  pausestartdate?: Date;
-  pauseenddate?: Date;
+   pauses?: PanelMachinePause[];
 }
 
 export interface ProdOrdersView {
@@ -52,9 +59,7 @@ export interface finishedPporders
   offtimeenddate?: Date;
   previd?: number;
   prevpanelcode?: string;
-    pauseduration?: number;
-  pausestartdate?: Date;
-  pauseenddate?: Date;
+    panelmachinepauses?: PanelMachinePause[];
 }
 
 export interface WorkingHoursConfig {

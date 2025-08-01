@@ -67,9 +67,11 @@ mutation updatePporder($input: UpdatePporderInput!) {
     offtimeduration
     offtimestartdate
     offtimeenddate
-       pauseduration
-    pausestartdate
-    pauseenddate
+ pauses  {id
+pausestartdate
+pauseenddate
+pauseduration
+pausecomment}
       pporderlines{
       status
       upDate
@@ -97,9 +99,13 @@ query GetPpOrders($filter: PpordersFilterInput) {
     offtimeduration
     offtimestartdate
     offtimeenddate
-       pauseduration
-    pausestartdate
-    pauseenddate
+    pauses
+    {id
+pausestartdate
+pauseenddate
+pauseduration
+pausecomment}
+    
     
   }
 }`;
@@ -120,9 +126,13 @@ query GetMasterlength($filter:MasterlengthFilterInput)  {
     offtimeduration
     offtimestartdate
     offtimeenddate
-   pauseduration
-    pausestartdate
-    pauseenddate
+    # pauses {
+    #   id
+    #   pausestartdate
+    #   pauseenddate
+    #   pauseduration
+    #   pausecomment
+    # }
     
 }
 }`

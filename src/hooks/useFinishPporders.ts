@@ -1,9 +1,9 @@
 import { useUpdate } from "@refinedev/core";
 import { message } from "antd";
 import dayjs, { Dayjs } from "dayjs";
-import { PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
-import { UPDATE_PPORDERS } from "@/graphql/queries";
-import { HandleUpdateAllEventsParams, UpdateFn } from "@/pages/ProductionPlanning/handlers/handleupdateall";
+import { PanelMachinePause, PPOrder, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
+import { UPDATE_PAUSE, UPDATE_PPORDERS } from "@/graphql/queries";
+import { HandleUpdateAllEventsParams, UpdateFn, UpdatePauseFn } from "@/pages/ProductionPlanning/handlers/handleupdateall";
 import { EventInput } from "fullcalendar";
 import { STATUS_MAP, statusColorMap } from "@/utilities";
 import { handleSaveEdit } from "@/pages/ProductionPlanning/utilities/usehandleedit";
@@ -42,6 +42,7 @@ export const useFinishPporder = ({
   manualSyncRef,
 }: UseFinishPporderParams) => {
   const { mutate: updatePporder } = useUpdate<PPOrder>();
+    const { mutate: updatePauseMutation } = useUpdate<PanelMachinePause>();
 
   const updatePporderFn: UpdateFn = async (
     id: number,
@@ -62,6 +63,19 @@ export const useFinishPporder = ({
       },
     });
   };
+
+    const updatePauseFn: UpdatePauseFn = async (pause: PanelMachinePause) => {
+    await updatePauseMutation({
+      resource: "panelmachinepauses",
+      id: pause.id ?? 0,
+      values: pause as any,
+      meta: {
+        gqlMutation: UPDATE_PAUSE,
+      },
+    });
+  };
+
+
 
 
   const handleFinish = async (order: PPOrder) => {
@@ -279,6 +293,7 @@ const adjustedEnd =sorted[0].end ? dayjs(sorted[0].end as Date) : originalEnd;
           dailyWorkingHours,
           defaultWorkingHours,
           updatePporder: updatePporderFn,
+          updatePause: updatePauseFn,
         });
 
         manualSyncRef.current = false;

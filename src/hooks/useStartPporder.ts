@@ -3,12 +3,14 @@ import { useCustom, useDataProvider, useUpdate } from "@refinedev/core";
 import { print } from "graphql";
 import dayjs from "dayjs";
 import {
+  PanelMachinePause,
   PPOrder,
   PPOrderLine,
   WorkingHoursConfig,
 } from "@/pages/ProductionPlanning/productioncalendartypes";
 import {
   GET_PPORDERLINES_OF_PPORDER,
+  UPDATE_PAUSE,
   UPDATE_PPORDERS,
 } from "@/graphql/queries";
 import {
@@ -21,6 +23,7 @@ import { statusColorMap, STATUS_MAP } from "@/utilities/map-status-id-to-color";
 import {
   HandleUpdateAllEventsParams,
   UpdateFn,
+  UpdatePauseFn,
 } from "@/pages/ProductionPlanning/handlers/handleupdateall";
 import { EventInput } from "fullcalendar";
 import { createOfftimeTitle } from ".././pages/ProductionPlanning/helpers/offtimetitle";
@@ -50,6 +53,7 @@ export const useStartPporder = ({
   const dataProvider = useDataProvider()();
 
   const { mutate: updatePporder } = useUpdate<PPOrder>();
+   const { mutate: updatePauseMutation } = useUpdate<PanelMachinePause>();
 
   const updatePporderFn: UpdateFn = async (
     id: number,
@@ -68,6 +72,17 @@ export const useStartPporder = ({
       },
       meta: {
         gqlMutation: UPDATE_PPORDERS,
+      },
+    });
+  };
+
+    const updatePauseFn: UpdatePauseFn = async (pause: PanelMachinePause) => {
+    await updatePauseMutation({
+      resource: "panelmachinepauses",
+      id: pause.id ?? 0,
+      values: pause as any,
+      meta: {
+        gqlMutation: UPDATE_PAUSE,
       },
     });
   };
@@ -96,7 +111,7 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs("2025-07-26T04:00:00.000");
+      const now = dayjs("2025-07-28T12:00:00.000");
     if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
       const dateKey = now.format("YYYY-MM-DD");
       const existingConfig = dailyWorkingHours[dateKey];
@@ -370,6 +385,7 @@ export const useStartPporder = ({
           dailyWorkingHours,
           defaultWorkingHours,
           updatePporder: updatePporderFn,
+                    updatePause: updatePauseFn,
         });
 
 

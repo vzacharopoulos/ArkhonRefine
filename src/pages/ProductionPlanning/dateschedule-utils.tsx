@@ -450,13 +450,17 @@ export function addWorkingMinutesDynamic(
 export function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
   const eventGroups = new Map<string, EventInput[]>();
 
-  // Group events by date and base ID
   events.forEach(event => {
-    if (!event.start || !event.id) return;
+    if (!event.start || !event.end || !event.id) return;
 
     const eventDate = dayjs(event.start as Date).format("YYYY-MM-DD");
-    const baseId = event.id.toString().split("-part-")[0]; // Extract base ID
-    const groupKey = `${eventDate}-${baseId}`;
+    const baseId = event.id.toString().split("-part-")[0];
+    const type = event.extendedProps?.isOfftime
+      ? "offtime"
+      : event.extendedProps?.isPause
+      ? "pause"
+      : "work";
+    const groupKey = `${eventDate}-${baseId}-${type}`;
 
     if (!eventGroups.has(groupKey)) {
       eventGroups.set(groupKey, []);
@@ -466,34 +470,93 @@ export function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
 
   const mergedEvents: EventInput[] = [];
 
-  eventGroups.forEach((group, groupKey) => {
-    if (group.length === 1) {
-      // Single event, no merging needed
-      mergedEvents.push(group[0]);
-    } else {
-      // Multiple parts to merge
-      const sortedParts = group.sort((a, b) =>
-        dayjs(a.start as Date).diff(dayjs(b.start as Date)),
-      );
+  eventGroups.forEach(group => {
+    const sortedParts = group.sort((a, b) =>
+      dayjs(a.start as Date).diff(dayjs(b.start as Date))
+    );
 
-      const firstPart = sortedParts[0];
-      const lastPart = sortedParts[sortedParts.length - 1];
+    let currentGroup: EventInput[] = [sortedParts[0]];
 
-      // Create merged event
-      const mergedEvent: EventInput = {
-        ...firstPart,
-        id: firstPart.id!.split("-part-")[0], // Use base ID
-        start: firstPart.start,
-        end: lastPart.end,
-        title: firstPart.title?.replace(/ - μέρος \d+$/, "") || firstPart.title, // Remove part suffix if exists
-      };
+    for (let i = 1; i < sortedParts.length; i++) {
+      const prev = currentGroup[currentGroup.length - 1];
+      const curr = sortedParts[i];
 
-      mergedEvents.push(mergedEvent);
+      const prevEnd = dayjs(prev.end as Date);
+      const currStart = dayjs(curr.start as Date);
+
+      if (prevEnd.isSame(currStart)) {
+        // ✅ Consecutive → merge candidate
+        currentGroup.push(curr);
+      } else {
+        // ❌ Not consecutive → flush previous group
+        mergedEvents.push(mergeEventGroup(currentGroup));
+        currentGroup = [curr];
+      }
+    }
+
+    // Push the last group
+    if (currentGroup.length > 0) {
+      mergedEvents.push(mergeEventGroup(currentGroup));
     }
   });
 
-  return mergedEvents;
+  // 🔁 Renumber all parts
+  const normalizedEvents: EventInput[] = [];
+  const counters = {
+    work: new Map<string, number>(),
+    offtime: new Map<string, number>(),
+    pause: new Map<string, number>(),
+  };
+
+  for (const ev of mergedEvents) {
+    const originalId = ev.id?.toString() ?? "";
+    const baseId = originalId.split("-part-")[0];
+    const type = ev.extendedProps?.isOfftime
+      ? "offtime"
+      : ev.extendedProps?.isPause
+      ? "pause"
+      : "work";
+    const counterMap = counters[type];
+    const count = counterMap.get(baseId) ?? 1;
+
+    const newId =
+      type === "work"
+        ? `${baseId}-part-${count}`
+        : `${baseId}-${type}-part-${count}`;
+
+    counterMap.set(baseId, count + 1);
+
+    const newTitle =
+      type === "work"
+        ? (ev.title?.replace(/ - μέρος \d+$/, '') ?? '') + ` - μέρος ${count}`
+        : ev.title;
+
+    normalizedEvents.push({
+      ...ev,
+      id: newId,
+      title: newTitle,
+      extendedProps: {
+        ...ev.extendedProps,
+        partIndex: count,
+      },
+    });
+  }
+
+  return normalizedEvents;
 }
+
+// 🔧 Helper to merge a list of events into one
+function mergeEventGroup(group: EventInput[]): EventInput {
+  const first = group[0];
+  const last = group[group.length - 1];
+
+  return {
+    ...first,
+    start: first.start,
+    end: last.end,
+  };
+}
+
 
 export function calculateWorkingMinutesBetween(
   start: Dayjs,

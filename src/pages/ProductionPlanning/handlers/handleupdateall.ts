@@ -3,6 +3,7 @@
 import { EventInput } from "@fullcalendar/core";
 import dayjs from "dayjs";
 import {
+  PanelMachinePause,
   PPOrder,
   WorkingHoursConfig,
 } from "@/pages/ProductionPlanning/productioncalendartypes";
@@ -17,11 +18,14 @@ export type UpdateFn = (
   extraValues?: Partial<PPOrder>,
 ) => Promise<void>;
 
+export type UpdatePauseFn = (pause: PanelMachinePause) => Promise<void>;
+
 export interface HandleUpdateAllEventsParams {
   events: EventInput[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
   updatePporder: UpdateFn;
+  updatePause: UpdatePauseFn;
 }
 
 export const handleUpdateAllEvents = async ({
@@ -29,11 +33,15 @@ export const handleUpdateAllEvents = async ({
   dailyWorkingHours,
   defaultWorkingHours,
   updatePporder,
+  updatePause,
 }: HandleUpdateAllEventsParams) => {
   const grouped: Record<string, EventInput[]> = {};
   const offInfo: Record<string, Partial<PPOrder>> = {};
-   const pauseInfo: Record<string, Partial<PPOrder>> = {};
+  // Changed to array to store multiple pauses per PPOrder
+  const pauseInfo: Record<string, Partial<PanelMachinePause>[]> = {};
+  
   console.log("✅ handleUpdateAllEvents was called with events:", events);
+  
   events.forEach((ev) => {
     if (!ev.id || !ev.start || !ev.end || ev.extendedProps?.status === 4)
       return;
@@ -57,7 +65,6 @@ export const handleUpdateAllEvents = async ({
             offtimestartdate: ev.extendedProps.offtimeStartDate
               ? dayjs(ev.extendedProps.offtimeStartDate).toDate()
               : dayjs(ev.start as Date).toDate(),
-
             offtimeenddate: ev.extendedProps.offtimeEndDate
               ? dayjs(ev.extendedProps.offtimeEndDate).toDate()
               : dayjs(ev.end as Date).toDate(),
@@ -75,32 +82,59 @@ export const handleUpdateAllEvents = async ({
       return;
     }
 
-
     if (ev.extendedProps?.isPause) {
+
       const currId = ev.extendedProps.currId || idStr.split("-part-")[0];
       const currIdStr = currId.toString();
-
+     ev.extendedProps.pausestartdate=ev.start as Date;
+      ev.extendedProps.pauseenddate=ev.end as Date;
+       console.log("pauseInfo[currIdStr]", pauseInfo[currIdStr]);
+      // Initialize array if it doesn't exist
       if (!pauseInfo[currIdStr]) {
-        pauseInfo[currIdStr] = {
-          pauseduration: ev.extendedProps.pauseDuration,
-          pausestartdate: ev.extendedProps.pauseStartDate
-            ? dayjs(ev.extendedProps.pauseStartDate).toDate()
-            : dayjs(ev.start as Date).toDate(),
-          pauseenddate: ev.extendedProps.pauseEndDate
-            ? dayjs(ev.extendedProps.pauseEndDate).toDate()
-            : dayjs(ev.end as Date).toDate(),
-        };
+        pauseInfo[currIdStr] = [];
+      }
+      
+      // Check if this pause already exists in the array
+      const existingPauseIndex = pauseInfo[currIdStr].findIndex(
+        pause => pause.id === ev.extendedProps?.pauseid
+      );
+      console.log("pauseInfo[currIdStr]", pauseInfo[currIdStr]);
+      console.log("existingPauseIndex", existingPauseIndex);
+      // Create new pause data
+      console.log("ev.extendedProps", ev.extendedProps);
+      
+      const newPauseData = {
+        id: ev.extendedProps.pauseid,
+        pporderid: Number(currId),
+        pauseduration: ev.extendedProps.pauseduration,
+        pausestartdate: ev.extendedProps.pausestartdate
+          ? dayjs(ev.extendedProps.pausestartdate).toDate()
+          : dayjs(ev.start as Date).toDate(),
+        pauseenddate: ev.extendedProps.pauseenddate
+          ? dayjs(ev.extendedProps.pauseenddate).toDate()
+          : dayjs(ev.end as Date).toDate(),
+      };
+      console.log("newPauseData", newPauseData);
+      console.log("pauseInfo", pauseInfo);
+      
+      if (existingPauseIndex === -1) {
+        // Add new pause to the array
+        pauseInfo[currIdStr].push(newPauseData);
       } else {
+        // Update existing pause - check if current end is later
         const currentEnd = new Date(
-          ev.extendedProps.pauseEndDate || (ev.end as Date),
+          ev.extendedProps.pauseendDate || (ev.end as Date),
         );
-        const existingEnd = pauseInfo[currIdStr].pauseenddate;
+        const existingEnd = pauseInfo[currIdStr][existingPauseIndex].pauseenddate;
         if (existingEnd && currentEnd > existingEnd) {
-          pauseInfo[currIdStr].pauseenddate = currentEnd;
+          pauseInfo[currIdStr][existingPauseIndex].pauseenddate = currentEnd;
+        
         }
       }
+      
       return;
     }
+
     const baseId = idStr.includes("-part-") ? idStr.split("-part-")[0] : idStr;
     const status = ev.extendedProps?.status;
 
@@ -128,15 +162,17 @@ export const handleUpdateAllEvents = async ({
         new Date(b.start as Date).getTime()
       );
     });
+    
     const firstStart = new Date(sorted[0].start as Date);
     const lastEnd = new Date(sorted[sorted.length - 1].end as Date);
     console.log("sorted", sorted);
+    
     const extra = offInfo[baseId];
-   const pauseExtra = pauseInfo[baseId];
+    const pauseExtras = pauseInfo[baseId] || []; // Get array of pauses
     let updatedOffInfo = extra;
-    let updatedPauseInfo = pauseExtra;
-console.log("dailyWorkingHours", dailyWorkingHours);
-    console.log("defaultWorkingHours", defaultWorkingHours);
+    
+    console.log("pauseExtras", pauseExtras);
+
     if (extra?.offtimeduration && extra.offtimestartdate) {
       const segments = splitEventIntoWorkingHours(
         dayjs(extra.offtimestartdate),
@@ -161,9 +197,11 @@ console.log("dailyWorkingHours", dailyWorkingHours);
           },
         },
       );
+      
       console.log("segments:", segments);
       console.log("segment start:", segments[0]?.start);
       console.log("segment end:", segments[segments.length - 1]?.end);
+      
       updatedOffInfo = {
         ...updatedOffInfo,
         offtimestartdate: dayjs(segments[0].start as any).toDate(),
@@ -173,45 +211,83 @@ console.log("dailyWorkingHours", dailyWorkingHours);
       };
     }
 
-    if (pauseExtra?.pauseduration && pauseExtra.pausestartdate) {
-      const segments = splitEventIntoWorkingHours(
-        dayjs(pauseExtra.pausestartdate),
-        pauseExtra.pauseduration,
-        dailyWorkingHours,
-        defaultWorkingHours,
-        {
-          id: `${baseId}-pause`,
-          title: `pause ${pauseExtra.pauseduration}m`,
-          color: "orange",
-          extendedProps: {
-            isPause: true,
-            currId: baseId,
-            pauseDuration: pauseExtra.pauseduration,
-          },
-        },
-      );
-      updatedPauseInfo = {
-        ...updatedPauseInfo,
-        pausestartdate: dayjs(segments[0].start as any).toDate(),
-        pauseenddate: dayjs(
-          segments[segments.length - 1].end as any,
-        ).toDate(),
-      };
-    }
     try {
+      // Update the PPOrder first
       await updatePporder(
         Number(baseId),
         dayjs(firstStart).toDate(),
         dayjs(lastEnd).toDate(),
         {
           ...updatedOffInfo,
-            ...updatedPauseInfo,
           status:
             group[0]?.extendedProps?.status === 1
               ? 14
               : group[0]?.extendedProps?.status,
         },
       );
+
+      console.log(`Successfully updated PPOrder ${baseId} with off info:`, updatedOffInfo);
+      
+      // Process all pauses for this PPOrder
+      if (pauseExtras.length > 0) {
+        console.log(`Processing ${pauseExtras.length} pauses for PPOrder ${baseId}`);
+        
+        // Sort pauses by end date to find the last one
+        const sortedPauses = pauseExtras.sort((a, b) => {
+          const endA = a.pauseenddate ? new Date(a.pauseenddate).getTime() : 0;
+          const endB = b.pauseenddate ? new Date(b.pauseenddate).getTime() : 0;
+          return endB - endA; // Descending order (latest first)
+        });
+        
+        const lastPauseEndDate = sortedPauses[0]?.pauseenddate;
+        console.log(`Last pause ends at: ${lastPauseEndDate}`);
+        console.log(`first pause start date: ${sortedPauses[0]?.pausestartdate}`);
+        
+        for (const pauseExtra of pauseExtras) {
+          let updatedPauseInfo: Partial<PanelMachinePause> = { ...pauseExtra };
+          
+          if (pauseExtra.pauseduration && pauseExtra.pausestartdate) {
+            const segments = splitEventIntoWorkingHours(
+              dayjs(pauseExtra.pausestartdate),
+              pauseExtra.pauseduration,
+              dailyWorkingHours,
+              defaultWorkingHours,
+              {
+                id: `${baseId}-pause-${pauseExtra.id}`,
+                title: `pause ${pauseExtra.pauseduration}m`,
+                color: "orange",
+                extendedProps: {
+                  isPause: true,
+                  currId: baseId,
+                  pauseduration: pauseExtra.pauseduration,
+                },
+              },
+            );
+            
+            updatedPauseInfo = {
+              ...updatedPauseInfo,
+              pausestartdate: dayjs(segments[0].start as any).toDate(),
+              pauseenddate: dayjs(
+                segments[segments.length - 1].end as any,
+              ).toDate(),
+            };
+          }
+          
+          // Update each pause individually
+          if (updatedPauseInfo.pausestartdate && pauseExtra.id) {
+            await updatePause({
+              id: Number(pauseExtra.id),
+              pporderid: Number(baseId),
+              pausestartdate: updatedPauseInfo.pausestartdate,
+              pauseenddate: updatedPauseInfo.pauseenddate,
+              pauseduration: pauseExtra.pauseduration,
+            });
+            
+            console.log(`Successfully updated pause ${pauseExtra.id} for PPOrder ${baseId}`);
+          }
+        }
+      }
+      
       console.log(`Successfully updated PPOrder ${baseId}`);
     } catch (error) {
       console.error(`Failed to update PPOrder ${baseId}:`, error);

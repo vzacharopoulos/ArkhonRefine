@@ -4,9 +4,11 @@ import {
   findNextWorkingTime,
   getWorkingHours,
   isWithinWorkingHours,
+  mergeSameDayEventParts,
   splitEventIntoWorkingHours,
 } from "../dateschedule-utils";
 import { WorkingHoursConfig } from "../productioncalendartypes";
+import { deduplicateEventIds } from "../event-utils";
 
 export function handleSaveEdit(
   selectedEvent: EventInput | null,
@@ -52,6 +54,17 @@ export function handleSaveEdit(
     };
   }
 
+   if (sorted[idx].extendedProps?.isPause) {
+    const newDuration = editEnd.diff(editStart, "minute");
+    updatedEvent.extendedProps = {
+      ...sorted[idx].extendedProps,
+      pauseduration: newDuration,
+      pausestartdate: dayjs(editStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+      pauseenddate: dayjs(editEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+    };
+  }
+
+
   sorted[idx] = updatedEvent;
 
   let prevEnd = editEnd;
@@ -82,95 +95,15 @@ export function handleSaveEdit(
     i += splitEvents.length - 1;
     prevEnd = dayjs(splitEvents[splitEvents.length - 1].end as Date);
   }
-
+deduplicateEventIds(sorted);
   return mergeSameDayEventParts(sorted);
 }
 
-function mergeSameDayEventParts(events: EventInput[]): EventInput[] {
-  const eventGroups = new Map<string, EventInput[]>();
+/**
+ * Merges events that are on the same day and consecutive.
+ * This is useful to avoid having multiple parts of the same event on the calendar.
+ * 
+ * @param events - Array of FullCalendar EventInput objects
+ * @returns Merged array of EventInput objects
+ */
 
-  events.forEach(event => {
-    if (!event.start || !event.id) return;
-
-    const eventDate = dayjs(event.start as Date).format("YYYY-MM-DD");
-    const baseId = event.id.toString().split("-part-")[0];
-    const groupKey = `${eventDate}-${baseId}`;
-
-    if (!eventGroups.has(groupKey)) {
-      eventGroups.set(groupKey, []);
-    }
-    eventGroups.get(groupKey)!.push(event);
-  });
-
-  const mergedEvents: EventInput[] = [];
-
-  eventGroups.forEach(group => {
-    if (group.length === 1) {
-      mergedEvents.push(group[0]);
-    } else {
-      const sortedParts = group.sort((a, b) =>
-        dayjs(a.start as Date).diff(dayjs(b.start as Date))
-      );
-
-      const firstPart = sortedParts[0];
-      const lastPart = sortedParts[sortedParts.length - 1];
-
-      mergedEvents.push({
-        ...firstPart,
-        id: firstPart.id!.split("-part-")[0],
-        start: firstPart.start,
-        end: lastPart.end,
-        title: firstPart.title?.replace(/ - μέρος \d+$/, '') || firstPart.title,
-      });
-    }
-  });
-
-  // 🔁 Renumber all part IDs and titles to ensure uniqueness
-// 🔁 Normalize work/offtime part IDs separately
-const normalizedEvents: EventInput[] = [];
-const workPartCounters = new Map<string, number>();
-const offtimePartCounters = new Map<string, number>();
-
-mergedEvents.forEach(ev => {
-  const originalId = ev.id?.toString() ?? "";
-  let baseId = "";
-
-  if (originalId.includes("-offtime-part-")) {
-    baseId = originalId.split("-offtime-part-")[0];
-  } else if (originalId.includes("-part-")) {
-    baseId = originalId.split("-part-")[0];
-  } else {
-    baseId = originalId;
-  }
-
-  const isOfftime = ev.extendedProps?.isOfftime === true;
-
-  // Separate counter for offtime and work
-  const counterMap = isOfftime ? offtimePartCounters : workPartCounters;
-  const count = counterMap.get(baseId) ?? 1;
-
-  const newId = isOfftime
-    ? `${baseId}-offtime-part-${count}`
-    : `${baseId}-part-${count}`;
-
-  counterMap.set(baseId, count + 1);
-
-  // Optional: Only update title for work segments
-  const newTitle = isOfftime
-    ? ev.title
-    : (ev.title?.replace(/ - μέρος \d+$/, '') ?? '') + ` - μέρος ${count}`;
-
-  normalizedEvents.push({
-    ...ev,
-    id: newId,
-    title: newTitle,
-    extendedProps: {
-      ...ev.extendedProps,
-      partIndex: count,
-    },
-  });
-});
-
-return normalizedEvents;
-
-}
