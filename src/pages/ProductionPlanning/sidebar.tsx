@@ -1,5 +1,5 @@
   import React, { useEffect, useMemo } from "react";
-import { Layout, Checkbox, Divider, Typography, List } from "antd";
+import { Layout, Checkbox, Divider, Typography, List, Button } from "antd";
 import { Draggable } from "@fullcalendar/interaction";
 import { EventInput, formatDate } from "@fullcalendar/core";
 import { PPOrder, PPOrderLine } from "./productioncalendartypes";
@@ -24,8 +24,10 @@ const { Title,Text  } = Typography;
     hours: number;
     minutes: number;
     formatted: string;
+
   };
-  totalMeter:number;
+  setPauseModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  totalMeter: number;
   }
   
   
@@ -34,6 +36,7 @@ const { Title,Text  } = Typography;
     onToggleWeekends,
     currentEvents,
     onToggleCurrentEvents,
+    setPauseModalOpen,
     unscheduledorders,
     selectedOrderId,
     onSelectOrder,
@@ -91,17 +94,19 @@ const { Title,Text  } = Typography;
         </div>
 
         <Divider />
-
-        <div className="demo-app-sidebar-section">
-          <Checkbox checked={weekendsVisible} onChange={onToggleWeekends}>
-            Toggle weekends
-          </Checkbox>
-        </div>
-        <div className="demo-app-sidebar-section">
-          <Checkbox checked={weekendsVisible} onChange={onToggleCurrentEvents}>
-            Toggle recent masters
-          </Checkbox>
-        </div>
+            <Button
+              type="primary"
+              size="middle"
+              shape="round"
+              onClick={() => setPauseModalOpen(true)}
+              style={{
+                background: "#bf9355ff",
+                border: "none"
+              }}
+            >
+              βάλε πάυση
+            </Button>
+       
 
 
         <Divider />

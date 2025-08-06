@@ -79,7 +79,7 @@ export const useFinishPporder = ({
 
 
   const handleFinish = async (order: PPOrder) => {
-    const now = dayjs("2025-07-24T21:40:00.000");
+      const now = dayjs("2025-08-09T10:00:00.000");
 
     if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
       const dateKey = now.format("YYYY-MM-DD");
@@ -155,27 +155,37 @@ export const useFinishPporder = ({
     console.log("currentEvents", currentEvents);
 
     // 1️⃣ Find the earliest job segment for this order
-    const jobEvents = currentEvents
-      .filter(
-        (ev) =>
-          ev.id &&
-          ev.id.toString().split("-part-")[0] === baseId &&
-          !ev.extendedProps?.isOfftime,
-      )
-      .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
-    const selectedEvent = jobEvents[0];
-    if (!selectedEvent) return;
+const jobEvents = currentEvents
+  .filter(
+    (ev) =>
+      ev.id &&
+      ev.id.toString().split("-part-")[0] === baseId &&
+      !ev.extendedProps?.isOfftime,
+  )
+  .sort((a, b) => dayjs(a.start as Date).diff(dayjs(b.start as Date)));
+const selectedEvent = jobEvents[0];
+if (!selectedEvent) return;
 
-    const editStart = dayjs(selectedEvent.start as Date);
+const editStart = dayjs(selectedEvent.start as Date);
 
-    // 2️⃣ Build the new events array
-    const updatedEvents = handleSaveEdit(
-      selectedEvent,
-      editStart,
-      now,
-      currentEvents,
-      dailyWorkingHours,
-      defaultWorkingHours,
+// 🔥 Only keep non-job events or the first job segment
+const filteredCurrentEvents = currentEvents.filter(ev => {
+  const isSameJob =
+    ev.id &&
+    !ev.id.toString().includes("offtime")&&
+    ev.id.toString().split("-part-")[0] === baseId &&
+    !ev.extendedProps?.isOfftime;
+  return !isSameJob || ev.id === selectedEvent.id;
+});
+
+// Then, use filteredCurrentEvents:
+const updatedEvents = handleSaveEdit(
+  selectedEvent,
+  editStart,
+  now,
+  filteredCurrentEvents, // 👈 Use filtered here!
+  dailyWorkingHours,
+  defaultWorkingHours,
     ).map((ev) => {
       const evBase = ev.id?.toString().split("-part-")[0];
       return evBase === baseId && !ev.extendedProps?.isOfftime
@@ -193,8 +203,23 @@ export const useFinishPporder = ({
     console.log("updatedEvents", updatedEvents);
     // Remove all existing events with same baseId (e.g. "123-part-0", "123-part-1", etc)
     const filteredEvents = updatedEvents.filter(
-      (ev) => !ev.id?.toString().startsWith(baseId)
-    );
+      (ev) => !ev.id?.toString().startsWith(baseId)&&
+      !ev.id?.toString().includes(String(selectedEvent.id)
+        )    );
+
+//         const filteredEvents = updatedEvents.filter(ev => {
+//   const idStr = ev.id?.toString() ?? "";
+//   // Remove if starts with baseId
+//   if (idStr.startsWith(baseId)) {
+//     return false;
+//   }
+//   // Remove if includes selectedId, unless exactly "selectedId-part-0"
+//   if (idStr.includes(selectedId)) {
+//     return idStr === `${selectedId}-part-0`;
+//   }
+//   // Keep all other events
+//   return true;
+// });
 
     // 🟢 3. Sort updated segments by start date
     const sorted = filteredEvents
@@ -206,6 +231,24 @@ export const useFinishPporder = ({
  const secondSegment = sorted[1];
     if (!firstSegment || !firstSegment.start || !firstSegment.end) {
       console.warn("First segment is missing start or end date.");
+      
+       updatePporder({
+      resource: "pporders",
+      id: order.id,
+      values: {
+        estFinishDate: dayjs(now).format('YYYY-MM-DDTHH:mm:ssZ'),
+        finishDateDatetime: dayjs(now).format('YYYY-MM-DDTHH:mm:ssZ'),
+        status: 4,
+      
+      },
+      meta: {
+        gqlMutation: UPDATE_PPORDERS,
+      },
+    });
+await refetchFinished
+await refetchPporders
+setCurrentEvents(currentEvents)
+  
       return;
     }
     let i=1

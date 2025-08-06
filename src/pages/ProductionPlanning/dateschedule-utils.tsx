@@ -305,11 +305,18 @@ export function splitEventIntoWorkingHours(
     const config =
       dailyWorkingHours[dateKey] ?? defaultWorkingHours[day] ?? fallbackConfig;
 
+
     if (!config.isWorkingDay) {
-      current = current
-        .add(1, "day")
-        .hour(config.startHour)
-        .minute(config.startMinute)
+     
+     const nextDay = current.add(1, "day");
+      const nextConfig =
+        dailyWorkingHours[nextDay.format("YYYY-MM-DD")] ??
+        defaultWorkingHours[nextDay.day()] ??
+        fallbackConfig;
+
+      current = nextDay
+        .hour(nextConfig.startHour)
+        .minute(nextConfig.startMinute)
         .second(0);
       continue;
     }

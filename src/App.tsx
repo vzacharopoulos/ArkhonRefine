@@ -32,10 +32,10 @@ import { ForgotPassword } from "./pages/forgotPassword";
 import { CustomLoginPage } from "./pages/login";
 import { Register } from "./pages/register";
 import { Layout } from "./components/layout";
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import TestingList, { CoilList } from "./pages/coillist/CoilList";
-import { CalendarMonthOutlined, ShopOutlined, ScienceOutlined } from "@mui/icons-material";
+import{ BarcodeOutlined, CalendarOutlined, DashboardOutlined, UnorderedListOutlined} from "@ant-design/icons"; 
 import {CoilShow} from "./pages/coillist/Coilshow";
+
 import { CoilEdit } from "./pages/coillist/CoilEdit";
 import { Calendar } from "antd";
 import { ProductionCalendar } from "./pages/ProductionPlanning/calendarpage";
@@ -70,7 +70,7 @@ function App() {
                    
                    meta:{
                    label:'Μηχανή Πάνελ',
-                   icon: <ScienceOutlined />,
+                   icon: <DashboardOutlined />,
 
                    }
                   },
@@ -82,15 +82,17 @@ function App() {
                     edit: "/coil/edit/:id",
                     meta: {
                       label: "coil",
-                      icon: <FormatListBulletedIcon />,
+                      icon: <BarcodeOutlined />,
                     },
                   },
                            {
                     name: "panelProductionOrdersExt2s",
                     list: "/panelProductionOrdersExt2s",
+                    
                     meta: {
                       label: "λιστες κτλ...",
-                      icon: <ShopOutlined />,
+                      icon: <UnorderedListOutlined />,
+                      
                     },
                   },
                   {
@@ -98,13 +100,13 @@ function App() {
                     list:"/scheduling",
                      meta: {
                       label: "Προγραμματισμος",
-                      icon: <CalendarMonthOutlined />,
+                      icon: <CalendarOutlined />,
                     },
 
 
 
 
-                        icon:<CalendarMonthOutlined/>
+                        // icon:<CalendarMonthOutlined/>
                   }
 
                 ]}

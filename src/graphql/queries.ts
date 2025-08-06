@@ -50,6 +50,27 @@ mutation UpdatePauseDetails($input: UpdatePauseDetailsInput!) {
   }
 }`
 
+export const CREATE_COMPLETE_PAUSE = gql`
+  mutation CreateCompletePause($input: CreateCompletePauseInput!) {
+    createCompletePause(input: $input) {
+      id
+      pporderid
+      pausestartdate
+      pauseenddate
+      pauseduration
+      pausecomment
+    }
+  }
+`;
+
+
+export const DELETE_MACHINE_PAUSE = gql`
+  mutation DeleteMachinePause($id: Int!) {
+    deleteMachinePause(id: $id)
+  }
+`;
+
+
 export const UPDATE_PPORDERS = gql`
 mutation updatePporder($input: UpdatePporderInput!) {
   updatePporder(input: $input) {

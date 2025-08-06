@@ -14,7 +14,7 @@ import { STATUS_MAP, statusColorMap, StatusTag } from "@/utilities/map-status-id
 import duration from "dayjs/plugin/duration";
 import { finishedPporders, PanelMachinePause, PPOrder, PPOrderLine, WorkingHoursConfig } from "./productioncalendartypes";
 import { Sidebar } from "./sidebar";
-import { EditOutlined } from "@ant-design/icons";
+import { EditOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import isBetween from 'dayjs/plugin/isBetween';
 import { addWorkingMinutes, addWorkingMinutesDynamic, calculateWorkingMinutesBetween, findLastEventEndTime, findNextWorkingTime, generateNonWorkingHourBackgroundEvents, getWorkingHours, isWithinWorkingHours, mergeSameDayEventParts, splitEventIntoWorkingHours } from "./dateschedule-utils";
 import { calculateTotalLength, calculateTotalTime, chainEventsSequentially, deduplicateEventIds, EventTooltip } from "./event-utils";
@@ -47,6 +47,10 @@ import { dummyEvents, SetCurrentEventsButton } from "./buttons/setcurrenteventsb
 import { SlotSettingsPopover } from "./buttons/slotsettingspopover";
 import { co } from "@fullcalendar/core/internal-common";
 import { useUpdatePause } from "@/hooks/useUpdatePause";
+import PauseModal from "@/components/modals/pausemodal";
+import { useCreatePause } from "@/hooks/useCreatePause";
+import { useDeletePause } from "@/hooks/useDeletePause";
+import { EnergySavingsLeafTwoTone } from "@mui/icons-material";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -79,7 +83,7 @@ export const ProductionCalendar: React.FC = () => {
   const { updateDailyWorkingHours } = useUpdateDailyWorkingHours();
 
   const { updatePporder } = useUpdatePporder();
-    const { updatePause } = useUpdatePause();
+  const { updatePause } = useUpdatePause();
 
   // Then create a function to handle the mutation:
   const handleUpdatePporder = async (
@@ -108,11 +112,50 @@ export const ProductionCalendar: React.FC = () => {
     }
   };
 
+
+
   const handlePersistWorkingHours = async (date: Dayjs, config: WorkingHoursConfig) => {
     try {
       await updateDailyWorkingHours(date.format('YYYY-MM-DD'), config);
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const { deletePause, error: deletePauseError, isLoading: isdeletingPause } = useDeletePause();
+
+
+
+  const { createPause, error, isLoading } = useCreatePause();
+
+  const handleSavePause = async () => {
+    if (!selectedPausePpOrderId || !pauseStart || !pauseEnd) return;
+
+    const duration = calculateWorkingMinutesBetween
+      (pauseStart, pauseEnd, dailyWorkingHours, defaultWorkingHours);
+    console.log("Creating pause for order:", selectedPausePpOrderId, "from", pauseStart, "to", pauseEnd, "duration:", duration);
+
+    try {
+      await createPause({
+        pporderid: selectedPausePpOrderId,
+        pausestartdate: pauseStart.toDate(),
+        pauseenddate: pauseEnd.toDate(),
+        pauseduration: duration,
+        pausecomment: pauseComment,
+      });
+
+      message.success('Pause created successfully');
+      setPauseModalOpen(false);
+      refetchPporders(); // Refresh the pporders to include the new pause
+      // Optional: Reset form state
+      setPauseStart(null);
+      setPauseEnd(null);
+      setPauseComment("");
+      setSelectedPausePpOrderId(null);
+
+    } catch (error) {
+      console.error('Failed to create pause:', error);
+      message.error('Failed to create pause. Please try again.');
     }
   };
 
@@ -154,17 +197,19 @@ export const ProductionCalendar: React.FC = () => {
         const previousCode = deletedOrder.prevpanelcode?.replace(/-001$/, "");
         const currentCode = nextOrder.panelcode?.replace(/-001$/, "");
         const offtimeduration = offTimeMap?.[previousCode ?? 0]?.[currentCode ?? 0] ?? 30;
-
+        const offtimeenddate = addWorkingMinutesDynamic(dayjs(deletedOrder.offtimestartdate),offtimeduration,dailyWorkingHours,defaultWorkingHours)
 
         await updatePporder(nextOrder.id, {
           offtimeduration: offtimeduration ?? null,
+         estStartDate:offtimeenddate,
+         estFinishDate:addWorkingMinutesDynamic(offtimeenddate,totalTimeByOrderId[nextOrder.id].totalMinutes??0 ,dailyWorkingHours,defaultWorkingHours),
           offtimestartdate: deletedOrder.offtimestartdate ?? null,
-          offtimeenddate: deletedOrder.offtimeenddate ?? null,
+          offtimeenddate: offtimeenddate?? null,
           previd: deletedOrder.previd ?? null,
           prevpanelcode: deletedOrder.prevpanelcode ?? null,
         });
       }
-      await refetchPporders();
+     
       // Filter out the deleted order and its parts from the currentEvents
       const updatedEvents = currentEvents.filter(ev => {
         const evId = ev.id?.toString();
@@ -173,7 +218,7 @@ export const ProductionCalendar: React.FC = () => {
 
       // Optional: filter out incomplete events (without start or end)
       const validEvents = updatedEvents.filter(ev => ev.start && ev.end);
-
+console.log("valid events",validEvents)
       // Chain remaining events
       const chainedEvents = chainEventsSequentially(validEvents, dailyWorkingHours, defaultWorkingHours);
 
@@ -208,6 +253,15 @@ export const ProductionCalendar: React.FC = () => {
   const [editStart, setEditStart] = useState<Dayjs | null>(null);
   const [editEnd, setEditEnd] = useState<Dayjs | null>(null);
   const manualSyncRef = useRef<boolean>(false);
+  const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [pauseStart, setPauseStart] = useState<Dayjs | null>(null);
+  const [pauseEnd, setPauseEnd] = useState<Dayjs | null>(null);
+  const [pauseComment, setPauseComment] = useState("");
+  const [selectedPausePpOrderId, setSelectedPausePpOrderId] = useState<number | null>(null);
+  const [selectedPausePpOrderTitle, setSelectedPausePpOrderTitle] = useState<string | null>(null);
+
+
+
 
   const [droppedIds, setDroppedIds] = useState<Set<string>>(new Set());
   const droppedIdsRef = useRef<Set<string>>(new Set());
@@ -280,8 +334,8 @@ export const ProductionCalendar: React.FC = () => {
     0: {
       startHour: 0,
       startMinute: 0,
-      endHour: 0,
-      endMinute: 0,
+      endHour: 23,
+      endMinute: 59,
       isWorkingDay: false,
     }, // Sunday is off
   });
@@ -311,6 +365,46 @@ export const ProductionCalendar: React.FC = () => {
       setDailyWorkingHours(mapped);
     }
   }, [workingHoursData?.data]);
+
+
+
+
+
+
+  useEffect(() => {//when you set pauseStart, find the event that contains it and set selectedPausePpOrderId
+    if (!!pauseStart && currentEvents) {
+      // Find the event that contains the pause start time
+      console.log("Finding containing event for pause start:", pauseStart.format("YYYY-MM-DD HH:mm:ss"));
+      console.log("Current events:", currentEvents);
+      const containingEvent = currentEvents.find(event => {
+        if (!event.start || !event.end) return false;
+
+        const eventStart = dayjs(event.start as Date);
+        const eventEnd = dayjs(event.end as Date);
+
+        // Check if pauseStart falls within this event's time range
+        return pauseStart.isSameOrAfter(eventStart) && pauseStart.isBefore(eventEnd);
+      });
+
+      if (containingEvent) {
+        // Extract the PPOrder ID from the event
+        const ppOrderId = containingEvent.extendedProps?.currId ||
+          containingEvent.id?.toString().split("-part-")[0];
+
+        if (ppOrderId) {
+          setSelectedPausePpOrderId(Number(ppOrderId));
+          setSelectedPausePpOrderTitle(containingEvent.title || "Unknown Order");
+          console.log("Found containing event:", containingEvent);
+          console.log("Selected PPOrder ID:", ppOrderId);
+        }
+      } else {
+        // No event found containing this time
+        setSelectedPausePpOrderId(null);
+        setSelectedPausePpOrderTitle("βαλτε παύση");
+        console.log("No event found containing pause start time");
+      }
+    }
+  }, [pauseStart]);
   // Temporary state for modal
   const [tempWorkingHours, setTempWorkingHours] = useState<WorkingHoursConfig>({
     startHour: 6,
@@ -377,9 +471,10 @@ export const ProductionCalendar: React.FC = () => {
 
   const totalTimeByOrderId = useMemo(() => {
     const map: Record<number, { hours: number; minutes: number; formatted: string; totalMinutes: number }> = {};
-
     unscheduledorders.forEach(order => {
       const lines = orderLines.filter(line => line.pporderno === order.pporderno);
+      // if(lines.length!=0){
+      // console.log(lines)}
       const time = calculateTotalTime(lines);
       const totalMinutes = time.hours * 60 + time.minutes;
       map[order.id] = {
@@ -387,6 +482,7 @@ export const ProductionCalendar: React.FC = () => {
         totalMinutes,
       };
     });
+    console.log(map)
     return map;
   }, [unscheduledorders, orderLines]);
 
@@ -408,7 +504,7 @@ export const ProductionCalendar: React.FC = () => {
     const processed: EventInput[] = [];
 
 
-  
+
 
     let prevEnd: Dayjs | null = null;
     preScheduled.forEach(order => {
@@ -476,124 +572,148 @@ export const ProductionCalendar: React.FC = () => {
           : findNextWorkingTime(prevEnd, dailyWorkingHours, defaultWorkingHours);
       }
       duration ? duration : totalTimeByOrderId
-       let segments: EventInput[] = [];
+      let segments: EventInput[] = [];
 
-    // CORRECTED: Handle multiple pauses
-    const pauses = order.pauses || [];
-    
-    if (pauses.length > 0) {
-      // Sort pauses by start date to process them chronologically
-      const sortedPauses = pauses
-        .filter(pause => pause.pauseduration && pause.pausestartdate && pause.pauseenddate)
-        .sort((a, b) => dayjs(a.pausestartdate as Date).diff(dayjs(b.pausestartdate as Date)));
+      // CORRECTED: Handle multiple pauses
+      const pauses = order.pauses || [];
 
-      if (sortedPauses.length > 0) {
-        let currentStart = start;
-        
-        sortedPauses.forEach((pause, index) => {
-          const pauseStart = dayjs(pause.pausestartdate as Date);
-          const pauseEnd = dayjs(pause.pauseenddate as Date);
-          
-          // Create work segment before this pause
-          if (currentStart.isBefore(pauseStart)) {
-            const beforeDuration = calculateWorkingMinutesBetween(
-              currentStart,
+      if (pauses.length > 0) {
+        // Sort pauses by start date to process them chronologically
+        const sortedPauses = pauses
+          .filter(pause => pause.pauseduration && pause.pausestartdate && pause.pauseenddate)
+          .sort((a, b) => dayjs(a.pausestartdate as Date).diff(dayjs(b.pausestartdate as Date)));
+
+        if (sortedPauses.length > 0) {
+          let currentStart = start;
+
+          sortedPauses.forEach((pause, index) => {
+            const pauseStart = dayjs(pause.pausestartdate as Date);
+            const pauseEnd = dayjs(pause.pauseenddate as Date);
+
+            // Create work segment before this pause
+            if (currentStart.isBefore(pauseStart)) {
+              const beforeDuration = calculateWorkingMinutesBetween(
+                currentStart,
+                pauseStart,
+                dailyWorkingHours,
+                defaultWorkingHours,
+              );
+
+              const beforeSegments = splitEventIntoWorkingHours(
+                currentStart,
+                beforeDuration,
+                dailyWorkingHours,
+                defaultWorkingHours,
+                {
+                  id: `${order.id}-work-${index}`,
+                  title: `${order.pporderno} - ${order.panelcode}`,
+                  color: statusColorMap[order.status ?? 0] || "gray",
+                  extendedProps: {
+                    ...order,
+                    panelcode: order.panelcode,
+                    status: order.status,
+                    tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""} (Part ${index + 1})
+                    κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
+                    εκτ. ωρα έναρξης: ${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
+                    εκτ. ωρα λήξης: ${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
+                    θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}`,
+                  },
+                },
+              );
+              segments.push(...beforeSegments);
+            }
+
+            // Create pause segment
+            const pauseSegments = splitEventIntoWorkingHours(
               pauseStart,
-              dailyWorkingHours,
-              defaultWorkingHours,
-            );
-            
-            const beforeSegments = splitEventIntoWorkingHours(
-              currentStart,
-              beforeDuration,
+              pause.pauseduration || 0,
               dailyWorkingHours,
               defaultWorkingHours,
               {
-                id: `${order.id}-work-${index}`,
+                id: `${order.id}-pause-${index}`,
+                start: pauseStart.toDate(),
+                end: pauseEnd.toDate(),
+                title: `παυση ${index + 1}, ${pause.pausecomment}`,
+                color: "orange",
+                extendedProps: {
+                  isPause: true,
+                  pauseid: pause.id,
+                  currId: order.id.toString(),
+                  pauseduration: pause.pauseduration,
+                  pausestartdate: dayjs(pauseStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+                  pauseenddate: dayjs(pauseEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+                  tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""} (Pause ${index + 1})
+                  σχολιο: ${pause.pausecomment || "—"}
+                  ωρα έναρξης: ${dayjs(pause.pausestartdate).format("YYYY-MM-DD HH:mm") || "—"}
+                  ωρα λήξης: ${dayjs(pause.pauseenddate).format("YYYY-MM-DD HH:mm") || "—"}
+                  χρόνος: ${pause.pauseduration || "0"} Λεπτά`,
+                },
+              },
+            );
+            segments.push(...pauseSegments);
+
+            // Update current start for next iteration
+            currentStart = pauseEnd;
+          });
+
+          // Create final work segment after all pauses
+          if (currentStart.isBefore(end)) {
+            const afterDuration = calculateWorkingMinutesBetween(
+              currentStart,
+              end,
+              dailyWorkingHours,
+              defaultWorkingHours,
+            );
+
+            const afterSegments = splitEventIntoWorkingHours(
+              currentStart,
+              afterDuration,
+              dailyWorkingHours,
+              defaultWorkingHours,
+              {
+                id: `${order.id}-work-final`,//this is important due to deduplicateeventids
                 title: `${order.pporderno} - ${order.panelcode}`,
                 color: statusColorMap[order.status ?? 0] || "gray",
                 extendedProps: {
                   ...order,
                   panelcode: order.panelcode,
                   status: order.status,
-                  tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""} (Part ${index + 1})
-                    κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
-                    εκτ. ωρα έναρξης: ${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
-                    εκτ. ωρα λήξης: ${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
-                    θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}`,
+                  tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""} (Final Part)
+                  κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
+                  εκτ. ωρα έναρξης: ${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
+                  εκτ. ωρα λήξης: ${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
+                  θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}`,
                 },
               },
             );
-            segments.push(...beforeSegments);
+            segments.push(...afterSegments);
           }
-          
-          // Create pause segment
-          const pauseSegments = splitEventIntoWorkingHours(
-            pauseStart,
-            pause.pauseduration|| 0,
+        } else {
+          // No valid pauses, create single work segment
+          segments = splitEventIntoWorkingHours(
+            start,
+            duration,
             dailyWorkingHours,
             defaultWorkingHours,
             {
-              id: `${order.id}-pause-${index}`,
-              start: pauseStart.toDate(),
-              end: pauseEnd.toDate(), 
-              title: `παυση ${index + 1}, ${pause.pausecomment}`,
-              color: "orange",
-              extendedProps: {
-                isPause: true,
-                pauseid: pause.id,
-                currId: order.id.toString(),
-                pauseduration: pause.pauseduration,
-                pausestartdate: dayjs(pauseStart).format('YYYY-MM-DDTHH:mm:ssZ'),
-                pauseenddate: dayjs(pauseEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
-                tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""} (Pause ${index + 1})
-                  σχολιο: ${pause.pausecomment || "—"}
-                  ωρα έναρξης: ${dayjs(pause.pausestartdate).format("YYYY-MM-DD HH:mm") || "—"}
-                  ωρα λήξης: ${dayjs(pause.pauseenddate).format("YYYY-MM-DD HH:mm") || "—"}
-                  χρόνος: ${pause.pauseduration || "0"} Λεπτά`,
-              },
-            },
-          );
-          segments.push(...pauseSegments);
-          
-          // Update current start for next iteration
-          currentStart = pauseEnd;
-        });
-
-        // Create final work segment after all pauses
-        if (currentStart.isBefore(end)) {
-          const afterDuration = calculateWorkingMinutesBetween(
-            currentStart,
-            end,
-            dailyWorkingHours,
-            defaultWorkingHours,
-          );
-          
-          const afterSegments = splitEventIntoWorkingHours(
-            currentStart,
-            afterDuration,
-            dailyWorkingHours,
-            defaultWorkingHours,
-            {
-              id: `${order.id}-work-final`,
+              id: String(order.id),
               title: `${order.pporderno} - ${order.panelcode}`,
               color: statusColorMap[order.status ?? 0] || "gray",
               extendedProps: {
                 ...order,
                 panelcode: order.panelcode,
                 status: order.status,
-                tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""} (Final Part)
-                  κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
-                  εκτ. ωρα έναρξης: ${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
-                  εκτ. ωρα λήξης: ${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
-                  θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}`,
+                tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}
+                κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
+                εκτ. ωρα έναρξης: ${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
+                εκτ. ωρα λήξης: ${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
+                θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}`,
               },
-            },
+            }
           );
-          segments.push(...afterSegments);
         }
       } else {
-        // No valid pauses, create single work segment
+        // No pauses, create single work segment
         segments = splitEventIntoWorkingHours(
           start,
           duration,
@@ -608,48 +728,24 @@ export const ProductionCalendar: React.FC = () => {
               panelcode: order.panelcode,
               status: order.status,
               tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}
-                κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
-                εκτ. ωρα έναρξης: ${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
-                εκτ. ωρα λήξης: ${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
-                θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}`,
-            },
-          }
-        );
-      }
-    } else {
-      // No pauses, create single work segment
-      segments = splitEventIntoWorkingHours(
-        start,
-        duration,
-        dailyWorkingHours,
-        defaultWorkingHours,
-        {
-          id: String(order.id),
-          title: `${order.pporderno} - ${order.panelcode}`,
-          color: statusColorMap[order.status ?? 0] || "gray",
-          extendedProps: {
-            ...order,
-            panelcode: order.panelcode,
-            status: order.status,
-            tooltip: `${order.pporderno ?? ""} - ${order.panelcode ?? ""}
               κατάσταση: ${STATUS_MAP[order.status || 0] || "Άγνωστη"}
               εκτ. ωρα έναρξης: ${dayjs(order.estStartDate).format("YYYY-MM-DD HH:mm") || "—"}
               εκτ. ωρα λήξης: ${dayjs(order.estFinishDate).format("YYYY-MM-DD HH:mm") || "—"}
               θεωρητικός χρόνος: ${totalTimeByOrderId[order.id]?.formatted || "0h 0m"}`,
-          },
-        }
-      );
-    }
+            },
+          }
+        );
+      }
 
-    const deduplicatedSegments = deduplicateEventIds(segments);
-    mergeSameDayEventParts(deduplicatedSegments);
-    processed.push(...deduplicatedSegments);
-    prevEnd = dayjs(deduplicatedSegments[deduplicatedSegments.length - 1].end as Date) ?? dayjs();
-  });
+      const deduplicatedSegments = deduplicateEventIds(segments);
+      mergeSameDayEventParts(deduplicatedSegments);
+      processed.push(...deduplicatedSegments);
+      prevEnd = dayjs(deduplicatedSegments[deduplicatedSegments.length - 1].end as Date) ?? dayjs();
+    });
 
-  setCurrentEvents(processed);
-  manualSyncRef.current = false;
-}, [unscheduledorders, dailyWorkingHours, defaultWorkingHours, manualSyncRef]);
+    setCurrentEvents(processed);
+    manualSyncRef.current = false;
+  }, [unscheduledorders, dailyWorkingHours, defaultWorkingHours, manualSyncRef]);
 
 
   const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
@@ -720,7 +816,7 @@ export const ProductionCalendar: React.FC = () => {
 
 
       let segments: EventInput[] = [];
-            const pause = order.pauses?.[0];
+      const pause = order.pauses?.[0];
       if (
         pause?.pauseduration &&
         pause.pausestartdate &&
@@ -869,7 +965,7 @@ export const ProductionCalendar: React.FC = () => {
       dailyWorkingHours,
       defaultWorkingHours,
       updatePporder: handleUpdatePporder,
-       updatePause: handleUpdatePause,
+      updatePause: handleUpdatePause,
     });
 
 
@@ -889,7 +985,7 @@ export const ProductionCalendar: React.FC = () => {
       dailyWorkingHours,
       defaultWorkingHours,
       updatePporder: handleUpdatePporder,
-       updatePause: handleUpdatePause,
+      updatePause: handleUpdatePause,
 
     });
   };
@@ -930,6 +1026,7 @@ export const ProductionCalendar: React.FC = () => {
     <TotalTimeProvider value={{ totalTimeByOrderId }}>
       <Layout style={{ padding: 12, display: "flex", gap: 24 }}>
         <Sider width={300} style={{ background: "#fff", padding: 12 }}>
+          
           <Sidebar
             weekendsVisible={weekendsVisible}
             onToggleWeekends={handleWeekendsToggle}
@@ -937,6 +1034,7 @@ export const ProductionCalendar: React.FC = () => {
             currentEvents={currentEvents}
             onToggleCurrentEvents={handleCurrentEventToggle}
             selectedOrderId={selectedOrderId}
+            setPauseModalOpen={setPauseModalOpen}
             onSelectOrder={(id) => {
               setSelectedOrderId(id);
               const order = unscheduledorders.find((o) => o.id === id);
@@ -970,12 +1068,28 @@ export const ProductionCalendar: React.FC = () => {
           maxHeight: "auto", // Maximum height
           overflow: "scroll", // Enable scrolling if content overflows
         }}>
-          <SlotSettingsPopover
-            slotDurationLabel={slotDurationLabel}
-            toggleSlotDuration={toggleSlotDuration}
-            slotModeLabel={slotModeLabel}
-            toggleSlotMinMax={toggleSlotMinMax}
-          />
+ <div style={{ display: "flex", alignItems: "start", gap: 10, marginBottom: 16 ,marginLeft:500
+ }}>
+ 
+          <Checkbox checked={weekendsVisible} onChange={handleWeekendsToggle}>
+           με/χωρίς σ/κ
+          </Checkbox>
+      
+        
+          <Checkbox checked={weekendsVisible} onChange={handleCurrentEventToggle}>
+            βάλτες ξανά σε σειρά
+                        <ExclamationCircleOutlined style={{ color: "#ff4d4f",marginLeft:5 }} />
+
+          </Checkbox>
+        
+  <SlotSettingsPopover
+    slotDurationLabel={slotDurationLabel}
+    toggleSlotDuration={toggleSlotDuration}
+    slotModeLabel={slotModeLabel}
+    toggleSlotMinMax={toggleSlotMinMax}
+  />
+</div>
+          
           <ProductionCalendarView
             events={[
               ...finishedEvents,
@@ -1005,12 +1119,66 @@ export const ProductionCalendar: React.FC = () => {
           event={selectedEvent}
           editStart={editStart}
           editEnd={editEnd}
-          onCancel={() => setEditModalOpen(false)}
+          onCancel={() => {
+            setEditModalOpen(false)
+            console.log("Deleting pause event:", selectedEvent?.id);
+
+
+          }
+
+          }
           onDelete={async () => {
             if (!selectedEvent) return;
+            if (selectedEvent.extendedProps?.isPause === true) {
+              console.log("Deleting pause event:", selectedEvent.id);
+              const success = await deletePause(Number(selectedEvent.extendedProps.pauseid));
+              //  await updatePporder(selectedEvent.extendedProps?.currId,
+              //      {
+              //        estFinishDate: selectedEvent.extendedProps.pauseduration.diff(selectedEvent.end),
+
+              //   });
+              // Step 1: Get relevant events
+              const relatedEvents = currentEvents.filter(ev =>
+                ev.extendedProps?.currId === selectedEvent.extendedProps?.currId
+              );
+
+              // Step 2: Find the latest event based on end date
+
+              const lastEvent = relatedEvents.reduce<EventInput | null>((latest, ev) =>
+                !latest || new Date(ev.end as Date) > new Date(latest.end as Date) ? ev : latest
+                , null);
+
+              // Step 3: Calculate new estFinishDate
+              const newEstFinishDate = selectedEvent.extendedProps.pauseduration
+                ? selectedEvent.extendedProps.pauseduration.subtract(lastEvent?.end, "minutes")
+                : null;
+
+              // Step 4: Update pporder if all good
+              if (success && newEstFinishDate) {
+                await updatePporder(selectedEvent.extendedProps?.currId, {
+                  estFinishDate: newEstFinishDate,
+                });
+              }
+
+
+
+
+
+
+
+              if (success) {
+                message.success("Pause deleted");
+                refetchPporders();
+                setEditModalOpen(false);
+                // Optionally update currentEvents
+              } else {
+                message.error("Failed to delete pause");
+              }
+              return;
+            }
 
             // Optional: persist the reset to your backend
-            console.log("selectedEvent.id", (selectedEvent.id as string).split('-')[0]);
+            console.log("selectedEvent.id", (selectedEvent.id as string));
             handleUnschedulePporder(selectedEvent.id, selectedEvent.extendedProps?.previd)
             // const updatedevents= await handleCurrentEventToggle();
             // setCurrentEvents(updatedevents);
@@ -1056,6 +1224,22 @@ export const ProductionCalendar: React.FC = () => {
 
           )}
         />
+        <PauseModal
+          dailyWorkingHours={dailyWorkingHours}
+          defaultWorkingHours={defaultWorkingHours}
+          selectedPausePpOrderId={selectedPausePpOrderId}
+          selectedPausePpOrderTitle={selectedPausePpOrderTitle}
+          open={pauseModalOpen}
+          start={pauseStart}
+          end={pauseEnd}
+          comment={pauseComment}
+          onChangeStart={setPauseStart}
+          onChangeEnd={setPauseEnd}
+          onChangeComment={setPauseComment}
+          onCancel={() => setPauseModalOpen(false)}
+          onOk={handleSavePause}
+        />
+
         <UpdateAllButton onClick={() => handleUpdateAll()} />
         <SetCurrentEventsButton events={[
 

@@ -111,7 +111,7 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs("2025-07-28T12:00:00.000");
+      const now = dayjs("2025-08-08T23:00:00.000");
     if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
       const dateKey = now.format("YYYY-MM-DD");
       const existingConfig = dailyWorkingHours[dateKey];
@@ -155,7 +155,8 @@ export const useStartPporder = ({
           ),
         )
         .pop();
-
+      console.log("lastFinishedstart", dayjs(lastFinished?.startDateDatetime));
+      console.log("lastFinishedend", dayjs(lastFinished?.finishDateDatetime));
       const offStart = lastFinished?.finishDateDatetime
         ? dayjs(lastFinished.finishDateDatetime)
         : null;

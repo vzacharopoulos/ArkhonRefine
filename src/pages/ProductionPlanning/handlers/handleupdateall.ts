@@ -86,7 +86,8 @@ export const handleUpdateAllEvents = async ({
 
       const currId = ev.extendedProps.currId || idStr.split("-part-")[0];
       const currIdStr = currId.toString();
-     ev.extendedProps.pausestartdate=ev.start as Date;
+     ev.extendedProps.pausestartdate=ev.start as Date;//POSSIBLe mistake, should be set to start date
+     ev.extendedProps.pauseenddate=ev.end as Date;//POSSIBLe mistake, should be set to end date
       ev.extendedProps.pauseenddate=ev.end as Date;
        console.log("pauseInfo[currIdStr]", pauseInfo[currIdStr]);
       // Initialize array if it doesn't exist
