@@ -42,6 +42,11 @@ export const PpordersBoxList: React.FC = () => {
             <PporderBox order={order} />
           </Col>
         ))}
+        {pporders.length === 0 && !ppordersError && (
+          <Col span={24}>
+            <Alert message="No PP Orders found" type="info" showIcon />
+          </Col>
+        )}
       </Row>
     </div>
   );
