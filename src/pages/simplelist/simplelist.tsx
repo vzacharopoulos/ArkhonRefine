@@ -1,7 +1,7 @@
 import React from "react";
 import { CrudSort, useList } from "@refinedev/core";
 import { List } from "@refinedev/antd";
-import { Badge, Button, Input, Table } from "antd";
+import { Badge, Button, Input, Table, Card, Row, Col, Spin, Alert } from "antd";
 import gql from "graphql-tag";
 import { PanelProductionOrderExt2 } from "./prodplanningtypes";
 import { useTable } from "@refinedev/antd";
@@ -9,8 +9,166 @@ import dayjs from "dayjs";
 import { ClearOutlined, EditOutlined } from "@ant-design/icons";
 import { co } from "@fullcalendar/core/internal-common";
 import {Typography} from "antd";
+import { usePporders } from "@/hooks/usePporders";
+import { usePporderLinesArray } from "@/hooks/usePporderLinesArray";
 
 const { Title, Text } = Typography;
+
+// New component for pporders box layout
+export const PpordersBoxList: React.FC = () => {
+  const { data: ppordersData, isLoading: ppordersLoading, error: ppordersError } = usePporders();
+
+  if (ppordersLoading) {
+    return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', padding: '50px' }} />;
+  }
+
+  // Show mock data if there's an error (API not available)
+  const pporders = ppordersData?.data?.pporders || (ppordersError ? mockPporders : []);
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <Title level={2}>PP Orders and Order Lines</Title>
+      {ppordersError && (
+        <Alert 
+          message="API not available - showing mock data" 
+          type="warning" 
+          showIcon 
+          style={{ marginBottom: '20px' }}
+        />
+      )}
+      <Row gutter={[16, 16]}>
+        {pporders.map((order) => (
+          <Col key={order.id} xs={24} sm={12} lg={8} xl={6}>
+            <PporderBox order={order} />
+          </Col>
+        ))}
+        {pporders.length === 0 && !ppordersError && (
+          <Col span={24}>
+            <Alert message="No PP Orders found" type="info" showIcon />
+          </Col>
+        )}
+      </Row>
+    </div>
+  );
+};
+
+// Mock data for demonstration when API is not available
+const mockPporders = [
+  {
+    id: 1,
+    pporderno: "POR001",
+    panelcode: "PANEL001",
+    status: 1,
+    estStartDate: "2025-01-15T08:00:00Z",
+    estFinishDate: "2025-01-15T16:00:00Z"
+  },
+  {
+    id: 2,
+    pporderno: "POR002", 
+    panelcode: "PANEL002",
+    status: 2,
+    estStartDate: "2025-01-16T08:00:00Z",
+    estFinishDate: "2025-01-16T18:00:00Z"
+  },
+  {
+    id: 3,
+    pporderno: "POR003",
+    panelcode: "PANEL003", 
+    status: 0,
+    estStartDate: "2025-01-17T08:00:00Z",
+    estFinishDate: "2025-01-17T17:00:00Z"
+  }
+];
+
+const mockPporderlines = [
+  {
+    id: 1,
+    panelcode: "LINE001",
+    status: 1,
+    custporderno: "CUST001",
+    prodOrdersView: { ttm: 150 }
+  },
+  {
+    id: 2,
+    panelcode: "LINE002", 
+    status: 2,
+    custporderno: "CUST002",
+    prodOrdersView: { ttm: 200 }
+  }
+];
+
+// Individual pporder box component
+const PporderBox: React.FC<{ order: any }> = ({ order }) => {
+  const { data: pporderlinesData, isLoading: linesLoading, error: linesError } = usePporderLinesArray([order.pporderno]);
+
+  // Show mock data if there's an error (API not available)
+  const pporderlines = pporderlinesData?.data?.pporderlines2 || (linesError ? mockPporderlines : []);
+
+  return (
+    <Card
+      title={
+        <div>
+          <Text strong>{order.pporderno}</Text>
+          <br />
+          <Text type="secondary">{order.panelcode}</Text>
+        </div>
+      }
+      extra={
+        <Badge 
+          status={order.status === 1 ? "processing" : order.status === 2 ? "success" : "default"} 
+          text={`Status: ${order.status}`} 
+        />
+      }
+      style={{ height: '100%' }}
+    >
+      <div style={{ marginBottom: '10px' }}>
+        <Text>Start: {order.estStartDate ? dayjs(order.estStartDate).format("DD/MM/YYYY") : "-"}</Text>
+        <br />
+        <Text>Finish: {order.estFinishDate ? dayjs(order.estFinishDate).format("DD/MM/YYYY") : "-"}</Text>
+      </div>
+      
+      {linesLoading ? (
+        <Spin />
+      ) : (
+        <div>
+          <Title level={5}>Order Lines ({pporderlines.length})</Title>
+          {pporderlines.length === 0 ? (
+            <Alert message="No order lines found" type="info" showIcon />
+          ) : (
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {pporderlines.map((line) => (
+                <Card 
+                  key={line.id} 
+                  size="small" 
+                  style={{ marginBottom: '8px' }}
+                  bodyStyle={{ padding: '8px' }}
+                >
+                  <div>
+                    <Text strong>{line.panelcode}</Text>
+                    <br />
+                    <Text type="secondary">Status: {line.status}</Text>
+                    {line.custporderno && (
+                      <>
+                        <br />
+                        <Text>Customer Order: {line.custporderno}</Text>
+                      </>
+                    )}
+                    {line.prodOrdersView?.ttm && (
+                      <>
+                        <br />
+                        <Text>TTM: {line.prodOrdersView.ttm}m</Text>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+};
 
 export const GETPANELPRODUCTIONORDERSEXT2 = gql`
 
@@ -240,7 +398,7 @@ const clearFilters = () => {
   );
 };
 
-export default PanelProductionList;
+export default PpordersBoxList;
 
 
 
