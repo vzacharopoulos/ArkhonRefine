@@ -28,12 +28,16 @@ FROM base as runner
 
 ENV NODE_ENV production
 
+
+ENV PORT=5173
+
 RUN npm install -g serve
 
 COPY --from=builder /app/refine/dist ./
 
 USER refine
 
-CMD ["serve"]
+CMD ["sh", "-c", "serve -l ${PORT}"]
 
-EXPOSE 5173
+EXPOSE ${PORT}
+

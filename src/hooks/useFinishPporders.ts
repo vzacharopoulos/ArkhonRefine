@@ -79,7 +79,7 @@ export const useFinishPporder = ({
 
 
   const handleFinish = async (order: PPOrder) => {
-      const now = dayjs("2025-08-09T10:00:00.000");
+      const now = dayjs("2025-08-11T10:00:00.000");
 
     if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
       const dateKey = now.format("YYYY-MM-DD");

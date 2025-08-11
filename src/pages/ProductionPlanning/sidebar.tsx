@@ -89,6 +89,7 @@ const { Title,Text  } = Typography;
              onSelectOrder={onSelectOrder}
              totalTime={totalTime}
              totalMeter={totalMeter}
+             orderLinesLoading={orderLinesLoading}
              />
              
         </div>

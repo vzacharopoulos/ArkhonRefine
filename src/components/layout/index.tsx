@@ -6,8 +6,9 @@ export const Layout = () => {
   return (
     <ThemedLayoutV2
       Header={Header}
+      
       Title={(titleProps) => (
-        <ThemedTitleV2 {...titleProps} text="διαχειριση ρολλα" />
+        <ThemedTitleV2 {...titleProps} text="Προγραμματισμός Παραγωγής" />
       )}
     >
       <Outlet />

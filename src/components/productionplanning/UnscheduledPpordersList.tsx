@@ -6,7 +6,7 @@ import { Menu, Typography } from "antd";
 import dayjs, { Dayjs, duration } from "dayjs";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { EventInput } from "fullcalendar";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 const { Title, Text } = Typography;
 
@@ -20,6 +20,7 @@ interface OrderListProps {
     formatted: string;
   }
   totalMeter: number;
+  orderLinesLoading: boolean;
 }
 
 export const OrderList: React.FC<OrderListProps> = ({
@@ -27,12 +28,14 @@ export const OrderList: React.FC<OrderListProps> = ({
   selectedOrderId,
   onSelectOrder,
   totalTime: propTotalTime, // Rename to avoid conflict
-  totalMeter
+  totalMeter,
+  orderLinesLoading
 }) => {
   const { totalTimeByOrderId } = useTotalTimeContext();
 
-
-
+  useEffect(() => {
+    console.log("orderLinesLoading", orderLinesLoading);
+  }, [orderLinesLoading]);
 
   return (
     <Menu
@@ -91,7 +94,8 @@ export const OrderList: React.FC<OrderListProps> = ({
       <Text>{order.panelcode}</Text>
       {order.id === selectedOrderId && (
         <Text strong style={{ marginLeft: 4 }}>
-          - {orderTotalTime}
+          {orderLinesLoading ? "Άγνωστο":` ${orderTotalTime}`  }
+          
         </Text>
       )}
     </div>

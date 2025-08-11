@@ -108,27 +108,40 @@ export const CoilList: React.FC<CoilListProps> = ({
                 <Input placeholder="Αναζήτηση πάχους" type="number" />
               </FilterDropdown>
             )}
-            render={(v) => (v ? `${v * 1000} μm` : "-")}
+            render={(v) => (v ? `${v } mm` : "-")}
             sorter
           />
 
-          <Table.Column
-            dataIndex="widthCoil"
-            title="Πλάτος Ρολού"
-            defaultFilteredValue={getDefaultFilter('widthCoil', filters)}
-            filterIcon={<SearchOutlined />}
-            filterDropdown={(props) => (
-              <FilterDropdown {...props}>
-                <Input
-                  placeholder='Αναζήτηση πλάτους'
-                  type="number"
-                  step="0.01"
-                />
-              </FilterDropdown>
-            )}
-            render={(value) => value ? `${value} mm` : '-'}
-            sorter={true} // Enable sorting
-          />
+      <Table.Column
+  dataIndex="widthCoil"
+  title="Πλάτος Ρολού"
+  defaultFilteredValue={getDefaultFilter("widthCoil", filters)}
+  filterIcon={<SearchOutlined />}
+  filteredValue={filters?.widthCoil || []}
+  filterDropdown={(props) => (
+    <FilterDropdown {...props}>
+      <Input
+        placeholder="Αναζήτηση πλάτους (mm)"
+        type="number"
+        step="1"
+        inputMode="decimal"
+        // SHOW in mm (stored value is meters)
+        value={filters?.widthCoil ?filters.widthCoil * 1000 : ""}
+        onChange={(e) => {
+          const raw = e.target.value;
+          // STORE: apply your transform
+          console.log("raw input", raw);
+                 // optional: live apply without closing
+        props.confirm?.({ closeDropdown: false });
+      }}
+      onPressEnter={() => props.confirm?.()}
+      onKeyDown={(e) => e.stopPropagation()}
+      />
+    </FilterDropdown>
+  )}
+  render={(value) => (value ? `${value*1000} m` : "-")}
+/>
+
           <Table.Column
             dataIndex="currWeight"
             title="Τρέχον Βάρος"

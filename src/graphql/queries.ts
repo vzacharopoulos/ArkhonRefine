@@ -120,14 +120,15 @@ query GetPpOrders($filter: PpordersFilterInput) {
     offtimeduration
     offtimestartdate
     offtimeenddate
-    pauses
-    {id
-pausestartdate
-pauseenddate
-pauseduration
-pausecomment}
-    
-    
+    pauses {
+      id
+      pausestartdate
+      pauseenddate
+      pauseduration
+      pausecomment
+    }
+
+
   }
 }`;
 
@@ -160,7 +161,8 @@ query GetMasterlength($filter:MasterlengthFilterInput)  {
 export const GET_PPORDERLINES_OF_PPORDER = gql`
 query GetPpOrderLINESTOPPORDER($filter: Pporderlines2FilterInput) {
   pporderlines2(filter: $filter) {
-    id
+   nodes
+   { id
     pporderno
     panelcode
     status
@@ -172,6 +174,11 @@ upDate
       time
       speed
       ttm
+        cin
+          cout
+          moldin
+          moldout
+          count
     }
  
     pporders{
@@ -183,8 +190,52 @@ upDate
       finishDateDatetime
       
     }
+   }totalCount
   }
 }`
+
+export const GET_PPORDERLINE2 = gql`
+  query PpOrderLine2(
+    $filter: Pporderlines2FilterInput
+    $sorting: [Pporderlines2SortInput!]
+    $paging: OffsetPaging
+  ) {
+    pporderlines2(
+      filter: $filter
+      sorting: $sorting
+      paging: $paging
+    ) {
+      nodes {
+        id
+        pporderno
+        custporderno
+        prodDate
+        upDate
+        status
+        isCanceled
+        panelcode
+        tradecode
+        prodOrdersView {
+          cin
+          cout
+          moldin
+          moldout
+          thickin
+          thickout
+          count
+           time
+      speed
+      ttm
+        }
+        pporders {
+          status
+        }
+      }
+      totalCount
+    }
+  }
+`;
+
 
 export const GET_COIL = gql`
 query GetCoil($id: Int!) {

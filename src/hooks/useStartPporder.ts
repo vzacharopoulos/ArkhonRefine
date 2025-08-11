@@ -6,6 +6,7 @@ import {
   PanelMachinePause,
   PPOrder,
   PPOrderLine,
+  PpOrderLinesResponse,
   WorkingHoursConfig,
 } from "@/pages/ProductionPlanning/productioncalendartypes";
 import {
@@ -28,6 +29,7 @@ import {
 import { EventInput } from "fullcalendar";
 import { createOfftimeTitle } from ".././pages/ProductionPlanning/helpers/offtimetitle";
 import { useUpdateDailyWorkingHours } from "./useWorkingHours";
+import { usePporderLines } from "./usePporderLines";
 
 interface UseStartPporderParams {
   finishedOrders: PPOrder[];
@@ -38,6 +40,7 @@ interface UseStartPporderParams {
   currentEvents: EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
   handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
+  
 }
 
 export const useStartPporder = ({
@@ -51,6 +54,7 @@ export const useStartPporder = ({
   handleUpdateAllEvents,
 }: UseStartPporderParams) => {
   const dataProvider = useDataProvider()();
+
 
   const { mutate: updatePporder } = useUpdate<PPOrder>();
    const { mutate: updatePauseMutation } = useUpdate<PanelMachinePause>();
@@ -67,6 +71,7 @@ export const useStartPporder = ({
       values: {
         estStartDate: dayjs(start).format("YYYY-MM-DDTHH:mm:ssZ"),
         estFinishDate: dayjs(end).format("YYYY-MM-DDTHH:mm:ssZ"),
+        
 
         ...extraValues,
       },
@@ -92,17 +97,17 @@ export const useStartPporder = ({
 
     try {
       const { data } = await dataProvider.custom!<{
-        pporderlines2: PPOrderLine[];
+        pporderlines2: PpOrderLinesResponse[];
       }>({
         url: "",
         method: "get",
         meta: {
           gqlQuery: GET_PPORDERLINES_OF_PPORDER,
-          variables: { filter: { ppordernos: order.pporderno } },
+          variables: { filter: { ppordernos: { in: [order.pporderno] } } },
         },
       });
 
-      const pporderlines2 = data?.pporderlines2 ?? [];
+      const pporderlines2 = data?.pporderlines2.nodes ?? [];
       console.log("pporderlines2", pporderlines2);
       console.log("data", data);
 
@@ -111,7 +116,7 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs("2025-08-08T23:00:00.000");
+      const now = dayjs("2025-08-09T12:00:00.000");
     if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
       const dateKey = now.format("YYYY-MM-DD");
       const existingConfig = dailyWorkingHours[dateKey];

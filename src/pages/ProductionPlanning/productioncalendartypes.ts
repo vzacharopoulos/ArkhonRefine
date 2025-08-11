@@ -8,6 +8,17 @@ export interface PanelMachinePause {
   pauseduration?: number;
   pausecomment?: string;
 }
+export interface groupIn{
+  cin?: string;
+  thickin?: string;
+  moldin?: string;
+  cout?: string;
+  thickout?: string;
+  moldout?: string;
+  totalTtm?: number;
+  tTime?: number;
+  count?: number;
+}
 
 export interface PPOrder {
   id: number;
@@ -28,6 +39,7 @@ export interface PPOrder {
   offtimestartdate?: Date;
   offtimeenddate?: Date;
    pauses?: PanelMachinePause[];
+  groupIn?: groupIn[];
 }
 
 export interface ProdOrdersView {
@@ -35,7 +47,22 @@ export interface ProdOrdersView {
   speed: number;
   ttm: number;
   time?: number;
+  cin?: string;
+  cout?: string;
+  moldin?: string;
+  moldout?: string;
+  thickin?: string;
+  thickout?: string;
+  count?: number;
 }
+
+export interface PpOrderLinesResponse {
+  pporderlines2: {
+    nodes: PPOrderLine[];
+    totalCount: number;
+  };
+}
+
 
 export interface PPOrderLine {
   id: number;

@@ -3,7 +3,7 @@ import { useCustom, useDataProvider, useResourceSubscription, useUpdate } from "
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { EventInput } from "@fullcalendar/core";
-import { GET_FINISHED_PPORDERS, GET_PPORDERLINES_OF_PPORDER, GET_PPORDERS, PPORDER_UPDATED_SUBSCRIPTION, PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, UPDATE_PPORDERS } from "@/graphql/queries";
+import { GET_FINISHED_PPORDERS,  GET_PPORDERS, PPORDER_UPDATED_SUBSCRIPTION, PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, UPDATE_PPORDERS } from "@/graphql/queries";
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
@@ -438,8 +438,8 @@ console.log("valid events",validEvents)
     isLoading: orderLinesLoading,
     refetch: refetchPporderlines,
   } = usePporderLines(selectedPporderno);
-
-  const orderLines = orderLinesData?.data?.pporderlines2 ?? [];
+  console.log("is orderLinesLoading", orderLinesLoading); 
+  const orderLines = orderLinesData?.data?? [];
   const finished = finishedData?.data?.masterlengths ?? [];
   const orders = ppordersData?.data?.pporders ?? [];
   const unscheduledorders = useMemo(
@@ -1068,7 +1068,7 @@ console.log("valid events",validEvents)
           maxHeight: "auto", // Maximum height
           overflow: "scroll", // Enable scrolling if content overflows
         }}>
- <div style={{ display: "flex", alignItems: "start", gap: 10, marginBottom: 16 ,marginLeft:500
+ <div style={{ display: "flex", alignItems: "start", gap: 10, marginBottom: 16 ,marginLeft:530
  }}>
  
           <Checkbox checked={weekendsVisible} onChange={handleWeekendsToggle}>
@@ -1241,10 +1241,10 @@ console.log("valid events",validEvents)
         />
 
         <UpdateAllButton onClick={() => handleUpdateAll()} />
-        <SetCurrentEventsButton events={[
+        {/* <SetCurrentEventsButton events={[
 
           ...currentEvents,
-        ]} />
+        ]} /> */}
       </Layout>
     </TotalTimeProvider>
   );

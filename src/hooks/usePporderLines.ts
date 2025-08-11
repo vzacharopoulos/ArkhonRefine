@@ -1,14 +1,20 @@
-import { useCustom } from "@refinedev/core";
-import { GET_PPORDERLINES_OF_PPORDER } from "@/graphql/queries";
+import { useList } from "@refinedev/core";
+import { GET_PPORDERLINE2 } from "@/graphql/queries";
 import { PPOrderLine } from "@/pages/ProductionPlanning/productioncalendartypes";
 
-export const usePporderLines = (pporderno: string | null) =>
-  useCustom<{ pporderlines2: PPOrderLine[] }>({
-    url: "",
-    method: "get",
-    meta: {
-      gqlQuery: GET_PPORDERLINES_OF_PPORDER,
-      variables: { filter: { ppordernos: pporderno } },
+export const usePporderLines = (ppordernos: string | null) =>
+  useList<PPOrderLine>({
+    resource: "pporderlines2",
+    pagination: {
+      mode: "off",
     },
-    queryOptions: { enabled: !!pporderno },
+    meta: {
+      gqlQuery: GET_PPORDERLINE2,
+    },
+  filters: ppordernos
+      ? [{ field: "ppordernos", operator: "in", value: ppordernos }]
+      : [],
+    queryOptions: {
+      enabled: !!ppordernos,
+    },
   });

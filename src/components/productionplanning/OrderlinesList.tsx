@@ -1,6 +1,6 @@
 import { PPOrderLine } from '@/pages/ProductionPlanning/productioncalendartypes';
 import { StatusTag } from '@/utilities';
-import { List } from 'antd';
+import { List, Skeleton } from 'antd';
 import dayjs from 'dayjs';
 import React from 'react'
 
@@ -12,9 +12,10 @@ interface OrderLinesListProps {
 
 
 export const OrderlinesList: React.FC<OrderLinesListProps> = ({orderLines,orderLinesLoading}) => (
+  console.log("orderLinesLoading", orderLinesLoading),
  <div style={{ maxHeight: 390, overflowY: "scroll", paddingRight: 8 }}>
               {orderLinesLoading ? (
-                <span>Loading...</span>
+                <Skeleton active />
               ) : (
                 <List
                   size="small"

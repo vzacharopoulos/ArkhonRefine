@@ -3,7 +3,7 @@ import { print } from "graphql";
 import { message } from "antd";
 import { PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, PPORDER_UPDATED_SUBSCRIPTION, GET_PPORDERLINES_OF_PPORDER } from "@/graphql/queries";
 import { wsClient } from "@/providers";
-import { PPOrder, PPOrderLine, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
+import { PPOrder, PPOrderLine, PpOrderLinesResponse, WorkingHoursConfig } from "@/pages/ProductionPlanning/productioncalendartypes";
 import { useStartPporder } from "@/hooks/useStartPporder";
 import { useDataProvider } from "@refinedev/core";
 import { HandleUpdateAllEventsParams } from "@/pages/ProductionPlanning/handlers/handleupdateall";
@@ -90,16 +90,15 @@ export const usePporderSubscriptions = ({
           if (!order?.pporderno) return;
 
           try {
-            const { data } = await dataProvider.custom!<{ pporderlines2: PPOrderLine[] }>({
+            const { data } = await dataProvider.custom!<{ pporderlines2: PpOrderLinesResponse[] }>({
               url: "",
               method: "get",
               meta: {
                 gqlQuery: GET_PPORDERLINES_OF_PPORDER,
-                variables: { filter: { ppordernos: order.pporderno } },
-              },
+           variables: { filter: { ppordernos: { in: [order.pporderno] } } }              },
             });
 
-            const lines = data?.pporderlines2 ?? [];
+            const lines = data?.pporderlines2?.nodes ?? [];
             const totalLines = lines.length;
             const finishedCount = lines.filter((l) => l.status === 4).length;
             const orderInfo = lines[0]?.pporders ?? order;
