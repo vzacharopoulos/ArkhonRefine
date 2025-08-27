@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { ThemedLayoutV2, ThemedTitleV2 } from "@refinedev/mui";
 import { Header } from "./header";
+import { Children } from "react";
 
 export const Layout = () => {
   return (

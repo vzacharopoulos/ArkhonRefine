@@ -37,7 +37,6 @@ import { useSyncEditEnd } from "@/hooks/useSyncEditEnd";
 import { usePporders } from "@/hooks/usePporders";
 import { useFinishedPporders } from "@/hooks/useFinishedPporders";
 import { useUpdatePporder } from "@/hooks/useUpdatePporder";
-import { useStartPporder } from "@/hooks/useStartPporder";
 import { handleUpdateAllEvents } from "./handlers/handleupdateall";
 import { usePporderLines } from "@/hooks/usePporderLines";
 import { createOfftimeTitle } from "./helpers/offtimetitle";
@@ -234,7 +233,7 @@ console.log("valid events",validEvents)
 
       setCurrentEvents(chainedEvents);
       message.success(`Η εντολή ${deletedOrder.pporderno} ακυρώθηκε επιτυχώς.`);
-      console.log(currentEvents)
+      // console.log(currentEvents)
     } catch (error) {
       console.error("Η εντολή δεν ενημερώθηκε:", error);
     }
@@ -242,7 +241,7 @@ console.log("valid events",validEvents)
 
 
 
-  const [weekendsVisible, setWeekendsVisible] = useState(true);
+  const [weekendsVisible, setWeekendsVisible] = useState<boolean>(true);
   const { currentEvents, setCurrentEvents } = useCurrentEvents();
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedPporderno, setSelectedPporderno] = useState<string | null>(null);
@@ -438,7 +437,6 @@ console.log("valid events",validEvents)
     isLoading: orderLinesLoading,
     refetch: refetchPporderlines,
   } = usePporderLines(selectedPporderno);
-  console.log("is orderLinesLoading", orderLinesLoading); 
   const orderLines = orderLinesData?.data?? [];
   const finished = finishedData?.data?.masterlengths ?? [];
   const orders = ppordersData?.data?.pporders ?? [];
@@ -482,7 +480,7 @@ console.log("valid events",validEvents)
         totalMinutes,
       };
     });
-    console.log(map)
+    // console.log(map)
     return map;
   }, [unscheduledorders, orderLines]);
 

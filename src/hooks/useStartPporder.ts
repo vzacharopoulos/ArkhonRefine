@@ -40,7 +40,8 @@ interface UseStartPporderParams {
   currentEvents: EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
   handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
-  
+  lastActiveOrderRef: React.MutableRefObject<PPOrder | null>;
+
 }
 
 export const useStartPporder = ({
@@ -52,12 +53,14 @@ export const useStartPporder = ({
   currentEvents,
   setCurrentEvents,
   handleUpdateAllEvents,
+  lastActiveOrderRef
+
 }: UseStartPporderParams) => {
   const dataProvider = useDataProvider()();
 
 
   const { mutate: updatePporder } = useUpdate<PPOrder>();
-   const { mutate: updatePauseMutation } = useUpdate<PanelMachinePause>();
+  const { mutate: updatePauseMutation } = useUpdate<PanelMachinePause>();
 
   const updatePporderFn: UpdateFn = async (
     id: number,
@@ -71,7 +74,7 @@ export const useStartPporder = ({
       values: {
         estStartDate: dayjs(start).format("YYYY-MM-DDTHH:mm:ssZ"),
         estFinishDate: dayjs(end).format("YYYY-MM-DDTHH:mm:ssZ"),
-        
+
 
         ...extraValues,
       },
@@ -81,7 +84,7 @@ export const useStartPporder = ({
     });
   };
 
-    const updatePauseFn: UpdatePauseFn = async (pause: PanelMachinePause) => {
+  const updatePauseFn: UpdatePauseFn = async (pause: PanelMachinePause) => {
     await updatePauseMutation({
       resource: "panelmachinepauses",
       id: pause.id ?? 0,
@@ -96,9 +99,8 @@ export const useStartPporder = ({
     if (!order.pporderno) return;
 
     try {
-      const { data } = await dataProvider.custom!<{
-        pporderlines2: PpOrderLinesResponse[];
-      }>({
+      const { data } = await dataProvider.custom!<PpOrderLinesResponse
+      >({
         url: "",
         method: "get",
         meta: {
@@ -116,99 +118,113 @@ export const useStartPporder = ({
         0,
       );
 
-      const now = dayjs("2025-08-09T12:00:00.000");
-    if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
-      const dateKey = now.format("YYYY-MM-DD");
-      const existingConfig = dailyWorkingHours[dateKey];
-      const defaultConfig = defaultWorkingHours[now.day()]; // 0 = Sunday, 1 = Monday...
+      const now = dayjs("2025-08-27T15:00:00.000");
+      if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
+        const dateKey = now.format("YYYY-MM-DD");
+        const existingConfig = dailyWorkingHours[dateKey];
+        const defaultConfig = defaultWorkingHours[now.day()]; // 0 = Sunday, 1 = Monday...
 
-      const startHour = parseInt(now.format("HH"), 10);
-      const startMinute = parseInt(now.format("mm"), 10);
+        const startHour = parseInt(now.format("HH"), 10);
+        const startMinute = parseInt(now.format("mm"), 10);
 
-      const endHour = existingConfig?.endHour ?? defaultConfig.endHour;
-      const endMinute = existingConfig?.endMinute ?? defaultConfig.endMinute;
+        const endHour = existingConfig?.endHour ?? defaultConfig.endHour;
+        const endMinute = existingConfig?.endMinute ?? defaultConfig.endMinute;
 
-      const newDailyWorkingHours = {
-        ...dailyWorkingHours,
-        [dateKey]: {
+        const newDailyWorkingHours = {
+          ...dailyWorkingHours,
+          [dateKey]: {
+            startHour,
+            startMinute,
+            endHour,
+            endMinute,
+            isWorkingDay: true,
+          },
+        };
+        setDailyWorkingHours(newDailyWorkingHours);
+        await updateDailyWorkingHours(dateKey, {
           startHour,
           startMinute,
           endHour,
           endMinute,
           isWorkingDay: true,
-        },
-      };
- setDailyWorkingHours(newDailyWorkingHours);
-      await updateDailyWorkingHours(dateKey, {
-        startHour,
-        startMinute,
-        endHour,
-        endMinute,
-        isWorkingDay: true,
-      });
+        });
 
-      
-    }
 
-     
+      }
 
-      const lastFinished = [...finishedOrders]
-        .filter((f) => f.finishDateDatetime)
-        .sort((a, b) =>
-          dayjs(a.finishDateDatetime as Date).diff(
-            dayjs(b.finishDateDatetime as Date),
-          ),
-        )
-        .pop();
-      console.log("lastFinishedstart", dayjs(lastFinished?.startDateDatetime));
-      console.log("lastFinishedend", dayjs(lastFinished?.finishDateDatetime));
-      const offStart = lastFinished?.finishDateDatetime
-        ? dayjs(lastFinished.finishDateDatetime)
-        : null;
+      let offStart: dayjs.Dayjs | null = null;
+      let offEnd: dayjs.Dayjs | null = null;
+      let offDuration = 0;
+      let offSegments: EventInput[] = [];
 
-      const offEnd = now;
-      const offDuration = offStart
-        ? calculateWorkingMinutesBetween(
-          offStart,
-          offEnd,
-          dailyWorkingHours,
-          defaultWorkingHours,
-        )
-        : 0;
-      const prevpanelcode = (lastFinished as any)?.code;
-      console.log("offDuration", offDuration);
-      console.log("offStart", offStart);
-      console.log("prevpanelcode", prevpanelcode);
+      console.log("lastActiveOrderRef?.current", lastActiveOrderRef?.current);
+      console.log("order", order);
+      if (lastActiveOrderRef?.current?.id === order.id) {
 
-      const offSegments =
-        offDuration && offStart
-          ? splitEventIntoWorkingHours(
+        const lastFinished = [...finishedOrders]
+          .filter((f) => f.finishDateDatetime)
+          .sort((a, b) =>
+            dayjs(a.finishDateDatetime as Date).diff(
+              dayjs(b.finishDateDatetime as Date),
+            ),
+          )
+          .pop();
+        console.log("lastFinishedstart", dayjs(lastFinished?.startDateDatetime));
+        console.log("lastFinishedend", dayjs(lastFinished?.finishDateDatetime));
+        const offStart = lastFinished?.finishDateDatetime
+          ? dayjs(lastFinished.finishDateDatetime)
+          : null;
+
+
+
+
+        const offEnd = now;
+        const offDuration = offStart
+          ? calculateWorkingMinutesBetween(
             offStart,
-            offDuration,
+            offEnd,
             dailyWorkingHours,
             defaultWorkingHours,
-            {
-              id: `${order.id}-offtime`,
-              title: createOfftimeTitle(
-                offDuration,
-                order.panelcode,
-                prevpanelcode,
-              ),
-              color: "gray",
-              extendedProps: {
-                isOfftime: true,
-                panelcode: order.panelcode,
-                prevpanelcode: prevpanelcode,
-                prevId: lastFinished?.id,
-                currId: order.id.toString(),
-                offtimeduration: offDuration,
-
-                offtimeStartDate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ'),
-                offtimeEndDate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
-              },
-            },
           )
-          : [];
+          : 0;
+        const prevpanelcode = (lastFinished as any)?.code;
+        console.log("offDuration", offDuration);
+        console.log("offStart", offStart);
+        console.log("prevpanelcode", prevpanelcode);
+
+        offSegments =
+          offDuration && offStart
+            ? splitEventIntoWorkingHours(
+              offStart,
+              offDuration,
+              dailyWorkingHours,
+              defaultWorkingHours,
+              {
+                id: `${order.id}-offtime`,
+                title: createOfftimeTitle(
+                  offDuration,
+                  order.panelcode,
+                  prevpanelcode,
+                ),
+                color: "gray",
+                extendedProps: {
+                  isOfftime: true,
+                  panelcode: order.panelcode,
+                  prevpanelcode: prevpanelcode,
+                  prevId: lastFinished?.id,
+                  currId: order.id.toString(),
+                  offtimeduration: offDuration,
+
+                  offtimeStartDate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ'),
+                  offtimeEndDate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
+                },
+              },
+            )
+            : [];
+
+      }
+      
+
       let jobStart = now;
       const jobSegments = splitEventIntoWorkingHours(
         jobStart,
@@ -243,9 +259,9 @@ export const useStartPporder = ({
           estStartDate: dayjs(jobStart).format('YYYY-MM-DDTHH:mm:ssZ'),
           finishDateDatetime: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
           estFinishDate: dayjs(jobEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
-          offtimestartdate: dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ'),
-          offtimeenddate: dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ'),
-          offtimeduration: offDuration,
+          offtimestartdate: offStart !== 0 ? dayjs(offStart).format('YYYY-MM-DDTHH:mm:ssZ') : null,
+          offtimeenddate: offEnd !== 0 ? dayjs(offEnd).format('YYYY-MM-DDTHH:mm:ssZ') : null,
+          offtimeduration: offDuration || null,
           status: 2,
         },
         meta: {
@@ -391,7 +407,7 @@ export const useStartPporder = ({
           dailyWorkingHours,
           defaultWorkingHours,
           updatePporder: updatePporderFn,
-                    updatePause: updatePauseFn,
+          updatePause: updatePauseFn,
         });
 
 

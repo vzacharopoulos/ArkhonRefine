@@ -1,6 +1,13 @@
 # This Dockerfile uses `serve` npm package to serve the static files with node process.
 # You can find the Dockerfile for nginx in the following link:
 # https://github.com/refinedev/dockerfiles/blob/main/vite/Dockerfile.nginx
+
+
+#docker images   # find SOURCE_IMAGE:TAG
+# docker tag SOURCE_IMAGE:TAG YOURUSER/myrepo:newtag
+# docker push YOURUSER/myrepo:newtag
+#above is how you push a new image to dockerhub
+#
 FROM refinedev/node:18 AS base
 
 FROM base as deps

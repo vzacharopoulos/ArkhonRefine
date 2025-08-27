@@ -11,9 +11,12 @@ export const usePporderLines = (ppordernos: string | null) =>
     meta: {
       gqlQuery: GET_PPORDERLINE2,
     },
-  filters: ppordernos
+    filters: ppordernos
       ? [{ field: "ppordernos", operator: "in", value: ppordernos }]
       : [],
+    sorters: [
+      
+    ],
     queryOptions: {
       enabled: !!ppordernos,
     },

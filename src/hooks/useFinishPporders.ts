@@ -24,6 +24,7 @@ interface UseFinishPporderParams {
   refetchFinished?: () => Promise<any>;
   refetchPporders?: () => void;
   manualSyncRef: React.MutableRefObject<boolean>;
+  lastActiveOrderRef: React.MutableRefObject<PPOrder | null>;
 }
 
 
@@ -40,6 +41,7 @@ export const useFinishPporder = ({
   handleUpdateAllEvents,
   refetchFinished,
   manualSyncRef,
+  lastActiveOrderRef
 }: UseFinishPporderParams) => {
   const { mutate: updatePporder } = useUpdate<PPOrder>();
     const { mutate: updatePauseMutation } = useUpdate<PanelMachinePause>();
@@ -79,8 +81,7 @@ export const useFinishPporder = ({
 
 
   const handleFinish = async (order: PPOrder) => {
-      const now = dayjs("2025-08-11T10:00:00.000");
-
+      const now = dayjs("2025-08-27T18:00:00.000");
     if (!isWithinWorkingHours(now, dailyWorkingHours, defaultWorkingHours)) {
       const dateKey = now.format("YYYY-MM-DD");
 
@@ -340,7 +341,7 @@ const adjustedEnd =sorted[0].end ? dayjs(sorted[0].end as Date) : originalEnd;
         });
 
         manualSyncRef.current = false;
-      }, 5000);
+      }, 2000);
    
     console.log("currentEvents", currentEvents)
 

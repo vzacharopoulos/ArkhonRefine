@@ -106,9 +106,8 @@ function App() {
                           v3LegacyAuthProviderCompatible
                           fallback={<CatchAllNavigate to="/login" />}
                         >
-                          <Layout>
-                            <Outlet />
-                          </Layout>
+                          <Layout/>
+                          
                         </Authenticated>
                       }
                     >

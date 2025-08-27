@@ -3,7 +3,7 @@ import { Select, Form, Spin, Alert, Button, message } from "antd";
 import gql from "graphql-tag";
 import React, { useState, useEffect, useRef } from "react";
 import { client } from "@/providers";
-import { UPDATE_PPORDERS } from "@/graphql/queries";
+import { GET_PPORDERS, UPDATE_PPORDERS } from "@/graphql/queries";
 import { useStartPporder } from "@/hooks/useStartPporder";
 import { useFinishedPporders } from "@/hooks/useFinishedPporders";
 import { useFinishPporder } from "@/hooks/useFinishPporders";
@@ -12,20 +12,6 @@ import { EventInput } from "fullcalendar";
 import { useCurrentEvents } from "@/contexts/currentEventsProvider";
 import { useUpdateDailyWorkingHours } from "@/hooks/useWorkingHours";
 
-const GET_PPORDERS = gql`
-  query GetPpOrders($filter: PpordersFilterInput) {
-    pporders(filter: $filter) {
-      id
-      pporderno
-      panelcode
-      status
-      startDateDatetime
-      finishDateDatetime
-      createDate
-      
-    }
-  }
-`;
 
 
 
@@ -72,7 +58,6 @@ const PanelMachineDashboard: React.FC<{
 // 14             προγραμματισμος παραγωγης                                                                                                                                         
   // Create a map of pporderno to order ID
   const ordersMap = React.useMemo(() => {
-    console.log(data?.data?.pporders)
     const map = new Map<string, number>();
     data?.data?.pporders?.forEach(order => {
       map.set(order.pporderno, order.id);

@@ -12,7 +12,6 @@ interface OrderLinesListProps {
 
 
 export const OrderlinesList: React.FC<OrderLinesListProps> = ({orderLines,orderLinesLoading}) => (
-  console.log("orderLinesLoading", orderLinesLoading),
  <div style={{ maxHeight: 390, overflowY: "scroll", paddingRight: 8 }}>
               {orderLinesLoading ? (
                 <Skeleton active />

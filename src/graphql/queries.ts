@@ -101,6 +101,77 @@ pausecomment}
 
 }`
 
+// export const UPDATE_PPORDERLINE_PRIORITY = gql`
+// mutation updatePporderlinePriority($input: UpdatePporderlinePriorityInput!) {
+//   updatePporderlinePriority(input: $input) {
+//     id
+//     priority
+//     pporderno
+//     custporderno
+//     status
+//     upDate
+//   }
+// }`
+export const GET_PPORDERS_LIST = gql`
+query GetPpOrdersList($filter: PpordersFilterInput) {
+  pporders(filter: $filter) {
+    id
+    pporderno
+    panelcode
+    status
+    startDateDatetime
+    finishDateDatetime
+    estDateOfProdDatetime
+    createDate
+    estStartDate
+    estFinishDate
+     previd
+    prevpanelcode
+    offtimeduration
+    offtimestartdate
+    offtimeenddate
+    pauses {
+      id
+      pausestartdate
+      pauseenddate
+      pauseduration
+      pausecomment
+    }
+
+    groupIn{cin
+           thickin
+           moldin
+            cout
+            thickout
+            moldout
+            totalTtm
+           
+            orders{
+              id
+              custporderno
+              status
+              upDate
+               tradecodeCustomer{ftrdate
+            name
+            tradecode}
+              prodOrdersView{
+                isCanceled
+                time
+                speed
+                ttm
+                cin
+                cout
+                moldin
+                moldout
+                count
+              }
+            }
+
+           }
+       
+  }
+}`;
+
 
 export const GET_PPORDERS = gql`
 query GetPpOrders($filter: PpordersFilterInput) {
@@ -129,8 +200,11 @@ query GetPpOrders($filter: PpordersFilterInput) {
     }
 
 
+       
   }
 }`;
+
+
 
 export const GET_FINISHED_PPORDERS = gql`
 query GetMasterlength($filter:MasterlengthFilterInput)  {
@@ -167,6 +241,9 @@ query GetPpOrderLINESTOPPORDER($filter: Pporderlines2FilterInput) {
     panelcode
     status
     custporderno
+     tradecodeCustomer{ftrdate
+                       name
+                       tradecode}  
 upDate
     status
     prodOrdersView{
@@ -215,6 +292,10 @@ export const GET_PPORDERLINE2 = gql`
         isCanceled
         panelcode
         tradecode
+        
+        #  tradecodeCustomer{ftrdate
+        #                name
+        #                tradecode}  
         prodOrdersView {
           cin
           cout
@@ -224,7 +305,7 @@ export const GET_PPORDERLINE2 = gql`
           thickout
           count
            time
-      speed
+      # speed
       ttm
         }
         pporders {

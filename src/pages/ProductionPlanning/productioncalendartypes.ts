@@ -18,6 +18,7 @@ export interface groupIn{
   totalTtm?: number;
   tTime?: number;
   count?: number;
+  orders?: PPOrderLine[];
 }
 
 export interface PPOrder {
@@ -63,6 +64,11 @@ export interface PpOrderLinesResponse {
   };
 }
 
+export interface CustomerTradecode {
+  ftrdate?: Date;
+  name?: string;
+  tradecode?: string;
+}
 
 export interface PPOrderLine {
   id: number;
@@ -71,8 +77,10 @@ export interface PPOrderLine {
   status?: number;
   custporderno?: string;
   upDate?: Date;
+  // priority?: number;
   prodOrdersView?: ProdOrdersView;
   pporders: PPOrder;
+  tradecodeCustomer?: CustomerTradecode;
 }
 
 export interface finishedPporders
@@ -87,6 +95,7 @@ export interface finishedPporders
   previd?: number;
   prevpanelcode?: string;
     panelmachinepauses?: PanelMachinePause[];
+    
 }
 
 export interface WorkingHoursConfig {
