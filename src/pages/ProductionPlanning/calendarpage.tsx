@@ -465,6 +465,7 @@ console.log("valid events",validEvents)
     setEditEnd,
     handleUpdateAllEvents,
     manualSyncRef,
+    
   });
 
   const totalTimeByOrderId = useMemo(() => {
@@ -1145,15 +1146,15 @@ console.log("valid events",validEvents)
               const lastEvent = relatedEvents.reduce<EventInput | null>((latest, ev) =>
                 !latest || new Date(ev.end as Date) > new Date(latest.end as Date) ? ev : latest
                 , null);
-
+const pauseMin = Number(selectedEvent.extendedProps?.pauseduration ?? 0);
+const lastEnd = lastEvent?.end ? dayjs(lastEvent.end as Date) : null;
               // Step 3: Calculate new estFinishDate
-              const newEstFinishDate = selectedEvent.extendedProps.pauseduration
-                ? selectedEvent.extendedProps.pauseduration.subtract(lastEvent?.end, "minutes")
-                : null;
-
+          const newEstFinishDate = (pauseMin > 0 && lastEnd)
+  ? lastEnd.subtract(pauseMin, "minute")   // returns a dayjs
+  : null;
               // Step 4: Update pporder if all good
               if (success && newEstFinishDate) {
-                await updatePporder(selectedEvent.extendedProps?.currId, {
+                await updatePporder(Number(selectedEvent.extendedProps?.currId), {
                   estFinishDate: newEstFinishDate,
                 });
               }

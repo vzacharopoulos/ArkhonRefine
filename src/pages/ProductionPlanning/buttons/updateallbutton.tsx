@@ -12,6 +12,6 @@ export const UpdateAllButton: React.FC<UpdateAllButtonProps> = ({ onClick }) => 
     onClick={onClick}
     style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}
   >
-    ενημέρωση όλων
+    αποθήκευση αλλαγών
   </Button>
 );

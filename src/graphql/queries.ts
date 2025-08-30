@@ -293,9 +293,9 @@ export const GET_PPORDERLINE2 = gql`
         panelcode
         tradecode
         
-        #  tradecodeCustomer{ftrdate
-        #                name
-        #                tradecode}  
+         tradecodeCustomer{ftrdate
+                       name
+                       tradecode}  
         prodOrdersView {
           cin
           cout

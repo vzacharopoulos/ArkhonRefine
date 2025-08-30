@@ -30,7 +30,7 @@ import { ForgotPassword } from "./pages/forgotPassword";
 import { CustomLoginPage } from "./pages/login";
 import { Register } from "./pages/register";
 import { Layout } from "./components/layout";
-import { BarcodeOutlined, CalendarOutlined, DashboardOutlined, UnorderedListOutlined } from "@ant-design/icons";
+import { BarcodeOutlined, CalendarOutlined, CustomerServiceOutlined, DashboardOutlined, UnorderedListOutlined } from "@ant-design/icons";
 import { CoilShow } from "./pages/coillist/Coilshow";
 import { CoilEdit } from "./pages/coillist/CoilEdit";
 import { ProductionCalendar } from "./pages/ProductionPlanning/calendarpage";
@@ -39,6 +39,7 @@ import SimpleListPage from "./pages/simplelist/simplelist";
 import { useState } from "react";
 import { EventInput } from "fullcalendar";
 import { CurrentEventsProvider } from "./contexts/currentEventsProvider";
+import { SportsFootballOutlined } from "@mui/icons-material";
 
 function App() {
   const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
@@ -58,6 +59,7 @@ function App() {
                   notificationProvider={useNotificationProvider}
                   routerProvider={routerBindings}
                   authProvider={authProvider}
+                 
                   resources={[
                     {
                       name: "PanelMachine",
@@ -70,17 +72,17 @@ function App() {
                       show: "/coil/show/:id",
                       create: "/coil/create/new",
                       edit: "/coil/edit/:id",
-                      meta: { label: "coil", icon: <BarcodeOutlined /> }
+                      meta: { label: "coils", icon: <BarcodeOutlined /> }
                     },
                     {
                       name: "panelProductionOrdersExt2s",
                       list: "/panelProductionOrdersExt2s",
-                      meta: { label: "λιστες κτλ...", icon: <UnorderedListOutlined /> }
+                      meta: { label: "Προγραμματισμός", icon: <UnorderedListOutlined /> }
                     },
                     {
                       name: "scheduling",
                       list: "/scheduling",
-                      meta: { label: "Προγραμματισμος", icon: <CalendarOutlined /> }
+                      meta: { label: "Ημερολόγιο", icon: <CalendarOutlined /> }
                     }
                   ]}
                   options={{
@@ -89,6 +91,10 @@ function App() {
                     useNewQueryKeys: true,
                     projectId: "FOmbmp-3QrkoJ-vH2Yuq",
                     liveMode: "auto",
+      //                title: {
+      //   icon: <SportsFootballOutlined />,
+      //   text: "Custom App Name",
+      // },
                   }}
                 >
                   <Routes>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { print } from "graphql";
 import { message } from "antd";
 import { PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, PPORDER_UPDATED_SUBSCRIPTION, GET_PPORDERLINES_OF_PPORDER } from "@/graphql/queries";
@@ -10,29 +10,28 @@ import { HandleUpdateAllEventsParams } from "@/pages/ProductionPlanning/handlers
 import { EventInput } from "fullcalendar";
 import { Dayjs } from "dayjs";
 import { useFinishPporder } from "./useFinishPporders";
-import { co } from "@fullcalendar/core/internal-common";
 
 interface UsePporderSubscriptionsProps {
   refetchPporders: () => void;
-  refetchPporderlines: () => void;
-  refetchFinished: () => Promise<any>; finishedOrders: PPOrder[];
+    refetchPporderlines: () => void;
+      refetchFinished: () => Promise<any>;  finishedOrders: PPOrder[];
   dailyWorkingHours: Record<string, WorkingHoursConfig>;
   setDailyWorkingHours: React.Dispatch<React.SetStateAction<Record<string, WorkingHoursConfig>>>;
   updateDailyWorkingHours: (date: string, values: WorkingHoursConfig) => Promise<WorkingHoursConfig>;
   defaultWorkingHours: Record<number, WorkingHoursConfig>;
-  currentEvents: EventInput[];
+  currentEvents:EventInput[];
   setCurrentEvents: React.Dispatch<React.SetStateAction<any[]>>;
-  setEditStart: (date: Dayjs | null) => void;
+    setEditStart: (date: Dayjs | null) => void;
   setEditEnd: (date: Dayjs | null) => void;
-  handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
-  manualSyncRef: React.MutableRefObject<boolean>;
+   handleUpdateAllEvents: (params: HandleUpdateAllEventsParams) => Promise<void>;
+     manualSyncRef: React.MutableRefObject<boolean>;
 
 }
 
 export const usePporderSubscriptions = ({
   refetchPporders,
-  refetchPporderlines,
-  refetchFinished,
+   refetchPporderlines,
+     refetchFinished,
   finishedOrders,
   dailyWorkingHours,
   setDailyWorkingHours,
@@ -40,16 +39,13 @@ export const usePporderSubscriptions = ({
   defaultWorkingHours,
   currentEvents,
   setCurrentEvents,
-  setEditStart,
+    setEditStart,
   setEditEnd,
   handleUpdateAllEvents,
   manualSyncRef,
 
-
+  
 }: UsePporderSubscriptionsProps) => {
-
-    const lastActiveOrderRef = useRef<PPOrder | null>(null);
-
   const { handleStart } = useStartPporder({
     finishedOrders,
     dailyWorkingHours,
@@ -59,26 +55,23 @@ export const usePporderSubscriptions = ({
     currentEvents,
     setCurrentEvents,
     handleUpdateAllEvents,
-    lastActiveOrderRef
-
+    
   });
 
-  
-
+ 
   const { handleFinish } = useFinishPporder({
     currentEvents,
-    setCurrentEvents,
-    setEditStart,
+        setCurrentEvents,
+            setEditStart,
     setEditEnd,
     dailyWorkingHours,
     setDailyWorkingHours,
     updateDailyWorkingHours,
     defaultWorkingHours,
     handleUpdateAllEvents,
-    refetchFinished,
-    refetchPporders,
-    manualSyncRef,
-    lastActiveOrderRef
+      refetchFinished,
+            refetchPporders,
+        manualSyncRef,
 
   });
 
@@ -97,7 +90,7 @@ export const usePporderSubscriptions = ({
           if (!order?.pporderno) return;
 
           try {
-            const { data } = await dataProvider.custom!<PpOrderLinesResponse>({
+            const { data } = await dataProvider.custom!<PpOrderLinesResponse >({
               url: "",
               method: "get",
               meta: {
@@ -106,58 +99,25 @@ export const usePporderSubscriptions = ({
               },
             });
 
-            const lines: PPOrderLine[] = data?.pporderlines2?.nodes ?? [];
+            const lines : PPOrderLine[] = data?.pporderlines2?.nodes ?? [];
             const totalLines = lines.length;
             const finishedCount = lines.filter((l) => l.status === 4).length;
+            const orderInfo = lines[0]?.pporders ?? order;
 
-            // prefer the richer object if available
-            console.log("lines[0]?.pporders", lines[0]?.pporders);
-            console.log("order", order);
-            const currentOrder: PPOrder = (lines[0]?.pporders ?? order) as PPOrder;
-            const prevOrder = null;
-
-            console.log("prevOrder", prevOrder);
-            // 1) If the current order has just completed all lines, finish it and clear ref
-            if (totalLines > 0 && finishedCount === totalLines) {
-              await handleFinish(currentOrder);
-              if (prevOrder?.pporderno === currentOrder.pporderno) {
-                lastActiveOrderRef.current = null;
-              }
-              return; // done for this event
+            if (finishedCount===1) {
+              await handleStart(orderInfo);
+              message.success(`Η Master ${orderInfo.pporderno} ξεκίνησε`);
             }
 
-            // 2) If we have no previous active order and this is the first finished line, start current
-            if (!prevOrder && finishedCount === 1) {
-              console.log("engaged in single master");
-                            lastActiveOrderRef.current = currentOrder;
-
-              await handleStart(currentOrder);
-              message.success(`Η Master ${currentOrder.pporderno} ξεκίνησε`);
-              return;
+            if ( totalLines > 0 && finishedCount === totalLines) {
+              await handleFinish(orderInfo);
             }
-
-            // 3) If we switched to a different order (and current isn’t finished), finish previous then start current
-            if (prevOrder && prevOrder.pporderno !== currentOrder.pporderno && finishedCount < totalLines) {
-              console.log("engaged in double master");
-              console.log("prevOrder", prevOrder);
-              console.log("currentOrder", currentOrder);
-                            lastActiveOrderRef.current = currentOrder;
-
-              await handleFinish(prevOrder);
-              await handleStart(currentOrder);
-
-              message.success(`Η Master ${currentOrder.pporderno} ξεκίνησε`);
-              return;
-            }
-
-            // (optional) If same order keeps progressing but not finished yet, do nothing.
-
           } catch (error) {
             console.error(error);
           }
         },
         error: (err) => console.error(err),
-        complete: () => { },
+        complete: () => {},
       }
     );
 
@@ -174,7 +134,7 @@ export const usePporderSubscriptions = ({
       {
         next: () => {
           refetchPporders();
-          refetchFinished();
+                    refetchFinished();
         },
         error: (err) => console.error(err),
         complete: () => {

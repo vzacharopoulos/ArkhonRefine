@@ -44,7 +44,6 @@ COPY --from=builder /app/refine/dist ./
 
 USER refine
 
-CMD ["sh", "-c", "serve -l ${PORT}"]
-
+CMD ["sh", "-c", "serve -s . -l ${PORT}"]
 EXPOSE ${PORT}
 

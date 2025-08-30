@@ -7,12 +7,12 @@ import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Popover from "@mui/material/Popover";
-import { useGetIdentity } from "@refinedev/core";
+import { useGetIdentity, useLogout } from "@refinedev/core";
 import { HamburgerMenu, RefineThemedLayoutV2HeaderProps } from "@refinedev/mui";
 import React, { useContext, useState } from "react";
 import { ColorModeContext } from "../../../contexts/color-mode";
 import type { Users } from '@/graphql/schema.types';
-import { SettingsOutlined } from "@mui/icons-material";
+import { LogoutOutlined, SettingsOutlined } from "@mui/icons-material";
 import { Button } from "@mui/material";
 
 type IUser = {
@@ -27,6 +27,8 @@ export const Header: React.FC<RefineThemedLayoutV2HeaderProps> = ({
   const { mode, setMode } = useContext(ColorModeContext);
   const { data: user } = useGetIdentity<Users>();
   const [IsOpen, SetIsOpen] = useState(false)
+
+    const { mutate: logout } = useLogout(); // ⬅️ use this
 
   // --- Popover state ---
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -118,7 +120,18 @@ export const Header: React.FC<RefineThemedLayoutV2HeaderProps> = ({
                     >
                       Ρυθμισεις
                     </Button>
-
+                   <Button
+            onClick={() => {
+              // optional: close the popover first
+              setAnchorEl(null);
+              logout(); // ⬅️ triggers authProvider.logout and redirects
+            }}
+            startIcon={<LogoutOutlined />}
+            fullWidth
+            style={{ justifyContent: "flex-start" }}
+          >
+            Αποσύνδεση
+          </Button>
 
                   </div>
                 </Popover>
