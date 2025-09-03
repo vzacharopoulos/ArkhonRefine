@@ -6,6 +6,7 @@ interface TotalTimeEntry {
   minutes: number;
   formatted: string;
   totalMinutes: number;
+  totalTtm: number;
 }
 
 interface TotalTimeContextType {

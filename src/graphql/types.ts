@@ -1491,6 +1491,7 @@ export type CoilsFilterInput = {
 export type CoilsResponse = {
   nodes: Array<Coil>;
   totalCount: Scalars['Int']['output'];
+  totalWeight: Scalars['Int']['output'];
 };
 
 export type CoilsSortInput = {
@@ -8474,6 +8475,8 @@ export const GetPpOrdersDocument = gql`
     offtimeduration
     offtimestartdate
     offtimeenddate
+    totalOrderTime
+    totalTtm
     pauses {
       id
       pausestartdate

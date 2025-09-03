@@ -1,0 +1,26 @@
+# Speed up Docker builds by reducing context size
+node_modules
+dist
+.next
+build
+.cache
+.turbo
+.vite
+coverage
+*.log
+*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.DS_Store
+.git
+.github
+**/__tests__
+**/*.spec.*
+**/*.test.*
+**/*.snap
+tmp
+Dockerfile*
+Caddyfile
+sql_talbe_adds

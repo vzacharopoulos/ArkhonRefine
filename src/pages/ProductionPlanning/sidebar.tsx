@@ -20,14 +20,13 @@ const { Title,Text  } = Typography;
     onSelectOrder: (id: number) => void;
     orderLines: PPOrderLine[];
     orderLinesLoading: boolean;
-    totalTime: {
+    totalOrderTime: {
     hours: number;
     minutes: number;
     formatted: string;
 
   };
   setPauseModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  totalMeter: number;
   }
   
   
@@ -40,8 +39,7 @@ const { Title,Text  } = Typography;
     unscheduledorders,
     selectedOrderId,
     onSelectOrder,
-    totalTime,
-     totalMeter,
+    totalOrderTime,
     orderLines,
     orderLinesLoading
 
@@ -87,8 +85,6 @@ const { Title,Text  } = Typography;
           <OrderList unscheduledorders={unscheduledorders}
            selectedOrderId={selectedOrderId}
              onSelectOrder={onSelectOrder}
-             totalTime={totalTime}
-             totalMeter={totalMeter}
              orderLinesLoading={orderLinesLoading}
              />
              

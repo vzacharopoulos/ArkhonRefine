@@ -12,16 +12,18 @@ import {
 import { WorkingHoursConfig } from "../productioncalendartypes";
 import { offTimeMap } from "./offtime-map";
 import { createOfftimeTitle } from "../helpers/offtimetitle";
+import { useTotalTimeContext } from "@/contexts/TotalTimeContext";
 
 export function handleDropFactory(
   currentEvents: EventInput[],
   finishedEvents: EventInput[],
-  totalTimeMinutes: number,
+ 
   dailyWorkingHours: Record<string, WorkingHoursConfig>,
   defaultWorkingHours: Record<number, WorkingHoursConfig>,
   setCurrentEvents: React.Dispatch<React.SetStateAction<EventInput[]>>,
- droppedIdsRef: React.MutableRefObject<Set<string>>
-  
+ droppedIdsRef: React.MutableRefObject<Set<string>>,
+    totalTimeByOrderId: Record<number, { totalMinutes: number }>
+
 ) {
   return function handleDrop(info: DropArg) {
     const draggedEvent = JSON.parse(info.draggedEl.dataset.event || "{}");
@@ -33,7 +35,7 @@ setTimeout(() => {
 }, 2000);
 
     const dropDate = dayjs(info.date);
-    const durationInMinutes = draggedEvent.extendedProps?.duration ?? totalTimeMinutes;
+    const durationInMinutes = draggedEvent.extendedProps?.duration ?? totalTimeByOrderId[draggedEvent.id]?.totalMinutes;
     const allEvents = [...currentEvents, ...finishedEvents];
     const lastEventEndTime = findLastEventEndTime(allEvents);
 

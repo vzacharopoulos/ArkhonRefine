@@ -1,0 +1,518 @@
+import React, { useEffect, useRef, useState } from "react";
+import { createWorker, OEM, PSM } from "tesseract.js";
+
+type Props = {
+  onFound?: (coilNo: string) => void;
+  // REQUIRED: Scanner only accepts a coil number if it exists in this whitelist
+  validCoils: string[];
+  // Auto-scan until match (default true)
+  continuous?: boolean;
+  // Processing method selection
+  processingMethod?: 'basic' | 'adaptive' | 'sunlight' | 'otsu';
+};
+
+const CoilNoScanner: React.FC<Props> = ({ 
+  onFound, 
+  validCoils, 
+  continuous = true,
+  processingMethod = 'basic' // Default to basic processing
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const workerRef = useRef<any>(null);
+
+  const [coilNo, setCoilNo] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [running, setRunning] = useState(false);
+  const validSetRef = useRef<Set<string> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+const [method, setMethod] = useState<'basic' | 'adaptive' | 'sunlight' | 'otsu'>(processingMethod);
+  // Normalize whitelist when it changes (REQUIRED)
+  useEffect(() => {
+    if (validCoils && validCoils.length) {
+      const norm = new Set(validCoils.map((v) => normalize(v)));
+      validSetRef.current = norm;
+    } else {
+      validSetRef.current = null; // nothing will be accepted
+    }
+  }, [validCoils]);
+
+  useEffect(() => {
+    let mounted = true;
+    console.log("[Scanner] Initializing worker...");
+    const t0 = performance.now();
+    (async () => {
+      const worker = await createWorker("eng");
+      await worker.setParameters({
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.:/",
+        tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+        tessedit_ocr_engine_mode: String(OEM.DEFAULT),
+        user_defined_dpi: "300",
+      });
+      if (!mounted) {
+        await worker.terminate();
+        return;
+      }
+      workerRef.current = worker;
+      setReady(true);
+      console.log(`[Scanner] Worker ready in ${(performance.now() - t0).toFixed(0)}ms`);
+    })();
+    return () => {
+      mounted = false;
+      (async () => {
+        if (workerRef.current) {
+          await workerRef.current.terminate();
+          console.log("[Scanner] Worker terminated");
+        }
+      })();
+    };
+  }, []);
+
+  const [procMethod, setProcMethod] = useState<Props["processingMethod"]>(processingMethod);
+useEffect(() => setProcMethod(processingMethod), [processingMethod]);
+
+type RejectedHit = { id: string; norm: string; count: number; last: number; confidence?: number };
+const rejectMapRef = useRef<Map<string, RejectedHit>>(new Map());
+const [rejectedList, setRejectedList] = useState<RejectedHit[]>([]);
+
+const recordRejected = (id: string, confidence?: number) => {
+  const norm = normalize(id);
+  if (!norm) return;
+  const now = Date.now();
+  const m = rejectMapRef.current;
+  const existing = m.get(norm);
+  if (existing) {
+    existing.count += 1;
+    existing.last = now;
+    // keep the latest confidence if provided
+    if (typeof confidence === "number") existing.confidence = confidence;
+  } else {
+    m.set(norm, { id, norm, count: 1, last: now, confidence });
+  }
+  // refresh list sorted by most recent
+  setRejectedList(Array.from(m.values()).sort((a, b) => b.last - a.last));
+};
+
+const clearRejected = () => {
+  rejectMapRef.current.clear();
+  setRejectedList([]);
+};
+
+const copyRejected = async () => {
+  const lines = rejectedList.map(r =>
+    `${r.id}\tcount=${r.count}\tlast=${new Date(r.last).toLocaleString()}` +
+    (typeof r.confidence === "number" ? `\tconf=${r.confidence.toFixed(1)}` : "")
+  ).join("\n");
+  try { await navigator.clipboard.writeText(lines || ""); } catch {}
+};
+
+  const startCamera = async () => {
+    try {
+      console.log("[Scanner] Requesting camera (environment)");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        const track = stream.getVideoTracks()[0];
+        console.log("[Scanner] Camera started", track && (track as any).getSettings ? (track as any).getSettings() : {});
+      }
+    } catch (e) {
+      console.error("Camera error:", e);
+    }
+  };
+
+  // Enhanced image processing methods
+  const adaptiveThreshold = (imageData: ImageData, blockSize = 15, C = 10) => {
+    const t = performance.now();
+    const { data, width, height } = imageData;
+    const gray = new Uint8Array(width * height);
+    const result = new Uint8ClampedArray(data.length);
+    
+    // Convert to grayscale first
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const grayValue = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      gray[i / 4] = grayValue;
+    }
+    
+    // Apply adaptive threshold
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = y * width + x;
+        const pixelIdx = idx * 4;
+        
+        // Calculate local mean in blockSize x blockSize window
+        let sum = 0, count = 0;
+        const halfBlock = Math.floor(blockSize / 2);
+        
+        for (let dy = -halfBlock; dy <= halfBlock; dy++) {
+          for (let dx = -halfBlock; dx <= halfBlock; dx++) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+              sum += gray[ny * width + nx];
+              count++;
+            }
+          }
+        }
+        
+        const localMean = sum / count;
+        const threshold = localMean - C;
+        const value = gray[idx] > threshold ? 255 : 0;
+        
+        result[pixelIdx] = result[pixelIdx + 1] = result[pixelIdx + 2] = value;
+        result[pixelIdx + 3] = data[pixelIdx + 3]; // Keep alpha
+      }
+    }
+    
+    const out = new ImageData(result, width, height);
+    console.log(`[Scanner] adaptiveThreshold b=${blockSize} C=${C} took ${(performance.now()-t).toFixed(0)}ms`);
+    return out;
+  };
+
+  const sunlightOptimized = (imageData: ImageData) => {
+    const t = performance.now();
+    const { data, width, height } = imageData;
+    const result = new Uint8ClampedArray(data.length);
+    
+    // First pass: convert to grayscale and enhance contrast
+    const gray = new Uint8Array(width * height);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let grayValue = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      
+      // Enhance contrast using S-curve
+      grayValue = grayValue / 255;
+      grayValue = grayValue < 0.5 ? 
+        2 * grayValue * grayValue : 
+        1 - 2 * (1 - grayValue) * (1 - grayValue);
+      grayValue = (grayValue * 255) | 0;
+      
+      gray[i / 4] = grayValue;
+    }
+    
+    // Calculate adaptive threshold based on local statistics
+    for (let i = 0; i < gray.length; i++) {
+      const y = Math.floor(i / width);
+      const x = i % width;
+      
+      // Sample local neighborhood
+      let localSum = 0, localCount = 0;
+      const radius = 20; // Larger radius for better adaptation
+      
+      for (let dy = -radius; dy <= radius; dy += 5) { // Sample every 5th pixel for speed
+        for (let dx = -radius; dx <= radius; dx += 5) {
+          const ny = y + dy;
+          const nx = x + dx;
+          if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+            localSum += gray[ny * width + nx];
+            localCount++;
+          }
+        }
+      }
+      
+      const localMean = localSum / localCount;
+      
+      // Dynamic threshold based on local conditions
+      const adaptiveOffset = 15; // Adjust based on your needs
+      const threshold = localMean - adaptiveOffset;
+      
+      const pixelValue = gray[i] > threshold ? 255 : 0;
+      
+      result[i * 4] = result[i * 4 + 1] = result[i * 4 + 2] = pixelValue;
+      result[i * 4 + 3] = data[i * 4 + 3];
+    }
+    
+    const out = new ImageData(result, width, height);
+    console.log(`[Scanner] sunlightOptimized took ${(performance.now()-t).toFixed(0)}ms`);
+        console.log("basic threshold out",out)
+
+    return out;
+  };
+
+  const otsuThreshold = (imageData: ImageData) => {
+    const t = performance.now();
+    const { data, width, height } = imageData;
+    const gray = new Uint8Array(width * height);
+    
+    // Convert to grayscale with contrast enhancement
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let grayValue = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      
+      // Gamma correction for better contrast
+      const gamma = 1.2;
+      grayValue = Math.pow(grayValue / 255, 1/gamma) * 255;
+      gray[i / 4] = grayValue;
+    }
+    
+    // Calculate histogram
+    const histogram = new Array(256).fill(0);
+    for (let i = 0; i < gray.length; i++) {
+      histogram[gray[i]]++;
+    }
+    
+    // Otsu's automatic threshold calculation
+    let total = histogram.reduce((sum, val) => sum + val, 0);
+    let sumB = 0, wB = 0, maximum = 0.0;
+    let sum1 = 0;
+    
+    for (let i = 0; i < 256; i++) {
+      sum1 += i * histogram[i];
+    }
+    
+    let threshold = 128; // fallback
+    for (let i = 0; i < 256; i++) {
+      wB += histogram[i];
+      if (wB === 0) continue;
+      
+      let wF = total - wB;
+      if (wF === 0) break;
+      
+      sumB += i * histogram[i];
+      let mB = sumB / wB;
+      let mF = (sum1 - sumB) / wF;
+      let between = wB * wF * Math.pow(mB - mF, 2);
+      
+      if (between > maximum) {
+        maximum = between;
+        threshold = i;
+      }
+    }
+    
+    // Apply threshold
+    const result = new Uint8ClampedArray(data.length);
+    for (let i = 0; i < gray.length; i++) {
+      const value = gray[i] > threshold ? 255 : 0;
+      result[i * 4] = result[i * 4 + 1] = result[i * 4 + 2] = value;
+      result[i * 4 + 3] = data[i * 4 + 3];
+    }
+    
+    const out = new ImageData(result, width, height);
+    console.log(`[Scanner] otsuThreshold took ${(performance.now()-t).toFixed(0)}ms`);
+        console.log("basic threshold out",out)
+
+    return out;
+  };
+
+  const basicThreshold = (imageData: ImageData) => {
+    const t = performance.now();
+    const { data } = imageData;
+    const result = new Uint8ClampedArray(data.length);
+    
+    // Your original method
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const gray = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      const v = gray > 160 ? 255 : 0;
+      result[i] = result[i + 1] = result[i + 2] = v;
+      result[i + 3] = data[i + 3];
+    }
+    
+    const out = new ImageData(result, imageData.width, imageData.height);
+    console.log("basic threshold out",out)
+    console.log(`[Scanner] basicThreshold took ${(performance.now()-t).toFixed(0)}ms`);
+    return out;
+  };
+
+  const processImage = (roi: ImageData) => {
+    console.log("[Scanner] processImage method=", method);
+    switch (method) {
+      case 'adaptive':
+        return adaptiveThreshold(roi, 15, 12);
+      case 'sunlight':
+        return sunlightOptimized(roi);
+      case 'otsu':
+        return otsuThreshold(roi);
+      case 'basic':
+      default:
+        return basicThreshold(roi);
+    }
+  };
+
+  const normalize = (s: string) => s.toUpperCase().replace(/\s+/g, "").trim();
+  
+  const extract = (raw: string) => {
+
+    let text = (raw || "").toUpperCase().replace(/\s+/g, "");
+    console.log("[Scanner] OCR raw:", JSON.stringify(raw), "normalized:", text);
+    // Common OCR swaps
+    text = text.replace(/O/g, "0");
+    
+    const jpPattern = /^JP\d{6}F0D\d(?:MHMZS|KMZS|MMZS)$/;
+    const dPattern = /^D\d{12}[ABCD]$/;
+    
+    // Only two accepted patterns:
+    // 1) JP + 6 digits + F0D + 1 digit + MHMZS  (e.g., JP534436F0D3MHMZS)
+    const jp = text.match(new RegExp(jpPattern.source, "g")) || [];  
+    if (jp.length) { console.log("[Scanner] matched JP:", jp[0]); return jp[0]; }
+    
+    // 2) D + 12 digits + B  (e.g., D202507120341B)
+    const dcode = text.match(/D\d{12}[ABCD]/g) || [];
+    if (dcode.length) { console.log("[Scanner] matched D:", dcode[0]); return dcode[0]; }
+    
+    // If label has explicit key
+    const m = text.match(/COIL\s*NO\.?[:\-]?([A-Z0-9\-]+)/);
+    if (m?.[1]) {
+      const t = m[1];
+      if (jpPattern.test(t) || dPattern.test(t)) return t;
+    }
+    return null;
+  };
+
+  const isAcceptable = (candidate: string | null) => {
+    if (!candidate) return false;
+    const norm = normalize(candidate);
+    const set = validSetRef.current;
+    if (!set || set.size === 0) return false; // whitelist REQUIRED
+    return set.has(norm);
+  };
+
+  const snapAndOCR = async () => {
+    if (!videoRef.current || !canvasRef.current || !workerRef.current) return;
+    setBusy(true);
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(video, 0, 0, w, h);
+      
+      // crop center band
+      const cropX = Math.floor(w * 0.20); // 30% from left
+      const cropW = Math.floor(w * 0.5);  // 50% width
+      const cropY = Math.floor(h * 0.60); // 45% from top
+      
+      const cropH = Math.floor(h * 0.35);  // 30% height
+
+      console.log(`[Scanner] ROI x=${cropX} y=${cropY} w=${cropW} h=${cropH}`);
+      const roi = ctx.getImageData(cropX, cropY, cropW, cropH);
+      
+      // Enhanced image processing based on selected method
+      const tProc = performance.now();
+      const processedRoi = processImage(roi);
+      console.log(`[Scanner] processing took ${(performance.now()-tProc).toFixed(0)}ms`);
+      ctx.putImageData(processedRoi, cropX, cropY);
+      const tOcr = performance.now();
+      const { data } = await workerRef.current.recognize(canvas);
+      console.log(`[Scanner] OCR ${(performance.now()-tOcr).toFixed(0)}ms conf=`, (data as any)?.confidence);
+const found = extract(data.text || "");
+setCoilNo(found || "(not found)");
+
+if (isAcceptable(found ?? "not found ")) {
+  if (onFound && found) onFound(found);
+  stopContinuous(); // success → stop if continuous
+} else if (found) {
+  // save rejected candidate (with overall confidence if available)
+  recordRejected(found, (data as any)?.confidence);
+}
+    } catch (e) {
+      console.error(e);
+      setCoilNo("(error)");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startContinuous = () => {
+    if (!continuous || running) return;
+    setRunning(true);
+    console.log("[Scanner] auto-scan started");
+    // run every ~1200ms to avoid overlapping OCR calls
+    timerRef.current = setInterval(() => {
+      if (!busy && ready) {
+        snapAndOCR();
+      }
+    }, 1200);
+  };
+
+  const stopContinuous = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setRunning(false);
+    console.log("[Scanner] auto-scan stopped");
+  };
+
+  useEffect(() => {
+    if (continuous && ready && validSetRef.current && validSetRef.current.size > 0) {
+      startContinuous();
+      return stopContinuous;
+    }
+    return undefined;
+  }, [continuous, ready, validCoils]);
+
+  return (
+    <div style={{ padding: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <button onClick={startCamera}>Enable Camera</button>
+        <select 
+          value={method} 
+          onChange={(e) => setMethod(e.target.value as any)}
+          style={{ padding: 4 }}
+        >
+          <option value="sunlight">Sunlight Optimized</option>
+          <option value="adaptive">Adaptive Threshold</option>
+          <option value="otsu">Auto Threshold (Otsu)</option>
+          <option value="basic">Basic Threshold</option>
+        </select>
+      </div>
+      <div style={{ position: "relative", width: "100%", maxWidth: 640 }}>
+        <video ref={videoRef} playsInline muted style={{ width: "100%" }} />
+        <div
+          style={{
+            position: "absolute", 
+            left: "25%", 
+            right: "25%", 
+            top: "35%", 
+            height: "30%",
+            border: "2px dashed rgba(255,255,255,0.9)",
+          }}
+        />
+      </div>
+      <button onClick={snapAndOCR} disabled={busy || !ready} style={{ marginTop: 12 }}>
+        {busy ? "Reading..." : "Scan COIL NO"}
+      </button>
+      <div style={{ marginTop: 8 }}>
+        <strong>COIL NO:</strong> {coilNo}
+      </div>
+      <div style={{ marginTop: 12, padding: 8, border: "1px solid #ddd", borderRadius: 8 }}>
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <strong>Rejected candidates (not in whitelist)</strong>
+    <div style={{ display: "flex", gap: 8 }}>
+      <button onClick={copyRejected} disabled={!rejectedList.length}>Copy</button>
+      <button onClick={clearRejected} disabled={!rejectedList.length}>Clear</button>
+    </div>
+  </div>
+  {rejectedList.length === 0 ? (
+    <div style={{ color: "#666", marginTop: 6 }}>None yet.</div>
+  ) : (
+    <ul style={{ margin: "6px 0 0 16px" }}>
+      {rejectedList.map(r => (
+        <li key={r.norm}>
+          <code>{r.id}</code>
+          {"  "}×{r.count}
+          {"  "}· last {new Date(r.last).toLocaleTimeString()}
+          {typeof r.confidence === "number" && <> · conf {r.confidence.toFixed(1)}</>}
+        </li>
+      ))}
+    </ul>
+  )}
+</div>
+      <div style={{ marginTop: 4, fontSize: "12px", color: "#666" }}>
+        Mode: {method} | Running: {running ? "Yes" : "No"}
+      </div>
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+    </div>
+  );
+};
+
+export default CoilNoScanner;

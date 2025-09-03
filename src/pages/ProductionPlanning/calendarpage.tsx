@@ -3,7 +3,7 @@ import { useCustom, useDataProvider, useResourceSubscription, useUpdate } from "
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { EventInput } from "@fullcalendar/core";
-import { GET_FINISHED_PPORDERS,  GET_PPORDERS, PPORDER_UPDATED_SUBSCRIPTION, PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, UPDATE_PPORDERS } from "@/graphql/queries";
+import { GET_FINISHED_PPORDERS, GET_PPORDERS, PPORDER_UPDATED_SUBSCRIPTION, PPORDERLINE_CREATED_SUBSCRIPTION, PPORDERLINE_DELETED_SUBSCRIPTION, PPORDERLINE_STATUS_CHANGED_SUBSCRIPTION, UPDATE_PPORDERS } from "@/graphql/queries";
 import adaptivePlugin from '@fullcalendar/adaptive'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin, { Draggable, DropArg } from '@fullcalendar/interaction'
@@ -50,6 +50,8 @@ import PauseModal from "@/components/modals/pausemodal";
 import { useCreatePause } from "@/hooks/useCreatePause";
 import { useDeletePause } from "@/hooks/useDeletePause";
 import { EnergySavingsLeafTwoTone } from "@mui/icons-material";
+import {  usePpordersTimes } from "@/hooks/usePpordersTimes";
+import { time } from "console";
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 dayjs.extend(duration);
@@ -69,7 +71,7 @@ export const ProductionCalendar: React.FC = () => {
     error: ppordersError,
     refetch: refetchPporders,
 
-  } = usePporders();
+  } = usePporders({ status: [1, 2, 3, 14] });
 
   const {
     data: finishedData,
@@ -77,12 +79,16 @@ export const ProductionCalendar: React.FC = () => {
     refetch: refetchFinished,
   } = useFinishedPporders();
 
+  const { data: timesData } = usePpordersTimes({ status: [1, 2, 3, 14] });
+
   const { data: workingHoursData } = useDailyWorkingHoursQuery();
 
   const { updateDailyWorkingHours } = useUpdateDailyWorkingHours();
 
   const { updatePporder } = useUpdatePporder();
   const { updatePause } = useUpdatePause();
+
+
 
   // Then create a function to handle the mutation:
   const handleUpdatePporder = async (
@@ -196,19 +202,19 @@ export const ProductionCalendar: React.FC = () => {
         const previousCode = deletedOrder.prevpanelcode?.replace(/-001$/, "");
         const currentCode = nextOrder.panelcode?.replace(/-001$/, "");
         const offtimeduration = offTimeMap?.[previousCode ?? 0]?.[currentCode ?? 0] ?? 30;
-        const offtimeenddate = addWorkingMinutesDynamic(dayjs(deletedOrder.offtimestartdate),offtimeduration,dailyWorkingHours,defaultWorkingHours)
+        const offtimeenddate = addWorkingMinutesDynamic(dayjs(deletedOrder.offtimestartdate), offtimeduration, dailyWorkingHours, defaultWorkingHours)
 
         await updatePporder(nextOrder.id, {
           offtimeduration: offtimeduration ?? null,
-         estStartDate:offtimeenddate,
-         estFinishDate:addWorkingMinutesDynamic(offtimeenddate,totalTimeByOrderId[nextOrder.id].totalMinutes??0 ,dailyWorkingHours,defaultWorkingHours),
+          estStartDate: offtimeenddate,
+          estFinishDate: addWorkingMinutesDynamic(offtimeenddate, totalTimeByOrderId[nextOrder.id].totalMinutes ?? 0, dailyWorkingHours, defaultWorkingHours),
           offtimestartdate: deletedOrder.offtimestartdate ?? null,
-          offtimeenddate: offtimeenddate?? null,
+          offtimeenddate: offtimeenddate ?? null,
           previd: deletedOrder.previd ?? null,
           prevpanelcode: deletedOrder.prevpanelcode ?? null,
         });
       }
-     
+
       // Filter out the deleted order and its parts from the currentEvents
       const updatedEvents = currentEvents.filter(ev => {
         const evId = ev.id?.toString();
@@ -217,7 +223,7 @@ export const ProductionCalendar: React.FC = () => {
 
       // Optional: filter out incomplete events (without start or end)
       const validEvents = updatedEvents.filter(ev => ev.start && ev.end);
-console.log("valid events",validEvents)
+      console.log("valid events", validEvents)
       // Chain remaining events
       const chainedEvents = chainEventsSequentially(validEvents, dailyWorkingHours, defaultWorkingHours);
 
@@ -437,7 +443,7 @@ console.log("valid events",validEvents)
     isLoading: orderLinesLoading,
     refetch: refetchPporderlines,
   } = usePporderLines(selectedPporderno);
-  const orderLines = orderLinesData?.data?? [];
+  const orderLines = orderLinesData?.data ?? [];
   const finished = finishedData?.data?.masterlengths ?? [];
   const orders = ppordersData?.data?.pporders ?? [];
   const unscheduledorders = useMemo(
@@ -449,6 +455,7 @@ console.log("valid events",validEvents)
       }),
     [orders]
   );
+const timeRows = timesData?.data?.pporders ?? [];
 
   usePporderSubscriptions({
     refetchPporders,
@@ -465,25 +472,29 @@ console.log("valid events",validEvents)
     setEditEnd,
     handleUpdateAllEvents,
     manualSyncRef,
-    
-  });
 
-  const totalTimeByOrderId = useMemo(() => {
-    const map: Record<number, { hours: number; minutes: number; formatted: string; totalMinutes: number }> = {};
-    unscheduledorders.forEach(order => {
-      const lines = orderLines.filter(line => line.pporderno === order.pporderno);
-      // if(lines.length!=0){
-      // console.log(lines)}
-      const time = calculateTotalTime(lines);
-      const totalMinutes = time.hours * 60 + time.minutes;
-      map[order.id] = {
-        ...time,
-        totalMinutes,
-      };
-    });
-    // console.log(map)
-    return map;
-  }, [unscheduledorders, orderLines]);
+  });
+const totalTimeByOrderId = useMemo(() => {
+// Build lookup by order id from the compact rows
+const byId: Record<number, { totalOrderTime?: number | null; totalTtm?: number | null }> = {};
+for (const r of timeRows) byId[r.id] = r as any;
+console.log(timeRows)
+const map: Record<number, { hours: number; minutes: number; formatted: string; totalMinutes: number; totalTtm: number }> = {};
+for (const order of unscheduledorders) {
+const minutes = Math.round(Number(byId[order.id]?.totalOrderTime ?? 0)) || 0;
+const hours = Math.floor(minutes / 60);
+const mins = minutes % 60;
+map[order.id] = {
+hours,
+minutes: mins,
+formatted: `${hours}h ${mins}m`,
+totalMinutes: minutes,
+totalTtm: byId[order.id]?.totalTtm || 0,
+};
+}
+return map;
+}, [timeRows, unscheduledorders, PPORDERLINE_CREATED_SUBSCRIPTION, PPORDERLINE_DELETED_SUBSCRIPTION]);
+
 
 
   useEffect(() => { // renders currentEvents from unscheduled orders whenever orders change
@@ -747,9 +758,6 @@ console.log("valid events",validEvents)
   }, [unscheduledorders, dailyWorkingHours, defaultWorkingHours, manualSyncRef]);
 
 
-  const totalTime = useMemo(() => calculateTotalTime(orderLines), [orderLines]);
-  const totalMeter = useMemo(() => calculateTotalLength(orderLines), [orderLines]);
-
   const finishedEvents: EventInput[] = useMemo(() => {
     const events: EventInput[] = [];
     const sorted = [...finished].sort((a, b) =>
@@ -920,7 +928,6 @@ console.log("valid events",validEvents)
   }, [finished, dailyWorkingHours, defaultWorkingHours]);
 
 
-  const totalMinutes = totalTime.hours * 60 + totalTime.minutes;
 
 
 
@@ -928,22 +935,19 @@ console.log("valid events",validEvents)
     handleDropFactory(
       currentEvents,
       finishedEvents,
-      totalMinutes,
       dailyWorkingHours,
       defaultWorkingHours,
       setCurrentEvents,
-      droppedIdsRef
-
-
-
+      droppedIdsRef,
+      totalTimeByOrderId
     ), [
     currentEvents,
     finishedEvents,
-    totalMinutes,
     dailyWorkingHours,
     defaultWorkingHours,
     setCurrentEvents,
-    droppedIdsRef
+    droppedIdsRef,
+    totalTimeByOrderId
   ]);
 
   const nonWorkingTimeBackgroundEvents = useMemo(() => {
@@ -1021,11 +1025,11 @@ console.log("valid events",validEvents)
 
 
 
-  return (
+   return (
     <TotalTimeProvider value={{ totalTimeByOrderId }}>
       <Layout style={{ padding: 12, display: "flex", gap: 24 }}>
         <Sider width={300} style={{ background: "#fff", padding: 12 }}>
-          
+
           <Sidebar
             weekendsVisible={weekendsVisible}
             onToggleWeekends={handleWeekendsToggle}
@@ -1041,8 +1045,7 @@ console.log("valid events",validEvents)
             }}
             orderLines={orderLines}
             orderLinesLoading={orderLinesLoading}
-            totalTime={totalTime}
-            totalMeter={totalMeter}
+            totalOrderTime={totalTimeByOrderId[selectedOrderId ?? 0] || "0h 0m"}
           />
           <Divider />
           <WorkingHoursPicker
@@ -1067,28 +1070,29 @@ console.log("valid events",validEvents)
           maxHeight: "auto", // Maximum height
           overflow: "scroll", // Enable scrolling if content overflows
         }}>
- <div style={{ display: "flex", alignItems: "start", gap: 10, marginBottom: 16 ,marginLeft:530
- }}>
- 
-          <Checkbox checked={weekendsVisible} onChange={handleWeekendsToggle}>
-           με/χωρίς σ/κ
-          </Checkbox>
-      
-        
-          <Checkbox checked={weekendsVisible} onChange={handleCurrentEventToggle}>
-            βάλτες ξανά σε σειρά
-                        <ExclamationCircleOutlined style={{ color: "#ff4d4f",marginLeft:5 }} />
+          <div style={{
+            display: "flex", alignItems: "start", gap: 10, marginBottom: 16, marginLeft: 530
+          }}>
 
-          </Checkbox>
-        
-  <SlotSettingsPopover
-    slotDurationLabel={slotDurationLabel}
-    toggleSlotDuration={toggleSlotDuration}
-    slotModeLabel={slotModeLabel}
-    toggleSlotMinMax={toggleSlotMinMax}
-  />
-</div>
-          
+            <Checkbox checked={weekendsVisible} onChange={handleWeekendsToggle}>
+              με/χωρίς σ/κ
+            </Checkbox>
+
+
+            <Checkbox checked={weekendsVisible} onChange={handleCurrentEventToggle}>
+              βάλτες ξανά σε σειρά
+              <ExclamationCircleOutlined style={{ color: "#ff4d4f", marginLeft: 5 }} />
+
+            </Checkbox>
+
+            <SlotSettingsPopover
+              slotDurationLabel={slotDurationLabel}
+              toggleSlotDuration={toggleSlotDuration}
+              slotModeLabel={slotModeLabel}
+              toggleSlotMinMax={toggleSlotMinMax}
+            />
+          </div>
+
           <ProductionCalendarView
             events={[
               ...finishedEvents,
@@ -1146,12 +1150,12 @@ console.log("valid events",validEvents)
               const lastEvent = relatedEvents.reduce<EventInput | null>((latest, ev) =>
                 !latest || new Date(ev.end as Date) > new Date(latest.end as Date) ? ev : latest
                 , null);
-const pauseMin = Number(selectedEvent.extendedProps?.pauseduration ?? 0);
-const lastEnd = lastEvent?.end ? dayjs(lastEvent.end as Date) : null;
+              const pauseMin = Number(selectedEvent.extendedProps?.pauseduration ?? 0);
+              const lastEnd = lastEvent?.end ? dayjs(lastEvent.end as Date) : null;
               // Step 3: Calculate new estFinishDate
-          const newEstFinishDate = (pauseMin > 0 && lastEnd)
-  ? lastEnd.subtract(pauseMin, "minute")   // returns a dayjs
-  : null;
+              const newEstFinishDate = (pauseMin > 0 && lastEnd)
+                ? lastEnd.subtract(pauseMin, "minute")   // returns a dayjs
+                : null;
               // Step 4: Update pporder if all good
               if (success && newEstFinishDate) {
                 await updatePporder(Number(selectedEvent.extendedProps?.currId), {

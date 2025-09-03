@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run PS (Bypass)",
+      "type": "shell",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "options": {
+        "shell": {
+          "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass"]
+        }
+      },
+      "command": "Write-Output 'OK'",
+      "problemMatcher": []
+    }
+  ]
+}

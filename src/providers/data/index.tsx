@@ -10,10 +10,31 @@ import {createClient} from 'graphql-ws';
 
 
 const localIp =  import.meta.env.VITE_LOCAL_IP || "localhost";
-console.log(`🌐 data provider runnong at http://${localIp}:4000`);
-export const API_BASE_URL = `http://${localIp}:4000`;
-export const API_URL = `${API_BASE_URL}/graphql`;
-export const WS_URL = `ws://${localIp}:4000/graphql`;
+console.log(` 🌐 data provider running at ${window.location.origin}`);
+console.log(`🌐 local running at http://${localIp}:4000`);
+// Build API/WS URLs dynamically to support HTTPS on raw IP (e.g., https://192.168.11.15)
+function buildUrls() {
+  const isBrowser = typeof window !== "undefined";
+  if (isBrowser && window.location.protocol === "https:") {
+    const origin = window.location.origin; // e.g., https://192.168.11.15
+    return {
+      API_BASE_URL: origin,
+      // Use relative path to avoid mixed content and ensure same-origin
+      API_URL: "/graphql",
+      WS_URL: `wss://${window.location.host}/graphql`,
+    };
+  }
+  const protocol = (import.meta.env.VITE_PROTOCOL as string) || "http";
+  const wsProtocol = protocol === "https" ? "wss" : "ws";
+  const apiBase = `${protocol}://${localIp}:4000`;
+  return {
+    API_BASE_URL: apiBase,
+    API_URL: `${apiBase}/graphql`,
+    WS_URL: `${wsProtocol}://${localIp}:4000/graphql`,
+  };
+}
+
+export const { API_BASE_URL, API_URL, WS_URL } = buildUrls();
 
 
 

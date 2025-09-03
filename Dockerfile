@@ -46,4 +46,3 @@ USER refine
 
 CMD ["sh", "-c", "serve -s . -l ${PORT}"]
 EXPOSE ${PORT}
-

@@ -1,0 +1,22 @@
+{
+default_sni 192.168.11.33
+}
+https://192.168.11.33 {
+tls internal
+encode zstd gzip
+
+# ---- GraphQL (HTTP + WebSocket) ----
+  @graphql path /graphql*
+  reverse_proxy @graphql http://host.docker.internal:4000
+
+  # Explicit websocket matcher (optional; usually not needed, but safe)
+  @graphql_ws {
+    path /graphql
+    header Connection *Upgrade*
+    header Upgrade websocket
+  }
+  reverse_proxy @graphql_ws http://host.docker.internal:4000
+
+  # ---- Everything else -> frontend ----
+  reverse_proxy http://host.docker.internal:5173
+}

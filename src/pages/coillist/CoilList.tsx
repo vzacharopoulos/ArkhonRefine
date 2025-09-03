@@ -1,13 +1,20 @@
-import { List, useTable, EditButton, ShowButton, DeleteButton, DateField, getDefaultSortOrder, FilterDropdown } from "@refinedev/antd";
-import { Table, Space, Input, Select, Button } from "antd";
+import { List, useTable, EditButton, ShowButton, DeleteButton, DateField, getDefaultSortOrder, FilterDropdown, rangePickerFilterMapper, useSelect } from "@refinedev/antd";
+import { Table, Space, Input, Select, Button, DatePicker } from "antd";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import dayjs, { Dayjs } from "dayjs";
 import { SearchOutlined } from "@ant-design/icons";
-import { getDefaultFilter, setInitialFilters, useGetIdentity } from "@refinedev/core";
+import { CrudFilters, getDefaultFilter, LogicalFilter, setInitialFilters, useGetIdentity } from "@refinedev/core";
 
-import { GET_AVAILABLE_COILS } from "@/graphql/queries";
+import { GET_AVAILABLE_COILS, GET_STATUSES } from "@/graphql/queries";
 import { Coil, Users } from "graphql/types";
 import type { GetFieldsFromList } from "@refinedev/nestjs-query";
 import React from "react";
-
+import DirectionsBoatIcon from "@mui/icons-material/DirectionsBoat";
+import DirectionsBoatFilledIcon from "@mui/icons-material/DirectionsBoatFilled";
+import SailingIcon from "@mui/icons-material/Sailing";
+import { CoilsFilterInput, FilterLock } from "./coiltypes/coil_types";
+import { table } from "console";
 
 
 
@@ -19,12 +26,15 @@ interface CoilListProps {
   locationMap: Map<number, string>;
   colorMap: Map<string, { name: string; hexcode?: string }>
   tableProps: any;
+  totalWeight: number;
   current: number;
   pageSize: number;
   setCurrent: (page: number) => void;
   sorters: any;
   filters: any;
   initialFilters: any[];
+  setLockedPermanent: React.Dispatch<React.SetStateAction<CrudFilters>>;
+  clearLockedPermanent: () => void;
 }
 
 
@@ -38,13 +48,24 @@ export const CoilList: React.FC<CoilListProps> = ({
   tableProps,
   current,
   pageSize,
+ totalWeight,
   setCurrent,
   sorters,
   filters,
-  initialFilters
+  initialFilters,
+  setLockedPermanent,
+  clearLockedPermanent
 }) => {
   // pull in your user so you can derive allowedLocations
 
+  const SEND_FMT = "YYYY-MM-DD HH:mm:ss"; // what backend expects (local time)
+  // Status options for filtering by status id using label name
+  const { selectProps: statusSelectProps } = useSelect({
+    resource: "statuses",
+    optionLabel: "nameGrp",
+    optionValue: "id",
+    meta: { gqlQuery: GET_STATUSES },
+  });
 
 
 
@@ -52,56 +73,153 @@ export const CoilList: React.FC<CoilListProps> = ({
   if (userLoading || !user) {
     return <div>Loading...</div>;
   } else {
-    return (
-
-      <List headerButtons={() => (
-        <>
-          <Button
-            onClick={() => {
-              setFilters(initialFilters, "replace");
-            }}
-            style={{
+   
+return (
+  <List
+    headerButtons={() => (
+      <>
+        {/* Reset visible (non-permanent) filters */}
+      <Button onClick={() => setFilters(initialFilters, "replace")}  style={{
               backgroundColor: '#1890ff', // Blue color
               color: 'white',
               borderColor: '#1890ff'
-            }}
+            }}>
+        Επαναφορά Πίνακα
+      </Button>
 
-          >
-            Επαναφορά Πίνακα
-          </Button>
-        </>
-      )}
+      {/* Status filter (by name; filters by status id) */}
+      <Select
+        {...statusSelectProps}
+        allowClear
+        style={{ width: 220, marginLeft: 8 }}
+        placeholder="Κατάσταση"
+        value={getDefaultFilter("status", filters)}
+        onChange={(val) => {
+          setFilters([{ field: "status", operator: "eq", value: val || undefined }], "merge");
+        }}
+      />
+
+      {/* Permanent filter: isUnloaded */}
+      <Select
+        style={{ width: 220, marginLeft: 8 }}
+        placeholder="Φίλτρο αποφόρτωσης"
+        options={[
+          { label: 'Αποφορτωμένα (isUnloaded=1)', value: 'unloaded' },
+          { label: 'Μη αποφορτωμένα (isUnloaded=0)', value: 'not_unloaded' },
+          { label: 'Όλα (χωρίς φίλτρο)', value: 'all' },
+        ]}
+        onChange={(val) => {
+          setLockedPermanent((prev) => {
+            const current = Array.isArray(prev) ? prev : [];
+            const others = current.filter((f: any) => f.field !== 'isUnloaded' && f.field !== 'isLoaded');
+            if (val === 'unloaded') {
+              return [
+                ...others,
+                { field: 'isUnloaded', operator: 'eq', value: true },
+              ];
+            }
+            if (val === 'not_unloaded') {
+              return [
+                ...others,
+                { field: 'isUnloaded', operator: 'eq', value: false },
+              ];
+            }
+            // all -> clear only the isUnloaded/isLoaded constraints, keep others
+            return others;
+          });
+        }}
+      />
+
+      {/* 🔒 Set specific permanent filters (e.g., documents) */}
+      <Button
+        onClick={() => {
+          const docs = [
+            "2025CS-ARK13","2025CS-ARK12B","2025CS-ARK12A",
+            "2025CS-ARK14","2025CS-ARK15","2025CS-ARK16",
+            "2025CS-ARK17","25JY-AS04",
+          ];
+          // set as *permanent*
+          setLockedPermanent([
+            { field: "documents", operator: "in", value: docs },
+          ]);
+          // optional: clear same filter from the visible layer to avoid duplication
+          setFilters([{ field: "documents", operator: "in", value: undefined }], "merge");
+        }}
       >
+        καράβι πάτρα
+        <DirectionsBoatIcon />
+      </Button>
+
+      {/* 🔓 Clear dynamic permanent filters */}
+      <Button onClick={clearLockedPermanent}>
+        Ξεκλείδωμα μόνιμων φίλτρων
+      </Button>
+
+      {/* 🔒 Bonus: lock *current* visible filters as permanent */}
+      <Button
+        onClick={() => {
+          // take current filters that have a value and make them permanent
+          const toLock = (filters ?? []).filter((f: LogicalFilter) => f.value !== undefined && f.value !== null && f.value !== "");
+          setLockedPermanent(toLock);
+          // then clear them from the visible layer
+          setFilters((prev: LogicalFilter[]) => prev.filter(f => !toLock.some((t: LogicalFilter) => t.field === f.field)));
+        }}
+      >
+        Κλείδωμα τρεχόντων φίλτρων
+      </Button>
+    </>
+  )}
+>
         <Table
           {...tableProps}
           rowKey="id"
           pagination={{
+            ...tableProps.pagination, 
             current,
             pageSize,
             total: tableProps.pagination?.total ?? 0,
             onChange: (page) => setCurrent(page),
             showSizeChanger: true,
-            showTotal: (t) => `συνολο ${t} αντικείμενα`,
+            
+             showTotal: (total, range) => (
+            <span>
+              σύνολο {total} Coils — συνολικό βάρος:&nbsp;
+              <strong>{(totalWeight ?? 0).toLocaleString('el-GR')}</strong> kg
+            </span>
+          ),
           }}
           bordered
         >
-          <Table.Column<Coil>
-            dataIndex="coilno"
-            title="Κωδικός"
-            defaultFilteredValue={getDefaultFilter("coilno", filters)}
-            filterIcon={<SearchOutlined />}
-            filterDropdown={(props) => (
-              <FilterDropdown {...props}>
-                <Input placeholder="Αναζήτηση κωδικού" />
-              </FilterDropdown>
-            )}
-            sorter
-          />
+          // coilno — contains (text)
+<Table.Column
+  dataIndex="supcoilId"
+  title="Κωδικός Προμ"
+  filteredValue={getDefaultFilter("supcoilId", filters, "contains")} // Specify the operator here
+  filterIcon={<SearchOutlined />}
+  filterDropdown={(props) => (
+    <FilterDropdown {...props}>
+      <Input
+        placeholder="Αναζήτηση κωδικού"
+        onChange={(e) => {
+          const v = e.target.value.trim();
+          props.setSelectedKeys?.(v ? [v] : []);
+          // Commit immediately so changing page won't reset it
+          props.confirm?.({ closeDropdown: false });
+        }}
+        onPressEnter={() => props.confirm?.()}
+        onKeyDown={(e) => e.stopPropagation()}
+      />
+    </FilterDropdown>
+  )}
+  sorter
+  render={(value) => value || "-"}
+/>
+
 
           <Table.Column
             dataIndex="thickness"
             title="Πάχος"
-            defaultFilteredValue={getDefaultFilter("thickness", filters)}
+            filteredValue={getDefaultFilter("thickness", filters)}
             filterIcon={<SearchOutlined />}
             filterDropdown={(props) => (
               <FilterDropdown {...props}>
@@ -112,57 +230,51 @@ export const CoilList: React.FC<CoilListProps> = ({
             sorter
           />
 
-      <Table.Column
+ <Table.Column
   dataIndex="widthCoil"
   title="Πλάτος Ρολού"
-  defaultFilteredValue={getDefaultFilter("widthCoil", filters)}
+  filteredValue={getDefaultFilter("widthCoil", filters)}
   filterIcon={<SearchOutlined />}
-  filteredValue={filters?.widthCoil || []}
   filterDropdown={(props) => (
     <FilterDropdown {...props}>
       <Input
-        placeholder="Αναζήτηση πλάτους (mm)"
-        type="number"
-        step="1"
-        inputMode="decimal"
-        // SHOW in mm (stored value is meters)
-        value={filters?.widthCoil ?filters.widthCoil * 1000 : ""}
+        placeholder="Πλάτος (mm)"
+        inputMode="numeric"
         onChange={(e) => {
-          const raw = e.target.value;
-          // STORE: apply your transform
-          console.log("raw input", raw);
-                 // optional: live apply without closing
-        props.confirm?.({ closeDropdown: false });
-      }}
-      onPressEnter={() => props.confirm?.()}
-      onKeyDown={(e) => e.stopPropagation()}
+          const mm = e.target.value.trim();
+          const meters = mm ? String(Number(mm) / 1000) : "";
+          props.setSelectedKeys?.(meters ? [meters] : []);
+        }}
+        onPressEnter={() => props.confirm?.()}
+        onKeyDown={(e) => e.stopPropagation()}
       />
     </FilterDropdown>
   )}
-  render={(value) => (value ? `${value*1000} m` : "-")}
+  render={(v) => (v ? `${v * 1000} mm` : "-")}
+  sorter
 />
 
           <Table.Column
             dataIndex="currWeight"
             title="Τρέχον Βάρος"
-            defaultFilteredValue={getDefaultFilter('currWeight', filters)} // Note: defaultFilter is for single value, range handled by dropdown
+            filteredValue={getDefaultFilter("currWeight", filters)}
             filterIcon={<SearchOutlined />}
             filterDropdown={(props) => (
-              <FilterDropdown {...props}>
-                <Space direction="vertical">
-                  <Input
-                    placeholder='Από βάρος'
-                    type="number"
-                    step="0.01"
-
-                  />
-                  <Input
-                    placeholder='Έως βάρος'
-                    type="number"
-                    step="0.01"
-
-                  />
-                </Space>
+              <FilterDropdown {...props   } 
+              >
+          
+                <Input
+                  placeholder='Έως βάρος'
+                  type="number"
+                  step="0.01"
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    // Convert to number if not empty, else clear
+                    props.setSelectedKeys?.(val ? [Number(val)] : []);
+                  }}
+                  onPressEnter={() => props.confirm?.()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
               </FilterDropdown>
             )}
             render={(value) => value ? `${value} kg` : '-'}
@@ -170,18 +282,28 @@ export const CoilList: React.FC<CoilListProps> = ({
             sorter={true} // Enable sorting
           />
 
-          <Table.Column
-            dataIndex="upDate"
-            title="Τελευταία ενημέρωση"
-            render={(v) => <DateField value={v} format="LLL" />}
-            defaultSortOrder={getDefaultSortOrder("upDate", sorters)}
-            sorter
-          />
 
+<Table.Column
+  dataIndex="upDate"
+  title="Τελευταία ενημέρωση"
+  render={(v) => <DateField value={v} format="LLL" />}
+  // Do NOT pass string values to filteredValue for a RangePicker.
+  // Just show the filter icon as active if any filter is set:
+  filteredValue={getDefaultFilter('upDate', filters, 'in') }
+  filterDropdown={(props) => (
+  <FilterDropdown
+    {...props}
+    mapValue={(selectedKeys, event) => rangePickerFilterMapper(selectedKeys, event)}
+  >
+    <DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm:ss" />
+  </FilterDropdown>
+)}
+  sorter
+/>
           <Table.Column
             dataIndex="loc"
             title="Τοποθεσία"
-            defaultFilteredValue={getDefaultFilter('loc', filters, 'in')}
+            filteredValue={getDefaultFilter('loc', filters, 'in')}
             filterIcon={<SearchOutlined />}
             filterDropdown={(props) => (
               <FilterDropdown {...props}>
@@ -191,7 +313,7 @@ export const CoilList: React.FC<CoilListProps> = ({
                   placeholder="Επιλογή τοποθεσιών"
                   options={locationOptions}
                   allowClear
-                  {...props.filters} // This binds Refine's internal state
+                  // {...props.filters} // This binds Refine's internal state
                 />
               </FilterDropdown>
             )}
@@ -203,6 +325,7 @@ export const CoilList: React.FC<CoilListProps> = ({
             title="Κατάσταση Ανοίγματος"
             width={50}
             filterIcon={<SearchOutlined />}
+            filteredValue={getDefaultFilter('openstatus', filters, 'in')}
             filterDropdown={(props) => (
               <FilterDropdown {...props}>
                 <Select
@@ -214,7 +337,7 @@ export const CoilList: React.FC<CoilListProps> = ({
                     { label: "Κλειστό", value: "CLOSED" }
                   ]}
 
-                  value={getDefaultFilter('status', filters)} // Fixed field name from 'loc' to 'status'
+                  //value={getDefaultFilter('status', filters)} // Fixed field name from 'loc' to 'status'
                 />
               </FilterDropdown>
             )}
@@ -241,7 +364,7 @@ export const CoilList: React.FC<CoilListProps> = ({
   title="Χρώμα"
   defaultSortOrder={getDefaultSortOrder("color", sorters)}
   sorter
-  defaultFilteredValue={getDefaultFilter('color', filters, 'in')}
+  filteredValue={getDefaultFilter('color', filters, 'in')}
            filterIcon={<SearchOutlined />}
             filterDropdown={(props) => (
               <FilterDropdown {...props}>

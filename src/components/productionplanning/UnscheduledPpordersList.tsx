@@ -14,12 +14,7 @@ interface OrderListProps {
   unscheduledorders: PPOrder[];
   selectedOrderId: number | null;
   onSelectOrder: (id: number) => void;
-  totalTime: {
-    hours: number;
-    minutes: number;
-    formatted: string;
-  }
-  totalMeter: number;
+ 
   orderLinesLoading: boolean;
 }
 
@@ -27,15 +22,12 @@ export const OrderList: React.FC<OrderListProps> = ({
   unscheduledorders,
   selectedOrderId,
   onSelectOrder,
-  totalTime: propTotalTime, // Rename to avoid conflict
-  totalMeter,
   orderLinesLoading
 }) => {
   const { totalTimeByOrderId } = useTotalTimeContext();
-
   useEffect(() => {
     console.log("orderLinesLoading", orderLinesLoading);
-  }, [orderLinesLoading]);
+  }, [!!orderLinesLoading]);
 
   return (
     <Menu
@@ -52,11 +44,11 @@ export const OrderList: React.FC<OrderListProps> = ({
       {unscheduledorders.map((order) => {
         // Use context data for each order's total time
         const orderTotalTime = totalTimeByOrderId[order.id]?.formatted ?? "Άγνωστη";
-
+// console.log("Rendering order:", order.id, "Total Time:", orderTotalTime);
         const tooltip = `${order.pporderno ?? ""} - ${order.panelcode ?? ""}\n` +
           `εκτ εναρξη: ${dayjs(order.estStartDate) || "Άγνωστη"}\n` +
           `εκτ λήξη: ${dayjs(order.estFinishDate) || "Άγνωστη"}\n` +
-          `θεωρητικο μήκος: ${totalMeter.toFixed(0) || "Άγνωστη"}\n` +
+          `θεωρητικο μήκος: ${totalTimeByOrderId[order.id]?.totalTtm || "Άγνωστη"}\n` +
           `θεωρητική διάρκεια: ${orderTotalTime}\n`;
 
         const color = statusColorMap[order.status || 0] || "blue";

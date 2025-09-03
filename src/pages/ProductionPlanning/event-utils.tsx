@@ -1,6 +1,6 @@
 import { EventInput } from '@fullcalendar/core'
 import dayjs, { Dayjs } from "dayjs";
-import { PPOrderLine, WorkingHoursConfig } from './productioncalendartypes';
+import { PPOrder, PPOrderLine, WorkingHoursConfig } from './productioncalendartypes';
 
 
 import React, { useState } from "react";
@@ -59,25 +59,20 @@ export const EventTooltip: React.FC<EventTooltipProps> = ({ tooltip, status, chi
 
 
 
-export const calculateTotalTime= (orderLines: PPOrderLine[]) => {
-  const totalMinutes = orderLines.reduce((sum, line) => {
-    return sum + (line.prodOrdersView?.time ?? 0);
-  }, 0);
-
+export const calculateTotalTime= (orders: PPOrder[]) => {
+  // console.log(orders,"started time calc")
+  const totalMinutes = orders.reduce((acc, order) => acc + (order.totalOrderTime || 0), 0);
   // Create duration object
-  const duration = dayjs.duration(totalMinutes, 'minutes');
-  
+  const duration = dayjs.duration(totalMinutes ?? 0, 'minutes');
+
   return {
     hours: duration.hours(),
     minutes: duration.minutes(),
     formatted: `${duration.hours()}h ${duration.minutes()}m`
   };
 }
-export const calculateTotalLength= (orderLines: PPOrderLine[]) => {
-  const totalttm = orderLines.reduce((sum, line) => {
-    return sum + (line.prodOrdersView?.ttm ?? 0);
-  }, 0);
-
+export const calculateTotalLength= (orders: PPOrder[]) => {
+  const totalttm = orders.reduce((acc, order) => acc + (order.totalTtm || 0), 0);
   // Create duration object
 
   return totalttm;
