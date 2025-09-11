@@ -8,7 +8,6 @@ import { Card, Col, Row, Typography } from "antd";
 import type { CoilShowQuery,  } from "graphql/types";
 import { CoilShowDocument } from "@/graphql/queries";
 
-import { title } from "process";
 import { Coil } from "@/graphql/schema.types";
 import { useNumericResourceParams } from "@/utilities";
 

@@ -1,0 +1,25 @@
+/* tighter header, single line */
+.compact-table .ant-table-thead > tr > th {
+  padding: 60px 100px;            /* shrink height (default is ~12px vertical) */
+  white-space: initial;         /* keep header text on one line */
+  line-height: 0.7;   
+height:  20px 
+         /* a bit tighter line height */
+}
+
+/* if you want body rows tighter too (optional) */
+/* .compact-table .ant-table-tbody > tr > td {
+  padding: 8px 8px;
+}
+
+/* normalize filter icon size if you previously enlarged it */
+/* .compact-table .ant-table-filter-trigger .anticon {
+  font-size: 10px;
+}
+
+keep sorter & title inline without wrapping */
+/* .compact-table .ant-table-column-sorters {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+} */ 

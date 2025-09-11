@@ -40,7 +40,7 @@ import { useState } from "react";
 import { EventInput } from "fullcalendar";
 import { CurrentEventsProvider } from "./contexts/currentEventsProvider";
 import { SportsFootballOutlined } from "@mui/icons-material";
-
+import  "../index.css"
 function App() {
   const [currentEvents, setCurrentEvents] = useState<EventInput[]>([]);
 
@@ -74,6 +74,7 @@ function App() {
                       edit: "/coil/edit/:id",
                       meta: { label: "coils", icon: <BarcodeOutlined /> }
                     },
+                    
                     {
                       name: "panelProductionOrdersExt2s",
                       list: "/panelProductionOrdersExt2s",

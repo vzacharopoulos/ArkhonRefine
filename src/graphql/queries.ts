@@ -370,6 +370,9 @@ query GetCoil($id: Int!) {
     cutComment
    commentsPanel
     prodComment
+    currWeight
+    widthCoil
+    shipBayNo
   }
 }`
 
@@ -439,6 +442,7 @@ export const GET_EXPECTED_COILS = gql`
         comments
         color
         loc
+        loadDate
       supcoilId
 documents
         upDate
@@ -448,6 +452,7 @@ documents
         openstatus
         supplier
         company
+        shipBayNo
         status {
           id
           name
@@ -523,6 +528,7 @@ export const GET_AVAILABLE_COILS = gql`
         comments
         color
         loc
+        loadDate
         upDate
         thickness
         widthCoil
@@ -532,6 +538,7 @@ export const GET_AVAILABLE_COILS = gql`
       supcoilId
 
         company
+        shipBayNo
         status {
           id
           name
@@ -646,11 +653,12 @@ export const CoilShowDocument = gql`
     `;    
 
 export const UPDATE_COIL_STATUS = gql`
-mutation updateStatus($id:Int!,$statusId:Int!) {
-  updateCoilStatus(id:$id , statusId:$statusId) {
+mutation updateStatus($id:Int!,$statusIds:[Int!]!,$shipBayNo:Int!) {
+  updateCoilStatus(id:$id , statusIds:$statusIds shipBayNo:$shipBayNo) {
     id
     coilno
     status { id name nameGrp }
+shipBayNo
   }
 }
 `;

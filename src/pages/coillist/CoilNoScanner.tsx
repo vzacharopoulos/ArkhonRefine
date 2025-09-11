@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createWorker, OEM, PSM } from "tesseract.js";
 type Roi = { left: number; top: number; width: number; height: number };
+type ProcessingMethod = 'basic' | 'adaptive' | 'sunlight' | 'otsu';
 type Props = {
   onFound?: (coilNo: string) => void;
   // Optional whitelist of acceptable coil numbers. If provided and continuous is true,
@@ -14,6 +15,8 @@ type Props = {
   onRoiChange?: (next: Roi) => void;
   // OPTIONAL — persist per-browser
   persistRoiKey?: string; // e.g. "coil-scanner-roi"
+  // Processing method selection (default 'basic')
+  processingMethod?: ProcessingMethod;
 };
 
 const CoilNoScanner: React.FC<Props> = ({
@@ -24,6 +27,7 @@ const CoilNoScanner: React.FC<Props> = ({
   Roi: roiProp,
   onRoiChange,
   persistRoiKey,
+  processingMethod = 'basic',
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -35,6 +39,10 @@ const CoilNoScanner: React.FC<Props> = ({
   const [running, setRunning] = useState(false);
   const validSetRef = useRef<Set<string> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Processing method state (with prop default)
+  const [method, setMethod] = useState<ProcessingMethod>(processingMethod);
+  useEffect(() => setMethod(processingMethod), [processingMethod]);
 
   // 🔻 NEW: Rejected hits (not acceptable) storage
   type RejectedHit = {
@@ -99,11 +107,162 @@ const CoilNoScanner: React.FC<Props> = ({
 
   const normalize = (s: string) => s.toUpperCase().replace(/\s+/g, "").trim();
 
+  // ===== Image Processing Methods =====
+  const basicThreshold = (imageData: ImageData) => {
+    const t = performance.now();
+    const { data } = imageData;
+    const result = new Uint8ClampedArray(data.length);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const gray = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      const v = gray > 160 ? 255 : 0;
+      result[i] = result[i + 1] = result[i + 2] = v;
+      result[i + 3] = data[i + 3];
+    }
+    const out = new ImageData(result, imageData.width, imageData.height);
+    console.log(`[Scanner] basicThreshold took ${(performance.now() - t).toFixed(0)}ms`);
+    return out;
+  };
+
+  const adaptiveThreshold = (imageData: ImageData, blockSize = 15, C = 10) => {
+    const t = performance.now();
+    const { data, width, height } = imageData;
+    const gray = new Uint8Array(width * height);
+    const result = new Uint8ClampedArray(data.length);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const grayValue = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      gray[i / 4] = grayValue;
+    }
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = y * width + x;
+        const pixelIdx = idx * 4;
+        let sum = 0, count = 0;
+        const halfBlock = Math.floor(blockSize / 2);
+        for (let dy = -halfBlock; dy <= halfBlock; dy++) {
+          for (let dx = -halfBlock; dx <= halfBlock; dx++) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+              sum += gray[ny * width + nx];
+              count++;
+            }
+          }
+        }
+        const localMean = sum / count;
+        const threshold = localMean - C;
+        const value = gray[idx] > threshold ? 255 : 0;
+        result[pixelIdx] = result[pixelIdx + 1] = result[pixelIdx + 2] = value;
+        result[pixelIdx + 3] = data[pixelIdx + 3];
+      }
+    }
+    const out = new ImageData(result, width, height);
+    console.log(`[Scanner] adaptiveThreshold b=${blockSize} C=${C} took ${(performance.now() - t).toFixed(0)}ms`);
+    return out;
+  };
+
+  const sunlightOptimized = (imageData: ImageData) => {
+    const t = performance.now();
+    const { data, width, height } = imageData;
+    const result = new Uint8ClampedArray(data.length);
+    const gray = new Uint8Array(width * height);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let gv = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      let gnorm = gv / 255;
+      gnorm = gnorm < 0.5 ? 2 * gnorm * gnorm : 1 - 2 * (1 - gnorm) * (1 - gnorm);
+      gv = (gnorm * 255) | 0;
+      gray[i / 4] = gv;
+    }
+    for (let i = 0; i < gray.length; i++) {
+      const y = Math.floor(i / width);
+      const x = i % width;
+      let localSum = 0, localCount = 0;
+      const radius = 20;
+      for (let dy = -radius; dy <= radius; dy += 5) {
+        for (let dx = -radius; dx <= radius; dx += 5) {
+          const ny = y + dy;
+          const nx = x + dx;
+          if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+            localSum += gray[ny * width + nx];
+            localCount++;
+          }
+        }
+      }
+      const localMean = localSum / localCount;
+      const threshold = localMean - 15;
+      const pixelValue = gray[i] > threshold ? 255 : 0;
+      result[i * 4] = result[i * 4 + 1] = result[i * 4 + 2] = pixelValue;
+      result[i * 4 + 3] = data[i * 4 + 3];
+    }
+    const out = new ImageData(result, width, height);
+    console.log(`[Scanner] sunlightOptimized took ${(performance.now() - t).toFixed(0)}ms`);
+    return out;
+  };
+
+  const otsuThreshold = (imageData: ImageData) => {
+    const t = performance.now();
+    const { data, width, height } = imageData;
+    const gray = new Uint8Array(width * height);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let gv = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      const gamma = 1.2;
+      gv = Math.pow(gv / 255, 1 / gamma) * 255;
+      gray[i / 4] = gv;
+    }
+    const histogram = new Array(256).fill(0);
+    for (let i = 0; i < gray.length; i++) histogram[gray[i]]++;
+    let total = histogram.reduce((s: number, v: number) => s + v, 0);
+    let sumB = 0, wB = 0, maximum = 0.0;
+    let sum1 = 0;
+    for (let i = 0; i < 256; i++) sum1 += i * histogram[i];
+    let threshold = 128;
+    for (let i = 0; i < 256; i++) {
+      wB += histogram[i];
+      if (wB === 0) continue;
+      const wF = total - wB;
+      if (wF === 0) break;
+      sumB += i * histogram[i];
+      const mB = sumB / wB;
+      const mF = (sum1 - sumB) / wF;
+      const between = wB * wF * Math.pow(mB - mF, 2);
+      if (between > maximum) {
+        maximum = between;
+        threshold = i;
+      }
+    }
+    const result = new Uint8ClampedArray(data.length);
+    for (let i = 0; i < gray.length; i++) {
+      const value = gray[i] > threshold ? 255 : 0;
+      result[i * 4] = result[i * 4 + 1] = result[i * 4 + 2] = value;
+      result[i * 4 + 3] = data[i * 4 + 3];
+    }
+    const out = new ImageData(result, width, height);
+    console.log(`[Scanner] otsuThreshold took ${(performance.now() - t).toFixed(0)}ms`);
+    return out;
+  };
+
+  const processImage = (roi: ImageData) => {
+    switch (method) {
+      case 'adaptive':
+        return adaptiveThreshold(roi, 15, 12);
+      case 'sunlight':
+        return sunlightOptimized(roi);
+      case 'otsu':
+        return otsuThreshold(roi);
+      case 'basic':
+      default:
+        return basicThreshold(roi);
+    }
+  };
+
 // Allowed JP suffixes (extend here if needed)
 const JP_SUFFIXES = ["MHMZS",  "M0MZS", "K0MZS"] as const;
 
 const JP_FINDER = new RegExp(
-  `J[PB]\\d{6}(?:F0D|LED)\\d(?:${JP_SUFFIXES.join("|")})`
+  `J[PBA]\\d{6}(?:F0D|LED|LZD)\\d(?:${JP_SUFFIXES.join("|")})`
 );
 // J[PB] means "J" followed by either "P" or "B"
 const DC_FINDER = /[DC]\d{12}[ABCD]/; // D or C, 12 digits, then A/B/C/D
@@ -292,25 +451,18 @@ const cropH = Math.round(h * Roi.height);
     // --- 2) Grab pixels only from ROI ---
     const roi = ctx.getImageData(cropX, cropY, cropW, cropH);
 
-    // --- 3) Threshold the ROI (same logic you had) ---
-    const data = roi.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i], g = data[i + 1], b = data[i + 2];
-      const gray = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
-      const v = gray > 160 ? 255 : 0;
-      data[i] = data[i + 1] = data[i + 2] = v;
-      // alpha stays as-is
-    }
+    // --- 3) Process ROI using selected method ---
+    const processed = processImage(roi);
 
     // (Optional) Draw processed ROI back on the main canvas for debugging
-    ctx.putImageData(roi, cropX, cropY);
+    ctx.putImageData(processed, cropX, cropY);
 
     // --- 4) Feed ONLY the ROI to Tesseract (faster & more accurate) ---
     // Stage canvas: hold the processed ROI at native ROI size
     const stage = document.createElement("canvas");
     stage.width = cropW;
     stage.height = cropH;
-    stage.getContext("2d")!.putImageData(roi, 0, 0);
+    stage.getContext("2d")!.putImageData(processed, 0, 0);
 
     // Scale to a target width that Tesseract handles well (700–1200px works nicely)
     const targetW = Math.min(900, cropW); // don’t upscale too much
@@ -334,7 +486,7 @@ const cropH = Math.round(h * Roi.height);
         stopContinuous();
       } else if (found) {
         // 🔻 NEW: keep non-acceptable IDs
-        recordRejected(found, (data as any)?.confidence);
+        recordRejected(found, (ocr as any)?.confidence);
       }
     } catch (e) {
       console.error(e);
@@ -373,7 +525,7 @@ const cropH = Math.round(h * Roi.height);
 
   return (
     <div style={{ padding: 12 }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <button onClick={startCamera}>Enable Camera</button>
         {validSetRef.current && validSetRef.current.size > 0 && (
           running ? (
@@ -384,6 +536,20 @@ const cropH = Math.round(h * Roi.height);
             </button>
           )
         )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 12 }}>Processing:</label>
+          <select
+            value={method}
+            onChange={(e) => setMethod(e.target.value as ProcessingMethod)}
+            style={{ padding: '4px 6px' }}
+            title="Choose image processing for OCR"
+          >
+            <option value="basic">Basic</option>
+            <option value="adaptive">Adaptive</option>
+            <option value="sunlight">Sunlight</option>
+            <option value="otsu">Otsu</option>
+          </select>
+        </div>
       </div>
 
  <div style={{ position: "relative", width: "100%", maxWidth: 640 }}>

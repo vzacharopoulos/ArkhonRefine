@@ -11,11 +11,16 @@ export default defineConfig({
     tsconfigPaths(),
     react(),
     VitePWA({
-      // minimal + automatic updates
+      strategies: "injectManifest",
+      // 🔥 explicitly set the source and the output name
+srcDir: "src",
+      filename: "service-worker.ts",
+      injectManifest: {
+        // allow precaching of large app chunk(s)
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+      },
       registerType: "autoUpdate",
-      injectRegister: "auto",
-
-      // simple manifest (adjust names/colors if you like)
+  injectRegister: "auto", // 👈 disable auto injection
       manifest: {
         name: "Coil Scanner",
         short_name: "Scanner",
@@ -31,20 +36,8 @@ export default defineConfig({
         ],
       },
 
-      // ❗ No runtime caching rules, and no precache beyond defaults
-      // If you want ZERO precache, set globPatterns: [].
-      workbox: {
-        globPatterns: [],       // ← disables precaching files
-        runtimeCaching: [],     // ← no runtime cache either
-        // navigateFallback: "/index.html", // optional; omit if you truly want minimal SW
-      },
-
-      // Let SW run in dev so you can test installability on your LAN https
-      devOptions: { enabled: true },
+      devOptions: { enabled: true, type: "module" },
     }),
   ],
-  server: {
-    host: "0.0.0.0",
-    port: 5173,
-  },
+  server: { host: "0.0.0.0", port: 5173 },
 });

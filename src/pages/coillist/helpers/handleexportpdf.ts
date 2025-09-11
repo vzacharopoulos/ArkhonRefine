@@ -2,9 +2,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import dayjs from "dayjs";
-import "dayjs/locale/el";
 import type { Coil } from "@/graphql/schema.types";
-
 
 type ColorInfo = { name: string | null; hexcode?: string };
 
@@ -19,7 +17,7 @@ type TDict = {
     coilno: string;
     color: string;
     loc: string;
-    upDate: string;
+    loadDate: string;
     thickness: string;
     widthMm: string;
     currWeight: string;
@@ -27,8 +25,7 @@ type TDict = {
   };
 };
 
-
-const elDict: TDict = {
+const enDict: TDict = {
   reportTitle: "Coil Report",
   date: "Date",
   totalItems: "Total Coils",
@@ -39,13 +36,12 @@ const elDict: TDict = {
     coilno: "Coil No.",
     color: "Color",
     loc: "Location",
-    upDate: "Last Updated",
+    loadDate: "Last Updated",
     thickness: "Thickness",
     widthMm: "Width (mm)",
     currWeight: "Weight (kg)",
     status: "Status",
   },
-  
 };
 
 type Params = {
@@ -55,12 +51,8 @@ type Params = {
   totalItems?: number;
   totalWeight: number;
   filename?: string;
-  locale?: string;   // e.g. "el"
-  t?: TDict;         // override texts if needed
+  t?: TDict; // override texts if needed
 };
-
-// OPTIONAL: call this once somewhere at app start if all PDFs are Greek
-dayjs.locale("el");
 
 export async function exportCoilsPdf({
   rows,
@@ -69,42 +61,56 @@ export async function exportCoilsPdf({
   totalItems,
   totalWeight,
   filename = dayjs().format("YYYY-MM-DD") + "-coils.pdf",
-  locale = "el",    // for dates
-  t = elDict,       // Greek by default
+  t = enDict,
 }: Params) {
-  dayjs.locale(locale);
-
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-
-  // 🔤 IMPORTANT: embed a font that supports Greek (see note below)
-  // await ensureGreekFont(doc); // <- call this if you implement the helper below
-  // doc.setFont("NotoSans", "normal");
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const now = dayjs().format("YYYY-MM-DD HH:mm");
 
   const columns = [
-    { header: t.cols.coilno,    dataKey: "coilno" },
-    { header: t.cols.color,     dataKey: "colorName" },
-    { header: t.cols.loc,       dataKey: "locName" },
-    { header: t.cols.upDate,    dataKey: "upDate" },
+    { header: t.cols.coilno, dataKey: "coilno" },
+    { header: t.cols.color, dataKey: "colorName" },
+    { header: t.cols.loc, dataKey: "locName" },
+    { header: t.cols.loadDate, dataKey: "loadDate" },
     { header: t.cols.thickness, dataKey: "thickness" },
-    { header: t.cols.widthMm,   dataKey: "widthMm" },
-    { header: t.cols.currWeight,dataKey: "currWeight" },
-    { header: t.cols.status,dataKey: "status" },
+    { header: t.cols.widthMm, dataKey: "widthMm" },
+    { header: t.cols.currWeight, dataKey: "currWeight" },
+    { header: t.cols.status, dataKey: "status" },
   ];
 
-  const data = rows.map((r) => ({
-    coilno: r.coilno ?? "-",
-    colorName: r.color ? (colorMap.get(r.color.trim())?.name ?? r.color) : "-",
-    locName: r.loc != null ? (locationMap.get(r.loc as number) ?? String(r.loc).toLowerCase().includes("τελωνειακή") ? "Arkhon dispatch" : name) : "-",
-    upDate: r.upDate ? dayjs(r.upDate as any).format("YYYY-MM-DD HH:mm") : "-",
-    thickness: r.thickness ?? "-",
-    widthMm: r.widthCoil != null ? Math.round((r.widthCoil as number) * 1000) : "-",
-    currWeight: r.currWeight ?? "-",
-    status: r.status?.name ?? "-",
-  }));
+  // Sort rows by loadDate descending
+  const data = rows
+    .slice()
+    .sort((a, b) => {
+      const da = a.loadDate ? dayjs(a.loadDate) : dayjs(0);
+      const db = b.loadDate ? dayjs(b.loadDate) : dayjs(0);
+      return db.valueOf() - da.valueOf();
+    })
+    .map((r) => ({
+      coilno: r.coilno ?? "-",
+      colorName: r.color
+        ? colorMap.get(r.color.trim())?.name ?? r.color
+        : "-",
+      locName:
+        r.loc != null
+          ? locationMap.get(r.loc as number) ??
+            (String(r.loc).toLowerCase().includes("τελωνειακή")
+              ? "Arkhon dispatch"
+              : String(r.loc))
+          : "-",
+      loadDate: r.loadDate
+        ? dayjs(r.loadDate as any).add(3,"hours").format("YYYY-MM-DD HH:mm")
+        : "-",
+      thickness: r.thickness ?? "-",
+      widthMm:
+        r.widthCoil != null
+          ? Math.round((r.widthCoil as number) * 1000)
+          : "-",
+      currWeight: r.currWeight ?? "-",
+      status: r.status?.name ?? "-",
+    }));
 
   autoTable(doc, {
     head: [columns.map((c) => c.header)],
@@ -120,9 +126,15 @@ export async function exportCoilsPdf({
         doc.text(`${t.date}: ${now}`, pageWidth - 20, 28, { align: "right" });
 
         doc.setFontSize(11);
-        doc.text(`${t.totalItems}: ${totalItems?.toLocaleString("el-GR")}`, 20, 46);
+        if (typeof totalItems === "number") {
+          doc.text(
+            `${t.totalItems}: ${totalItems.toLocaleString("en-US")}`,
+            20,
+            46
+          );
+        }
         doc.text(
-          `${t.totalWeight}: ${totalWeight.toLocaleString("el-GR")} kg`,
+          `${t.totalWeight}: ${totalWeight.toLocaleString("en-US")} kg`,
           20,
           62
         );

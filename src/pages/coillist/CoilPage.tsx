@@ -15,7 +15,7 @@ import { CoilColorType } from "@/graphql/schema.types";
 import { useCoilColors } from "./hooks/useCoilColors";
 import CoilNoScanner from "./CoilNoScanner";
 import { coilWhitelist } from "./coiltypes/coil_whitelist.sample";
-import { Button, Card, Modal, Select, Typography } from "antd";
+import { Button, Card, Modal, Select, Typography, Input } from "antd";
 import { exportCoilsPdf } from "./helpers/handleexportpdf";
 import { cleanFilters, toGraphQLFilter, toGraphQLSorting } from "./helpers/filterstographql";
 
@@ -47,9 +47,10 @@ export const CoilPage: React.FC = () => {
   const [mode, setMode] = React.useState<"available" | "expected">("expected");
   const selected = resourceOptions[mode];
   const [scanOpen, setScanOpen] = React.useState(false);
+  const [supcoilSearch, setSupcoilSearch] = React.useState<string>("");
   const dataProvider = useDataProvider()();
   const { edit } = useNavigation();
-  const [Roi, setRoi] = React.useState({ left: 0.2, top: 0.35, width: 0.6, height: 0.15 });
+  const [Roi, setRoi] = React.useState({ left: 0.2, top: 0.35, width: 0.6, height: 0.10 });
 
   const locationFilter = React.useMemo(
     () =>
@@ -62,20 +63,24 @@ export const CoilPage: React.FC = () => {
   );
 
   const locationMap = React.useMemo(() => {
-    const map = new Map<number, string>();
-    user?.allowedLocations?.forEach((loc) => {
-      map.set(loc.locationId, loc.name || `Location ${loc.locationId}`);
-    });
-    return map;
-  }, [user?.allowedLocations]);
+  const map = new Map<number, string>();
+  map.set(-1, "Χωρίς Θέση"); // special case
+  user?.allowedLocations?.forEach((loc) => {
+    map.set(loc.locationId, loc.name || `Location ${loc.locationId}`);
+  });
+  return map;
+}, [user?.allowedLocations]);
 
-  const locationOptions = React.useMemo(() => {
-    if (!user?.allowedLocations) return [];
-    return user.allowedLocations.map((location) => ({
-      label: location.name || `Location ${location.locationId}`,
-      value: location.locationId,
-    }));
-  }, [user?.allowedLocations]);
+const locationOptions = React.useMemo(() => {
+  const opts = user?.allowedLocations
+    ? user.allowedLocations.map((location) => ({
+        label: location.name || `Location ${location.locationId}`,
+        value: location.locationId,
+      }))
+    : [];
+  // Ensure -1 is always present once
+  return [{ label: "Χωρίς Θέση", value: -1 }, ...opts.filter(o => o.value !== -1)];
+}, [user?.allowedLocations]);
 
   type CoilsQueryResult = {
     availableCoils: {
@@ -90,10 +95,16 @@ export const CoilPage: React.FC = () => {
     }[];
   };
 
-  const basePermanent: CrudFilters = React.useMemo(
-    () => [{ field: "loc_in", operator: "in", value: locationFilter }],
-    [locationFilter],
-  );
+const basePermanent: CrudFilters = React.useMemo(
+  () => [
+    {
+      field: "loc_in",
+      operator: "in",
+      value: Array.from(new Set([...(locationFilter || []), -1])),
+    },
+  ],
+  [locationFilter],
+);
 
   const [lockedPermanent, setLockedPermanent] = React.useState<CrudFilters>([]);
 
@@ -211,6 +222,27 @@ export const CoilPage: React.FC = () => {
                   { value: "expected", label: "Αναμενόμενα Ρολά" },
                 ]}
               />
+
+              {/* <Input.Search
+                placeholder="Search Supplier Coil ID"
+                value={supcoilSearch}
+                allowClear
+                enterButton
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSupcoilSearch(v);
+                  if (!v) {
+                    setFilters([{ field: "supcoilId", operator: "contains", value: undefined }], "merge");
+                    setCurrent(1);
+                  }
+                }}
+                onSearch={(val) => {
+                  setSupcoilSearch(val);
+                  setFilters([{ field: "supcoilId", operator: "contains", value: val || undefined }], "merge");
+                  setCurrent(1);
+                }}
+                style={{ width: 260 }}
+              /> */}
 
               <Button
                 type="primary"

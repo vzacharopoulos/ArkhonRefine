@@ -6,6 +6,7 @@
 // ];
 export const coilWhitelist: string[] = [
   "JP533732F0D4M0MZS",
+  "JP466679F0D1MHMZS",
   "JP533731F0D2M0MZS",
   "JP533733F0D3M0MZS",
   "JP533733F0D1M0MZS",

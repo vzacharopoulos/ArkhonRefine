@@ -14,7 +14,6 @@ import DirectionsBoatIcon from "@mui/icons-material/DirectionsBoat";
 import DirectionsBoatFilledIcon from "@mui/icons-material/DirectionsBoatFilled";
 import SailingIcon from "@mui/icons-material/Sailing";
 import { CoilsFilterInput, FilterLock } from "./coiltypes/coil_types";
-import { table } from "console";
 
 
 
@@ -88,7 +87,7 @@ return (
       </Button>
 
       {/* Status filter (by name; filters by status id) */}
-      <Select
+      {/* <Select
         {...statusSelectProps}
         allowClear
         style={{ width: 220, marginLeft: 8 }}
@@ -97,15 +96,15 @@ return (
         onChange={(val) => {
           setFilters([{ field: "status", operator: "eq", value: val || undefined }], "merge");
         }}
-      />
+      /> */}
 
       {/* Permanent filter: isUnloaded */}
       <Select
         style={{ width: 220, marginLeft: 8 }}
         placeholder="Φίλτρο αποφόρτωσης"
         options={[
-          { label: 'Αποφορτωμένα (isUnloaded=1)', value: 'unloaded' },
-          { label: 'Μη αποφορτωμένα (isUnloaded=0)', value: 'not_unloaded' },
+          { label: 'Αποφορτωμένα ', value: 'unloaded' },
+          { label: 'Μη αποφορτωμένα ', value: 'not_unloaded' },
           { label: 'Όλα (χωρίς φίλτρο)', value: 'all' },
         ]}
         onChange={(val) => {
@@ -173,6 +172,12 @@ return (
         <Table
           {...tableProps}
           rowKey="id"
+          sticky
+              className="compact-table"
+
+            size="small"                 // smaller paddings overall
+            scroll={{ x: "max-content" }} // enables sticky columns
+            
           pagination={{
             ...tableProps.pagination, 
             current,
@@ -195,7 +200,10 @@ return (
   dataIndex="supcoilId"
   title="Κωδικός Προμ"
   filteredValue={getDefaultFilter("supcoilId", filters, "contains")} // Specify the operator here
-  filterIcon={<SearchOutlined />}
+  filterIcon={   <span style={{ fontSize: 22 }}>
+      <SearchOutlined />
+    </span>}
+  
   filterDropdown={(props) => (
     <FilterDropdown {...props}>
       <Input
@@ -211,52 +219,13 @@ return (
       />
     </FilterDropdown>
   )}
-  sorter
+  
   render={(value) => value || "-"}
 />
 
-
-          <Table.Column
-            dataIndex="thickness"
-            title="Πάχος"
-            filteredValue={getDefaultFilter("thickness", filters)}
-            filterIcon={<SearchOutlined />}
-            filterDropdown={(props) => (
-              <FilterDropdown {...props}>
-                <Input placeholder="Αναζήτηση πάχους" type="number" />
-              </FilterDropdown>
-            )}
-            render={(v) => (v ? `${v } mm` : "-")}
-            sorter
-          />
-
- <Table.Column
-  dataIndex="widthCoil"
-  title="Πλάτος Ρολού"
-  filteredValue={getDefaultFilter("widthCoil", filters)}
-  filterIcon={<SearchOutlined />}
-  filterDropdown={(props) => (
-    <FilterDropdown {...props}>
-      <Input
-        placeholder="Πλάτος (mm)"
-        inputMode="numeric"
-        onChange={(e) => {
-          const mm = e.target.value.trim();
-          const meters = mm ? String(Number(mm) / 1000) : "";
-          props.setSelectedKeys?.(meters ? [meters] : []);
-        }}
-        onPressEnter={() => props.confirm?.()}
-        onKeyDown={(e) => e.stopPropagation()}
-      />
-    </FilterDropdown>
-  )}
-  render={(v) => (v ? `${v * 1000} mm` : "-")}
-  sorter
-/>
-
-          <Table.Column
+   <Table.Column
             dataIndex="currWeight"
-            title="Τρέχον Βάρος"
+            title="Βάρος"
             filteredValue={getDefaultFilter("currWeight", filters)}
             filterIcon={<SearchOutlined />}
             filterDropdown={(props) => (
@@ -282,6 +251,64 @@ return (
             sorter={true} // Enable sorting
           />
 
+
+
+          <Table.Column
+            dataIndex="thickness"
+            title="Πάχος"
+            filteredValue={getDefaultFilter("thickness", filters)}
+            filterIcon={<SearchOutlined />}
+            filterDropdown={(props) => (
+              <FilterDropdown {...props}>
+                <Input placeholder="Αναζήτηση πάχους" type="number" />
+              </FilterDropdown>
+            )}
+            render={(v) => (v ? `${v } mm` : "-")}
+            sorter
+          />
+
+ <Table.Column
+  dataIndex="widthCoil"
+  title="Πλάτος"
+  filteredValue={getDefaultFilter("widthCoil", filters)}
+  filterIcon={<SearchOutlined />}
+  filterDropdown={(props) => (
+    <FilterDropdown {...props}>
+      <Input
+        placeholder="Πλάτος (mm)"
+        inputMode="numeric"
+        onChange={(e) => {
+          const mm = e.target.value.trim();
+          const meters = mm ? String(Number(mm) / 1000) : "";
+          props.setSelectedKeys?.(meters ? [meters] : []);
+        }}
+        onPressEnter={() => props.confirm?.()}
+        onKeyDown={(e) => e.stopPropagation()}
+      />
+    </FilterDropdown>
+  )}
+  render={(v) => (v ? `${v * 1000} mm` : "-")}
+  sorter
+/>
+
+<Table.Column
+  dataIndex="loadDate"
+  title="Φορτώθηκε"
+  render={(v) => <DateField value={v} format="LLL" />}
+  // Do NOT pass string values to filteredValue for a RangePicker.
+  // Just show the filter icon as active if any filter is set:
+  filteredValue={getDefaultFilter('loadDate', filters, 'in') }
+  filterDropdown={(props) => (
+  <FilterDropdown
+    {...props}
+    mapValue={(selectedKeys, event) => rangePickerFilterMapper(selectedKeys, event)}
+  >
+    <DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm:ss" />
+  </FilterDropdown>
+)}
+  sorter
+/>
+       
 
 <Table.Column
   dataIndex="upDate"
@@ -320,7 +347,7 @@ return (
             render={(value) => locationMap.get(value) || `Τοπ. ${value}`}
           />
 
-          <Table.Column
+          {/* <Table.Column
             dataIndex="openstatus"
             title="Κατάσταση Ανοίγματος"
             width={50}
@@ -346,6 +373,26 @@ return (
               return value === 'OPEN' ? 'Ανοιχτό' : 'Κλειστό';
             }}
 
+          /> */}
+
+          <Table.Column
+            dataIndex="shipBayNo"
+            title="αμπαρι"
+            filteredValue={getDefaultFilter('shipBayNo', filters, 'in')}
+            filterIcon={<SearchOutlined />}
+            filterDropdown={(props) => (
+              <FilterDropdown {...props}>
+                <Select
+                  style={{ minWidth: 160 }}
+                  mode="multiple"
+                  placeholder="Select bay"
+                  options={[1,2,3,4,5].map((n) => ({ label: String(n), value: n }))}
+                  allowClear
+                />
+              </FilterDropdown>
+            )}
+            render={(value) => (value ?? '-')}
+            sorter
           />
 
           <Table.Column
@@ -403,11 +450,12 @@ return (
           <Table.Column<Coil>
             title="Actions"
             dataIndex="actions"
+              fixed="right"
+              width={40} // adjust as needed
             render={(_, record) => (
               <Space>
-                <EditButton hideText size="small" recordItemId={record.id} />
+                <EditButton hideText size="large" recordItemId={record.id} />
                 <ShowButton hideText size="small" recordItemId={record.id} />
-                <DeleteButton hideText size="small" recordItemId={record.id} />
               </Space>
             )}
           />
