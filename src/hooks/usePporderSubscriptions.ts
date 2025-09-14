@@ -15,6 +15,27 @@ import dayjs from "dayjs";
 import { calculateWorkingMinutesBetween, splitEventIntoWorkingHours } from "@/pages/ProductionPlanning/dateschedule-utils";
 import { handleSaveEdit } from "@/pages/ProductionPlanning/utilities/usehandleedit";
 
+const porders: PPOrder = {
+  createDate: new Date("2025-09-08T13:01:30"),
+  estFinishDate: new Date("2025-09-10T13:01:30"),
+  estStartDate: new Date("2025-09-09T13:01:30"),
+  finishDateDatetime: new Date("2025-09-10T13:01:30"),
+  groupIn: [],
+  id: 1,
+  offtimeduration: 41,
+  offtimeenddate: new Date("2025-09-10T15:01:30"),
+  offtimestartdate: new Date("2025-09-10T14:01:30"),
+  panelcode: "PANEL-1000",
+  pporderno: "PP-0001",
+  previd: undefined,
+  prevpanelcode: undefined,
+  startDateDatetime: new Date("2025-09-09T13:01:30"),
+  status: 2,
+  totalOrderTime: 28.08,   // added per updated type
+  totalTtm: 488.83,
+};
+
+
 interface UsePporderSubscriptionsProps {
   refetchPporders: () => void;
     refetchPporderlines: () => void;
@@ -211,12 +232,12 @@ export const usePporderSubscriptions = ({
             const orderInfo = lines[0]?.pporders ?? order;
 
             if (finishedCount===1) {
-              await handleStart(orderInfo);
+              //await handleStart(porders);
               message.success(`Η Master ${orderInfo.pporderno} ξεκίνησε`);
             }
 
             if ( totalLines > 0 && finishedCount === totalLines) {
-              await handleFinish(orderInfo);
+             // await handleFinish(orderInfo);
             }
           } catch (error) {
             console.error(error);

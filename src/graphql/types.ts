@@ -16,7 +16,6 @@ export type Scalars = {
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
   Date: { input: any; output: any; }
-  DateTime: { input: any; output: any; }
 };
 
 export type Abcparams = {
@@ -1116,6 +1115,10 @@ export type Bnktrntype = {
   opening?: Maybe<Scalars['Float']['output']>;
 };
 
+export type BooleanFilter = {
+  eq?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type Branch = {
   abcmask?: Maybe<Scalars['String']['output']>;
   accmask?: Maybe<Scalars['String']['output']>;
@@ -1275,6 +1278,7 @@ export type Coil = {
   cnomthickness?: Maybe<Scalars['String']['output']>;
   coathick?: Maybe<Scalars['String']['output']>;
   coating?: Maybe<Scalars['String']['output']>;
+  coatingRef?: Maybe<CoilCoating>;
   coilno?: Maybe<Scalars['String']['output']>;
   color?: Maybe<Scalars['String']['output']>;
   comments?: Maybe<Scalars['String']['output']>;
@@ -1320,6 +1324,7 @@ export type Coil = {
   id: Scalars['Int']['output'];
   initWeight?: Maybe<Scalars['Float']['output']>;
   innerdiameter?: Maybe<Scalars['Float']['output']>;
+  isUnloaded?: Maybe<Scalars['Boolean']['output']>;
   loadDate?: Maybe<Scalars['Date']['output']>;
   loaderid?: Maybe<Scalars['String']['output']>;
   loc?: Maybe<Scalars['Float']['output']>;
@@ -1339,6 +1344,7 @@ export type Coil = {
   ptradecode?: Maybe<Scalars['String']['output']>;
   quality?: Maybe<Scalars['Float']['output']>;
   sheetType?: Maybe<Scalars['String']['output']>;
+  shipBayNo?: Maybe<Scalars['Float']['output']>;
   slithick?: Maybe<Scalars['String']['output']>;
   slitrange?: Maybe<Scalars['String']['output']>;
   status: StatusType;
@@ -1358,6 +1364,13 @@ export type Coil = {
   widthCoil?: Maybe<Scalars['Float']['output']>;
 };
 
+export type CoilCoating = {
+  code: Scalars['String']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['Int']['output'];
+  name?: Maybe<Scalars['String']['output']>;
+};
+
 export type CoilColorType = {
   code: Scalars['String']['output'];
   description?: Maybe<Scalars['String']['output']>;
@@ -1372,12 +1385,14 @@ export type CoilColorType = {
 
 /** Fields by which coils can be sorted */
 export type CoilSortField =
-  | 'WIDTH'
   | 'coilno'
   | 'color'
   | 'currWeight'
   | 'id'
+  | 'loadDate'
   | 'openstatus'
+  | 'shipBayNo'
+  | 'supcoilId'
   | 'thickness'
   | 'upDate'
   | 'widthCoil';
@@ -1434,6 +1449,7 @@ export type Coils = {
   id: Scalars['Int']['output'];
   initWeight?: Maybe<Scalars['Float']['output']>;
   innerdiameter?: Maybe<Scalars['Int']['output']>;
+  isUnloaded?: Maybe<Scalars['Boolean']['output']>;
   loadDate?: Maybe<Scalars['Date']['output']>;
   loaderid?: Maybe<Scalars['String']['output']>;
   loc?: Maybe<Scalars['Int']['output']>;
@@ -1453,6 +1469,7 @@ export type Coils = {
   ptradecode?: Maybe<Scalars['String']['output']>;
   quality?: Maybe<Scalars['Int']['output']>;
   sheetType?: Maybe<Scalars['String']['output']>;
+  shipBayNo?: Maybe<Scalars['Int']['output']>;
   slithick: Scalars['String']['output'];
   slitrange: Scalars['String']['output'];
   status?: Maybe<Status>;
@@ -1475,28 +1492,37 @@ export type Coils = {
 export type CoilsFilterInput = {
   coilno?: InputMaybe<StringFilterInput>;
   color?: InputMaybe<StringFilterInput>;
-  currWeight?: InputMaybe<StringFilterInput>;
-  currWeightFrom?: InputMaybe<StringFilterInput>;
-  currWeightTo?: InputMaybe<StringFilterInput>;
+  currWeight?: InputMaybe<IntFilter>;
+  currWeightFrom?: InputMaybe<IntFilter>;
+  currWeightTo?: InputMaybe<IntFilter>;
+  documents?: InputMaybe<StringFilter>;
+  isLoaded?: InputMaybe<BooleanFilter>;
+  isUnloaded?: InputMaybe<BooleanFilter>;
+  loadDate?: InputMaybe<DateFilter>;
+  loadDateFrom?: InputMaybe<DateFilter>;
+  loadDateTo?: InputMaybe<DateFilter>;
   loc?: InputMaybe<IntInInput>;
   loc_in?: InputMaybe<IntInInput>;
   openstatus?: InputMaybe<OpenstatusFilterInput>;
-  status?: InputMaybe<Scalars['Int']['input']>;
+  shipBayNo?: InputMaybe<IntFilter>;
+  supcoilId?: InputMaybe<StringFilterInput>;
   thickness?: InputMaybe<StringFilterInput>;
-  upDateFrom?: InputMaybe<Scalars['DateTime']['input']>;
-  upDateTo?: InputMaybe<Scalars['DateTime']['input']>;
+  upDate?: InputMaybe<DateFilter>;
+  upDateFrom?: InputMaybe<DateFilter>;
+  upDateTo?: InputMaybe<DateFilter>;
   widthCoil?: InputMaybe<StringFilterInput>;
 };
 
 export type CoilsResponse = {
   nodes: Array<Coil>;
   totalCount: Scalars['Int']['output'];
-  totalWeight: Scalars['Int']['output'];
+  totalWeight: Scalars['Float']['output'];
 };
 
 export type CoilsSortInput = {
-  direction: SortOrder;
+  direction?: InputMaybe<SortOrder>;
   field: CoilSortField;
+  order?: InputMaybe<SortOrder>;
 };
 
 export type Colorlist = {
@@ -2188,8 +2214,11 @@ export type CustomerSortField =
   | 'name';
 
 export type CustomerSortInput = {
-  direction: SortOrder;
+  direction?: InputMaybe<SortOrder>;
+  directionStr?: InputMaybe<Scalars['String']['input']>;
   field: CustomerSortField;
+  order?: InputMaybe<SortOrder>;
+  orderStr?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Customertrans = {
@@ -2457,6 +2486,7 @@ export type DateFilter = {
   eq?: InputMaybe<Scalars['Date']['input']>;
   gt?: InputMaybe<Scalars['Date']['input']>;
   gte?: InputMaybe<Scalars['Date']['input']>;
+  in?: InputMaybe<Array<Scalars['Date']['input']>>;
   lt?: InputMaybe<Scalars['Date']['input']>;
   lte?: InputMaybe<Scalars['Date']['input']>;
 };
@@ -3363,8 +3393,11 @@ export type FintradeSyncSortField =
   | 'tradecode';
 
 export type FintradeSyncSortInput = {
-  direction: SortOrder;
+  direction?: InputMaybe<SortOrder>;
+  directionStr?: InputMaybe<Scalars['String']['input']>;
   field: FintradeSyncSortField;
+  order?: InputMaybe<SortOrder>;
+  orderStr?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Fintransform = {
@@ -4478,6 +4511,7 @@ export type Mutation = {
   deletePporder: Scalars['Boolean']['output'];
   login: LoginResponse;
   removeRecipe: Scalars['Boolean']['output'];
+  updateCoilStatus: Coil;
   updateOneCoil: Coil;
   updatePauseDetails: PanelMachinePauses;
   /** Update an existing production order */
@@ -4519,6 +4553,13 @@ export type MutationLoginArgs = {
 
 export type MutationRemoveRecipeArgs = {
   id: Scalars['String']['input'];
+};
+
+
+export type MutationUpdateCoilStatusArgs = {
+  id: Scalars['Int']['input'];
+  shipBayNo: Scalars['Int']['input'];
+  statusIds: Array<Scalars['Int']['input']>;
 };
 
 
@@ -5071,6 +5112,7 @@ export type Pporderlines2 = {
   prodOrdersView?: Maybe<ProdOrdersView>;
   status?: Maybe<Scalars['Int']['output']>;
   tradecode?: Maybe<Scalars['String']['output']>;
+  tradecodeCustomer?: Maybe<TradecodeCustomer>;
   upDate?: Maybe<Scalars['Date']['output']>;
 };
 
@@ -5094,8 +5136,11 @@ export type Pporderlines2SortField =
   | 'prodDate';
 
 export type Pporderlines2SortInput = {
-  direction: SortOrder;
+  direction?: InputMaybe<SortOrder>;
+  directionStr?: InputMaybe<Scalars['String']['input']>;
   field: Pporderlines2SortField;
+  order?: InputMaybe<SortOrder>;
+  orderStr?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Pporders = {
@@ -5122,6 +5167,7 @@ export type Pporders = {
   startDate?: Maybe<Scalars['Date']['output']>;
   startDateDatetime?: Maybe<Scalars['Date']['output']>;
   status?: Maybe<Scalars['Int']['output']>;
+  totalOrderTime?: Maybe<Scalars['Float']['output']>;
   totalTime?: Maybe<Scalars['Float']['output']>;
   totalTtm?: Maybe<Scalars['Float']['output']>;
 };
@@ -5284,8 +5330,11 @@ export type ProdOrdersViewResponse = {
 };
 
 export type ProdOrdersViewSortInput = {
-  direction: SortOrder;
+  direction?: InputMaybe<SortOrder>;
+  directionStr?: InputMaybe<Scalars['String']['input']>;
   field: PanelProductionOrdersExt2SortField;
+  order?: InputMaybe<SortOrder>;
+  orderStr?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Productionparams = {
@@ -5457,6 +5506,7 @@ export type QueryCoilsArgs = {
   filter?: InputMaybe<CoilsFilterInput>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  sorting?: InputMaybe<Array<CoilsSortInput>>;
 };
 
 
@@ -6030,6 +6080,7 @@ export type Sizelist = {
   size20?: Maybe<Scalars['String']['output']>;
 };
 
+/** Specify ascending or descending order */
 export type SortOrder =
   | 'ASC'
   | 'DESC';
@@ -6619,6 +6670,8 @@ export type StringFilterInput = {
 
 export type Subscription = {
   pporderUpdated: Pporders;
+  pporderlineCreated: Pporderlines2;
+  pporderlineDeleted: Pporderlines2;
   pporderlineStatusChanged: Pporderlines2;
   recipeAdded: Recipe;
 };
@@ -7368,6 +7421,12 @@ export type Taxfreejustification = {
   mydatacode?: Maybe<Scalars['Float']['output']>;
 };
 
+export type TradecodeCustomer = {
+  ftrdate?: Maybe<Scalars['Date']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  tradecode?: Maybe<Scalars['String']['output']>;
+};
+
 export type Transportation = {
   carrierid?: Maybe<Scalars['Float']['output']>;
   codeid?: Maybe<Scalars['Float']['output']>;
@@ -7412,9 +7471,12 @@ export type UpdateCoilInput = {
   cutComment?: InputMaybe<Scalars['String']['input']>;
   delDate?: InputMaybe<Scalars['Date']['input']>;
   initWeight?: InputMaybe<Scalars['Float']['input']>;
+  isLoaded?: InputMaybe<Scalars['Boolean']['input']>;
+  loadDate?: InputMaybe<Scalars['Date']['input']>;
   loc?: InputMaybe<Scalars['Int']['input']>;
   openstatus?: InputMaybe<Scalars['String']['input']>;
   prodComment?: InputMaybe<Scalars['String']['input']>;
+  shipBayNo?: InputMaybe<Scalars['Int']['input']>;
   statusId?: InputMaybe<Scalars['Int']['input']>;
   supplier?: InputMaybe<Scalars['String']['input']>;
   thickness?: InputMaybe<Scalars['Float']['input']>;
@@ -7966,6 +8028,22 @@ export type PporderlineStatusChangedSubscription = { pporderlineStatusChanged: (
     & { pporders?: Maybe<Pick<Pporders, 'id' | 'pporderno'>> }
   ) };
 
+export type PporderlineCreatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type PporderlineCreatedSubscription = { pporderlineCreated: (
+    Pick<Pporderlines2, 'id' | 'pporderno' | 'status'>
+    & { prodOrdersView?: Maybe<Pick<ProdOrdersView, 'time'>>, pporders?: Maybe<Pick<Pporders, 'id' | 'pporderno'>> }
+  ) };
+
+export type PporderlineDeletedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type PporderlineDeletedSubscription = { pporderlineDeleted: (
+    Pick<Pporderlines2, 'id' | 'pporderno' | 'status'>
+    & { prodOrdersView?: Maybe<Pick<ProdOrdersView, 'time'>>, pporders?: Maybe<Pick<Pporders, 'id' | 'pporderno'>> }
+  ) };
+
 export type PporderUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -8009,8 +8087,21 @@ export type GetPpOrdersListQueryVariables = Exact<{
 
 export type GetPpOrdersListQuery = { pporders: Array<(
     Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'status' | 'startDateDatetime' | 'finishDateDatetime' | 'estDateOfProdDatetime' | 'createDate' | 'estStartDate' | 'estFinishDate' | 'previd' | 'prevpanelcode' | 'offtimeduration' | 'offtimestartdate' | 'offtimeenddate'>
-    & { pauses?: Maybe<Array<Pick<PanelMachinePauses, 'id' | 'pausestartdate' | 'pauseenddate' | 'pauseduration' | 'pausecomment'>>>, groupIn?: Maybe<Array<Pick<PporderGroupIn, 'cin' | 'thickin' | 'moldin' | 'cout' | 'thickout' | 'moldout' | 'totalTtm'>>> }
+    & { pauses?: Maybe<Array<Pick<PanelMachinePauses, 'id' | 'pausestartdate' | 'pauseenddate' | 'pauseduration' | 'pausecomment'>>>, groupIn?: Maybe<Array<(
+      Pick<PporderGroupIn, 'cin' | 'thickin' | 'moldin' | 'cout' | 'thickout' | 'moldout' | 'totalTtm'>
+      & { orders?: Maybe<Array<(
+        Pick<Pporderlines2, 'id' | 'custporderno' | 'status' | 'upDate'>
+        & { tradecodeCustomer?: Maybe<Pick<TradecodeCustomer, 'ftrdate' | 'name' | 'tradecode'>>, prodOrdersView?: Maybe<Pick<ProdOrdersView, 'isCanceled' | 'time' | 'speed' | 'ttm' | 'cin' | 'cout' | 'moldin' | 'moldout' | 'count'>> }
+      )>> }
+    )>> }
   )> };
+
+export type GetPpOrdersTimesQueryVariables = Exact<{
+  filter?: InputMaybe<PpordersFilterInput>;
+}>;
+
+
+export type GetPpOrdersTimesQuery = { pporders: Array<Pick<Pporders, 'id' | 'totalOrderTime' | 'totalTtm'>> };
 
 export type GetPpOrdersQueryVariables = Exact<{
   filter?: InputMaybe<PpordersFilterInput>;
@@ -8038,7 +8129,7 @@ export type GetPpOrderLinestopporderQuery = { pporderlines2: (
     Pick<Pporderlines2Response, 'totalCount'>
     & { nodes: Array<(
       Pick<Pporderlines2, 'id' | 'pporderno' | 'panelcode' | 'status' | 'custporderno' | 'upDate'>
-      & { prodOrdersView?: Maybe<Pick<ProdOrdersView, 'isCanceled' | 'time' | 'speed' | 'ttm' | 'cin' | 'cout' | 'moldin' | 'moldout' | 'count'>>, pporders?: Maybe<Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'startDateDatetime' | 'finishDateDatetime'>> }
+      & { tradecodeCustomer?: Maybe<Pick<TradecodeCustomer, 'ftrdate' | 'name' | 'tradecode'>>, prodOrdersView?: Maybe<Pick<ProdOrdersView, 'isCanceled' | 'time' | 'speed' | 'ttm' | 'cin' | 'cout' | 'moldin' | 'moldout' | 'count'>>, pporders?: Maybe<Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'startDateDatetime' | 'finishDateDatetime'>> }
     )> }
   ) };
 
@@ -8053,7 +8144,7 @@ export type PpOrderLine2Query = { pporderlines2: (
     Pick<Pporderlines2Response, 'totalCount'>
     & { nodes: Array<(
       Pick<Pporderlines2, 'id' | 'pporderno' | 'custporderno' | 'prodDate' | 'upDate' | 'status' | 'isCanceled' | 'panelcode' | 'tradecode'>
-      & { prodOrdersView?: Maybe<Pick<ProdOrdersView, 'cin' | 'cout' | 'moldin' | 'moldout' | 'thickin' | 'thickout' | 'count' | 'time' | 'speed' | 'ttm'>>, pporders?: Maybe<Pick<Pporders, 'status'>> }
+      & { tradecodeCustomer?: Maybe<Pick<TradecodeCustomer, 'ftrdate' | 'name' | 'tradecode'>>, prodOrdersView?: Maybe<Pick<ProdOrdersView, 'cin' | 'cout' | 'moldin' | 'moldout' | 'thickin' | 'thickout' | 'count' | 'time' | 'ttm'>>, pporders?: Maybe<Pick<Pporders, 'status'>> }
     )> }
   ) };
 
@@ -8062,7 +8153,7 @@ export type GetCoilQueryVariables = Exact<{
 }>;
 
 
-export type GetCoilQuery = { coil?: Maybe<Pick<Coil, 'id' | 'comments' | 'thickness' | 'loc' | 'cutComment' | 'commentsPanel' | 'prodComment'>> };
+export type GetCoilQuery = { coil?: Maybe<Pick<Coil, 'id' | 'comments' | 'supcoilId' | 'thickness' | 'loc' | 'cutComment' | 'commentsPanel' | 'prodComment' | 'currWeight' | 'widthCoil' | 'shipBayNo'>> };
 
 export type UpdateOneCoilMutationVariables = Exact<{
   input: UpdateOneCoilInput;
@@ -8092,10 +8183,10 @@ export type GetexpectedCoilsQueryVariables = Exact<{
 
 
 export type GetexpectedCoilsQuery = { expectedCoils: (
-    Pick<CoilsResponse, 'totalCount'>
+    Pick<CoilsResponse, 'totalCount' | 'totalWeight'>
     & { nodes: Array<(
-      Pick<Coil, 'id' | 'coilno' | 'comments' | 'color' | 'loc' | 'upDate' | 'thickness' | 'widthCoil' | 'currWeight' | 'openstatus' | 'supplier' | 'company'>
-      & { status: Pick<StatusType, 'id' | 'name'> }
+      Pick<Coil, 'id' | 'coilno' | 'comments' | 'color' | 'loc' | 'loadDate' | 'supcoilId' | 'documents' | 'upDate' | 'thickness' | 'widthCoil' | 'currWeight' | 'openstatus' | 'supplier' | 'company' | 'shipBayNo'>
+      & { status: Pick<StatusType, 'id' | 'name' | 'nameGrp'> }
     )> }
   ) };
 
@@ -8103,6 +8194,29 @@ export type CoilColorsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type CoilColorsQuery = { coilColors: Array<Pick<CoilColorType, 'id' | 'code' | 'name' | 'hexcode'>> };
+
+export type GetAvailableCoilsWeightQueryVariables = Exact<{
+  filter?: InputMaybe<CoilsFilterInput>;
+  sorting?: InputMaybe<Array<CoilsSortInput> | CoilsSortInput>;
+}>;
+
+
+export type GetAvailableCoilsWeightQuery = { availableCoils: Pick<CoilsResponse, 'totalWeight'> };
+
+export type GetExpectedCoilsWeightQueryVariables = Exact<{
+  filter?: InputMaybe<CoilsFilterInput>;
+  sorting?: InputMaybe<Array<CoilsSortInput> | CoilsSortInput>;
+}>;
+
+
+export type GetExpectedCoilsWeightQuery = { expectedCoils: Pick<CoilsResponse, 'totalWeight'> };
+
+export type GetCoilByIdQueryVariables = Exact<{
+  id: Scalars['Int']['input'];
+}>;
+
+
+export type GetCoilByIdQuery = { coil?: Maybe<Pick<Coil, 'id' | 'coilno' | 'supcoilId' | 'upDate'>> };
 
 export type GetAvailableCoilsQueryVariables = Exact<{
   filter?: InputMaybe<CoilsFilterInput>;
@@ -8113,10 +8227,10 @@ export type GetAvailableCoilsQueryVariables = Exact<{
 
 
 export type GetAvailableCoilsQuery = { availableCoils: (
-    Pick<CoilsResponse, 'totalCount'>
+    Pick<CoilsResponse, 'totalCount' | 'totalWeight'>
     & { nodes: Array<(
-      Pick<Coil, 'id' | 'coilno' | 'comments' | 'color' | 'loc' | 'upDate' | 'thickness' | 'widthCoil' | 'currWeight' | 'openstatus' | 'supplier' | 'company'>
-      & { status: Pick<StatusType, 'id' | 'name'> }
+      Pick<Coil, 'id' | 'coilno' | 'comments' | 'color' | 'loc' | 'loadDate' | 'upDate' | 'thickness' | 'widthCoil' | 'currWeight' | 'openstatus' | 'supplier' | 'supcoilId' | 'company' | 'shipBayNo'>
+      & { status: Pick<StatusType, 'id' | 'name' | 'nameGrp'> }
     )> }
   ) };
 
@@ -8127,8 +8241,20 @@ export type CoilShowQueryVariables = Exact<{
 
 export type CoilShowQuery = { coil?: Maybe<(
     Pick<Coil, 'id' | 'coilno' | 'color' | 'sheetType' | 'coating' | 'coathick' | 'paintType' | 'steelGrade' | 'createDate' | 'delDate' | 'upDate' | 'gaugeThickness' | 'thickness' | 'widthCoil' | 'initWeight' | 'weight' | 'currWeight' | 'grossWeight' | 'wastage' | 'loc' | 'currLength' | 'comments' | 'commentsPanel' | 'supplier' | 'openstatus' | 'innerdiameter' | 'quality' | 'supcoilId' | 'customer' | 'orderDate' | 'corderid' | 'loadDate' | 'tporderId' | 'tporderSort' | 'classification' | 'painted' | 'heatno' | 'cutWastage' | 'nomthickness' | 'price' | 'cutComment' | 'surfaceType' | 'loaderid' | 'donkey' | 'dateofDes34' | 'dcustomer' | 'prodDate' | 'datediff' | 'datediffnow' | 'tempStatus' | 'property' | 'slitrange' | 'slithick' | 'locTrans' | 'dateTrans' | 'customs' | 'currLengthAgr' | 'currLengthPol' | 'currLengthAlu' | 'currLengthAlup' | 'currLengthPap' | 'currLengthAlue' | 'currLengthBit' | 'currLengthSto' | 'anVcoated' | 'prodComment' | 'documents' | 'vesselName' | 'dischargePort' | 'productCode' | 'dcustomerName' | 'cnomthickness' | 'tnomthickness' | 'ptradecode' | 'clength' | 'dateDiffDelNow' | 'dateDiffCutNow' | 'dateDiffCutProd' | 'dateDiffCutSales' | 'dateDiffDelPaint' | 'dateDiffDelSales' | 'dateDiffDelCut' | 'company'>
-    & { status: Pick<StatusType, 'name'> }
+    & { status: Pick<StatusType, 'name' | 'nameGrp'> }
   )> };
+
+export type UpdateStatusMutationVariables = Exact<{
+  id: Scalars['Int']['input'];
+  statusIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+  shipBayNo: Scalars['Int']['input'];
+}>;
+
+
+export type UpdateStatusMutation = { updateCoilStatus: (
+    Pick<Coil, 'id' | 'coilno' | 'shipBayNo'>
+    & { status: Pick<StatusType, 'id' | 'name' | 'nameGrp'> }
+  ) };
 
 export type GetDailyWorkingHoursQueryVariables = Exact<{
   date: Scalars['String']['input'];
@@ -8149,6 +8275,18 @@ export type UpdateDailyWorkingHoursMutationVariables = Exact<{
 
 
 export type UpdateDailyWorkingHoursMutation = { updateWorkingHours: Pick<WorkingHours, 'date' | 'startHour' | 'startMinute' | 'endHour' | 'endMinute' | 'isWorkingDay'> };
+
+export type GetStatusesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetStatusesQuery = { statuses: Array<Pick<StatusType, 'id' | 'name' | 'nameGrp'>> };
+
+export type FindExpectedQueryVariables = Exact<{
+  filter?: InputMaybe<CoilsFilterInput>;
+}>;
+
+
+export type FindExpectedQuery = { expectedCoils: { nodes: Array<Pick<Coil, 'id'>> } };
 
 
 export const PporderlineStatusChangedDocument = gql`
@@ -8185,6 +8323,82 @@ export function usePporderlineStatusChangedSubscription(baseOptions?: Apollo.Sub
       }
 export type PporderlineStatusChangedSubscriptionHookResult = ReturnType<typeof usePporderlineStatusChangedSubscription>;
 export type PporderlineStatusChangedSubscriptionResult = Apollo.SubscriptionResult<PporderlineStatusChangedSubscription>;
+export const PporderlineCreatedDocument = gql`
+    subscription PporderlineCreated {
+  pporderlineCreated {
+    id
+    pporderno
+    status
+    prodOrdersView {
+      time
+    }
+    pporders {
+      id
+      pporderno
+    }
+  }
+}
+    `;
+
+/**
+ * __usePporderlineCreatedSubscription__
+ *
+ * To run a query within a React component, call `usePporderlineCreatedSubscription` and pass it any options that fit your needs.
+ * When your component renders, `usePporderlineCreatedSubscription` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = usePporderlineCreatedSubscription({
+ *   variables: {
+ *   },
+ * });
+ */
+export function usePporderlineCreatedSubscription(baseOptions?: Apollo.SubscriptionHookOptions<PporderlineCreatedSubscription, PporderlineCreatedSubscriptionVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useSubscription<PporderlineCreatedSubscription, PporderlineCreatedSubscriptionVariables>(PporderlineCreatedDocument, options);
+      }
+export type PporderlineCreatedSubscriptionHookResult = ReturnType<typeof usePporderlineCreatedSubscription>;
+export type PporderlineCreatedSubscriptionResult = Apollo.SubscriptionResult<PporderlineCreatedSubscription>;
+export const PporderlineDeletedDocument = gql`
+    subscription PporderlineDeleted {
+  pporderlineDeleted {
+    id
+    pporderno
+    status
+    prodOrdersView {
+      time
+    }
+    pporders {
+      id
+      pporderno
+    }
+  }
+}
+    `;
+
+/**
+ * __usePporderlineDeletedSubscription__
+ *
+ * To run a query within a React component, call `usePporderlineDeletedSubscription` and pass it any options that fit your needs.
+ * When your component renders, `usePporderlineDeletedSubscription` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = usePporderlineDeletedSubscription({
+ *   variables: {
+ *   },
+ * });
+ */
+export function usePporderlineDeletedSubscription(baseOptions?: Apollo.SubscriptionHookOptions<PporderlineDeletedSubscription, PporderlineDeletedSubscriptionVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useSubscription<PporderlineDeletedSubscription, PporderlineDeletedSubscriptionVariables>(PporderlineDeletedDocument, options);
+      }
+export type PporderlineDeletedSubscriptionHookResult = ReturnType<typeof usePporderlineDeletedSubscription>;
+export type PporderlineDeletedSubscriptionResult = Apollo.SubscriptionResult<PporderlineDeletedSubscription>;
 export const PporderUpdatedDocument = gql`
     subscription PporderUpdated {
   pporderUpdated {
@@ -8420,6 +8634,28 @@ export const GetPpOrdersListDocument = gql`
       thickout
       moldout
       totalTtm
+      orders {
+        id
+        custporderno
+        status
+        upDate
+        tradecodeCustomer {
+          ftrdate
+          name
+          tradecode
+        }
+        prodOrdersView {
+          isCanceled
+          time
+          speed
+          ttm
+          cin
+          cout
+          moldin
+          moldout
+          count
+        }
+      }
     }
   }
 }
@@ -8457,6 +8693,48 @@ export type GetPpOrdersListQueryHookResult = ReturnType<typeof useGetPpOrdersLis
 export type GetPpOrdersListLazyQueryHookResult = ReturnType<typeof useGetPpOrdersListLazyQuery>;
 export type GetPpOrdersListSuspenseQueryHookResult = ReturnType<typeof useGetPpOrdersListSuspenseQuery>;
 export type GetPpOrdersListQueryResult = Apollo.QueryResult<GetPpOrdersListQuery, GetPpOrdersListQueryVariables>;
+export const GetPpOrdersTimesDocument = gql`
+    query GetPpOrdersTimes($filter: PpordersFilterInput) {
+  pporders(filter: $filter) {
+    id
+    totalOrderTime
+    totalTtm
+  }
+}
+    `;
+
+/**
+ * __useGetPpOrdersTimesQuery__
+ *
+ * To run a query within a React component, call `useGetPpOrdersTimesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPpOrdersTimesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPpOrdersTimesQuery({
+ *   variables: {
+ *      filter: // value for 'filter'
+ *   },
+ * });
+ */
+export function useGetPpOrdersTimesQuery(baseOptions?: Apollo.QueryHookOptions<GetPpOrdersTimesQuery, GetPpOrdersTimesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetPpOrdersTimesQuery, GetPpOrdersTimesQueryVariables>(GetPpOrdersTimesDocument, options);
+      }
+export function useGetPpOrdersTimesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetPpOrdersTimesQuery, GetPpOrdersTimesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetPpOrdersTimesQuery, GetPpOrdersTimesQueryVariables>(GetPpOrdersTimesDocument, options);
+        }
+export function useGetPpOrdersTimesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetPpOrdersTimesQuery, GetPpOrdersTimesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetPpOrdersTimesQuery, GetPpOrdersTimesQueryVariables>(GetPpOrdersTimesDocument, options);
+        }
+export type GetPpOrdersTimesQueryHookResult = ReturnType<typeof useGetPpOrdersTimesQuery>;
+export type GetPpOrdersTimesLazyQueryHookResult = ReturnType<typeof useGetPpOrdersTimesLazyQuery>;
+export type GetPpOrdersTimesSuspenseQueryHookResult = ReturnType<typeof useGetPpOrdersTimesSuspenseQuery>;
+export type GetPpOrdersTimesQueryResult = Apollo.QueryResult<GetPpOrdersTimesQuery, GetPpOrdersTimesQueryVariables>;
 export const GetPpOrdersDocument = gql`
     query GetPpOrders($filter: PpordersFilterInput) {
   pporders(filter: $filter) {
@@ -8475,8 +8753,6 @@ export const GetPpOrdersDocument = gql`
     offtimeduration
     offtimestartdate
     offtimeenddate
-    totalOrderTime
-    totalTtm
     pauses {
       id
       pausestartdate
@@ -8581,6 +8857,11 @@ export const GetPpOrderLinestopporderDocument = gql`
       panelcode
       status
       custporderno
+      tradecodeCustomer {
+        ftrdate
+        name
+        tradecode
+      }
       upDate
       status
       prodOrdersView {
@@ -8652,6 +8933,11 @@ export const PpOrderLine2Document = gql`
       isCanceled
       panelcode
       tradecode
+      tradecodeCustomer {
+        ftrdate
+        name
+        tradecode
+      }
       prodOrdersView {
         cin
         cout
@@ -8661,7 +8947,6 @@ export const PpOrderLine2Document = gql`
         thickout
         count
         time
-        speed
         ttm
       }
       pporders {
@@ -8712,11 +8997,15 @@ export const GetCoilDocument = gql`
   coil(id: $id) {
     id
     comments
+    supcoilId
     thickness
     loc
     cutComment
     commentsPanel
     prodComment
+    currWeight
+    widthCoil
+    shipBayNo
   }
 }
     `;
@@ -8893,6 +9182,9 @@ export const GetexpectedCoilsDocument = gql`
       comments
       color
       loc
+      loadDate
+      supcoilId
+      documents
       upDate
       thickness
       widthCoil
@@ -8900,12 +9192,15 @@ export const GetexpectedCoilsDocument = gql`
       openstatus
       supplier
       company
+      shipBayNo
       status {
         id
         name
+        nameGrp
       }
     }
     totalCount
+    totalWeight
   }
 }
     `;
@@ -8987,6 +9282,131 @@ export type CoilColorsQueryHookResult = ReturnType<typeof useCoilColorsQuery>;
 export type CoilColorsLazyQueryHookResult = ReturnType<typeof useCoilColorsLazyQuery>;
 export type CoilColorsSuspenseQueryHookResult = ReturnType<typeof useCoilColorsSuspenseQuery>;
 export type CoilColorsQueryResult = Apollo.QueryResult<CoilColorsQuery, CoilColorsQueryVariables>;
+export const GetAvailableCoilsWeightDocument = gql`
+    query GetAvailableCoilsWeight($filter: CoilsFilterInput, $sorting: [CoilsSortInput!]) {
+  availableCoils(filter: $filter, sorting: $sorting) {
+    totalWeight
+  }
+}
+    `;
+
+/**
+ * __useGetAvailableCoilsWeightQuery__
+ *
+ * To run a query within a React component, call `useGetAvailableCoilsWeightQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAvailableCoilsWeightQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAvailableCoilsWeightQuery({
+ *   variables: {
+ *      filter: // value for 'filter'
+ *      sorting: // value for 'sorting'
+ *   },
+ * });
+ */
+export function useGetAvailableCoilsWeightQuery(baseOptions?: Apollo.QueryHookOptions<GetAvailableCoilsWeightQuery, GetAvailableCoilsWeightQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAvailableCoilsWeightQuery, GetAvailableCoilsWeightQueryVariables>(GetAvailableCoilsWeightDocument, options);
+      }
+export function useGetAvailableCoilsWeightLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAvailableCoilsWeightQuery, GetAvailableCoilsWeightQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAvailableCoilsWeightQuery, GetAvailableCoilsWeightQueryVariables>(GetAvailableCoilsWeightDocument, options);
+        }
+export function useGetAvailableCoilsWeightSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAvailableCoilsWeightQuery, GetAvailableCoilsWeightQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAvailableCoilsWeightQuery, GetAvailableCoilsWeightQueryVariables>(GetAvailableCoilsWeightDocument, options);
+        }
+export type GetAvailableCoilsWeightQueryHookResult = ReturnType<typeof useGetAvailableCoilsWeightQuery>;
+export type GetAvailableCoilsWeightLazyQueryHookResult = ReturnType<typeof useGetAvailableCoilsWeightLazyQuery>;
+export type GetAvailableCoilsWeightSuspenseQueryHookResult = ReturnType<typeof useGetAvailableCoilsWeightSuspenseQuery>;
+export type GetAvailableCoilsWeightQueryResult = Apollo.QueryResult<GetAvailableCoilsWeightQuery, GetAvailableCoilsWeightQueryVariables>;
+export const GetExpectedCoilsWeightDocument = gql`
+    query GetExpectedCoilsWeight($filter: CoilsFilterInput, $sorting: [CoilsSortInput!]) {
+  expectedCoils(filter: $filter, sorting: $sorting) {
+    totalWeight
+  }
+}
+    `;
+
+/**
+ * __useGetExpectedCoilsWeightQuery__
+ *
+ * To run a query within a React component, call `useGetExpectedCoilsWeightQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetExpectedCoilsWeightQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetExpectedCoilsWeightQuery({
+ *   variables: {
+ *      filter: // value for 'filter'
+ *      sorting: // value for 'sorting'
+ *   },
+ * });
+ */
+export function useGetExpectedCoilsWeightQuery(baseOptions?: Apollo.QueryHookOptions<GetExpectedCoilsWeightQuery, GetExpectedCoilsWeightQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetExpectedCoilsWeightQuery, GetExpectedCoilsWeightQueryVariables>(GetExpectedCoilsWeightDocument, options);
+      }
+export function useGetExpectedCoilsWeightLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetExpectedCoilsWeightQuery, GetExpectedCoilsWeightQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetExpectedCoilsWeightQuery, GetExpectedCoilsWeightQueryVariables>(GetExpectedCoilsWeightDocument, options);
+        }
+export function useGetExpectedCoilsWeightSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetExpectedCoilsWeightQuery, GetExpectedCoilsWeightQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetExpectedCoilsWeightQuery, GetExpectedCoilsWeightQueryVariables>(GetExpectedCoilsWeightDocument, options);
+        }
+export type GetExpectedCoilsWeightQueryHookResult = ReturnType<typeof useGetExpectedCoilsWeightQuery>;
+export type GetExpectedCoilsWeightLazyQueryHookResult = ReturnType<typeof useGetExpectedCoilsWeightLazyQuery>;
+export type GetExpectedCoilsWeightSuspenseQueryHookResult = ReturnType<typeof useGetExpectedCoilsWeightSuspenseQuery>;
+export type GetExpectedCoilsWeightQueryResult = Apollo.QueryResult<GetExpectedCoilsWeightQuery, GetExpectedCoilsWeightQueryVariables>;
+export const GetCoilByIdDocument = gql`
+    query GetCoilById($id: Int!) {
+  coil(id: $id) {
+    id
+    coilno
+    supcoilId
+    upDate
+  }
+}
+    `;
+
+/**
+ * __useGetCoilByIdQuery__
+ *
+ * To run a query within a React component, call `useGetCoilByIdQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCoilByIdQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetCoilByIdQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetCoilByIdQuery(baseOptions: Apollo.QueryHookOptions<GetCoilByIdQuery, GetCoilByIdQueryVariables> & ({ variables: GetCoilByIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetCoilByIdQuery, GetCoilByIdQueryVariables>(GetCoilByIdDocument, options);
+      }
+export function useGetCoilByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetCoilByIdQuery, GetCoilByIdQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetCoilByIdQuery, GetCoilByIdQueryVariables>(GetCoilByIdDocument, options);
+        }
+export function useGetCoilByIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetCoilByIdQuery, GetCoilByIdQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetCoilByIdQuery, GetCoilByIdQueryVariables>(GetCoilByIdDocument, options);
+        }
+export type GetCoilByIdQueryHookResult = ReturnType<typeof useGetCoilByIdQuery>;
+export type GetCoilByIdLazyQueryHookResult = ReturnType<typeof useGetCoilByIdLazyQuery>;
+export type GetCoilByIdSuspenseQueryHookResult = ReturnType<typeof useGetCoilByIdSuspenseQuery>;
+export type GetCoilByIdQueryResult = Apollo.QueryResult<GetCoilByIdQuery, GetCoilByIdQueryVariables>;
 export const GetAvailableCoilsDocument = gql`
     query GetAvailableCoils($filter: CoilsFilterInput, $sorting: [CoilsSortInput!], $limit: Int, $offset: Int) {
   availableCoils(
@@ -9001,19 +9421,24 @@ export const GetAvailableCoilsDocument = gql`
       comments
       color
       loc
+      loadDate
       upDate
       thickness
       widthCoil
       currWeight
       openstatus
       supplier
+      supcoilId
       company
+      shipBayNo
       status {
         id
         name
+        nameGrp
       }
     }
     totalCount
+    totalWeight
   }
 }
     `;
@@ -9077,6 +9502,7 @@ export const CoilShowDocument = gql`
     wastage
     status {
       name
+      nameGrp
     }
     loc
     currLength
@@ -9178,6 +9604,48 @@ export type CoilShowQueryHookResult = ReturnType<typeof useCoilShowQuery>;
 export type CoilShowLazyQueryHookResult = ReturnType<typeof useCoilShowLazyQuery>;
 export type CoilShowSuspenseQueryHookResult = ReturnType<typeof useCoilShowSuspenseQuery>;
 export type CoilShowQueryResult = Apollo.QueryResult<CoilShowQuery, CoilShowQueryVariables>;
+export const UpdateStatusDocument = gql`
+    mutation updateStatus($id: Int!, $statusIds: [Int!]!, $shipBayNo: Int!) {
+  updateCoilStatus(id: $id, statusIds: $statusIds, shipBayNo: $shipBayNo) {
+    id
+    coilno
+    status {
+      id
+      name
+      nameGrp
+    }
+    shipBayNo
+  }
+}
+    `;
+export type UpdateStatusMutationFn = Apollo.MutationFunction<UpdateStatusMutation, UpdateStatusMutationVariables>;
+
+/**
+ * __useUpdateStatusMutation__
+ *
+ * To run a mutation, you first call `useUpdateStatusMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateStatusMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateStatusMutation, { data, loading, error }] = useUpdateStatusMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *      statusIds: // value for 'statusIds'
+ *      shipBayNo: // value for 'shipBayNo'
+ *   },
+ * });
+ */
+export function useUpdateStatusMutation(baseOptions?: Apollo.MutationHookOptions<UpdateStatusMutation, UpdateStatusMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateStatusMutation, UpdateStatusMutationVariables>(UpdateStatusDocument, options);
+      }
+export type UpdateStatusMutationHookResult = ReturnType<typeof useUpdateStatusMutation>;
+export type UpdateStatusMutationResult = Apollo.MutationResult<UpdateStatusMutation>;
+export type UpdateStatusMutationOptions = Apollo.BaseMutationOptions<UpdateStatusMutation, UpdateStatusMutationVariables>;
 export const GetDailyWorkingHoursDocument = gql`
     query GetDailyWorkingHours($date: String!) {
   workingHours(date: $date) {
@@ -9306,3 +9774,86 @@ export function useUpdateDailyWorkingHoursMutation(baseOptions?: Apollo.Mutation
 export type UpdateDailyWorkingHoursMutationHookResult = ReturnType<typeof useUpdateDailyWorkingHoursMutation>;
 export type UpdateDailyWorkingHoursMutationResult = Apollo.MutationResult<UpdateDailyWorkingHoursMutation>;
 export type UpdateDailyWorkingHoursMutationOptions = Apollo.BaseMutationOptions<UpdateDailyWorkingHoursMutation, UpdateDailyWorkingHoursMutationVariables>;
+export const GetStatusesDocument = gql`
+    query GetStatuses {
+  statuses {
+    id
+    name
+    nameGrp
+  }
+}
+    `;
+
+/**
+ * __useGetStatusesQuery__
+ *
+ * To run a query within a React component, call `useGetStatusesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetStatusesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetStatusesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetStatusesQuery(baseOptions?: Apollo.QueryHookOptions<GetStatusesQuery, GetStatusesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetStatusesQuery, GetStatusesQueryVariables>(GetStatusesDocument, options);
+      }
+export function useGetStatusesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetStatusesQuery, GetStatusesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetStatusesQuery, GetStatusesQueryVariables>(GetStatusesDocument, options);
+        }
+export function useGetStatusesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetStatusesQuery, GetStatusesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetStatusesQuery, GetStatusesQueryVariables>(GetStatusesDocument, options);
+        }
+export type GetStatusesQueryHookResult = ReturnType<typeof useGetStatusesQuery>;
+export type GetStatusesLazyQueryHookResult = ReturnType<typeof useGetStatusesLazyQuery>;
+export type GetStatusesSuspenseQueryHookResult = ReturnType<typeof useGetStatusesSuspenseQuery>;
+export type GetStatusesQueryResult = Apollo.QueryResult<GetStatusesQuery, GetStatusesQueryVariables>;
+export const FindExpectedDocument = gql`
+    query FindExpected($filter: CoilsFilterInput) {
+  expectedCoils(filter: $filter) {
+    nodes {
+      id
+    }
+  }
+}
+    `;
+
+/**
+ * __useFindExpectedQuery__
+ *
+ * To run a query within a React component, call `useFindExpectedQuery` and pass it any options that fit your needs.
+ * When your component renders, `useFindExpectedQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useFindExpectedQuery({
+ *   variables: {
+ *      filter: // value for 'filter'
+ *   },
+ * });
+ */
+export function useFindExpectedQuery(baseOptions?: Apollo.QueryHookOptions<FindExpectedQuery, FindExpectedQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<FindExpectedQuery, FindExpectedQueryVariables>(FindExpectedDocument, options);
+      }
+export function useFindExpectedLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<FindExpectedQuery, FindExpectedQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<FindExpectedQuery, FindExpectedQueryVariables>(FindExpectedDocument, options);
+        }
+export function useFindExpectedSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<FindExpectedQuery, FindExpectedQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<FindExpectedQuery, FindExpectedQueryVariables>(FindExpectedDocument, options);
+        }
+export type FindExpectedQueryHookResult = ReturnType<typeof useFindExpectedQuery>;
+export type FindExpectedLazyQueryHookResult = ReturnType<typeof useFindExpectedLazyQuery>;
+export type FindExpectedSuspenseQueryHookResult = ReturnType<typeof useFindExpectedSuspenseQuery>;
+export type FindExpectedQueryResult = Apollo.QueryResult<FindExpectedQuery, FindExpectedQueryVariables>;
