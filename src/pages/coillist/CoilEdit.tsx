@@ -6,12 +6,16 @@ import { useNumericResourceParams } from "@/utilities";
 import { GetFields } from "@refinedev/nestjs-query";
 import { Coil } from "@/graphql/schema.types";
 import { useUpdateCoilStatus } from "@/pages/coillist/hooks/useUpdateCoilStatus";
+import { UseLoadToShipCoil } from "./hooks/useLoadToShipCoil";
 
 const { Title, Text } = Typography;
 
 export const CoilEdit: React.FC = () => {
   const { id } = useNumericResourceParams();
   const { updateCoilStatus } = useUpdateCoilStatus();
+    const { loadToShipCoil } = UseLoadToShipCoil();
+
+  
 
   const { formProps, saveButtonProps, formLoading, query } = useForm({
     resource: "coil",
@@ -44,9 +48,11 @@ const shipBayVal = Form.useWatch("shipBayNo", formProps.form);
       commentFieldLabel = "Σχόλια";
   }
   console.log(query?.data?.data)
+  
   const supcoilId = (query?.data?.data as any)?.supcoilId as string | undefined;
    const currWeight = (query?.data?.data as any)?.currWeight as string | undefined;
       const thickness = (query?.data?.data as any)?.thickness as string | undefined;
+      const isUnloaded = (query?.data?.data as any)?.isUnloaded as boolean | undefined;
 
       const widthCoil = (query?.data?.data as any)?.widthCoil as string | undefined;
 
@@ -76,6 +82,9 @@ const shipBayVal = Form.useWatch("shipBayNo", formProps.form);
       <Descriptions.Item label="Πλάτος">
         {typeof widthCoil === "number" ? `${Math.round(widthCoil * 1000)} mm` : "-"}
       </Descriptions.Item>
+        <Descriptions.Item label="ξεφορτωμένο">
+        {typeof isUnloaded === "boolean" ? `${isUnloaded} ` : "-"}
+      </Descriptions.Item>
     </Descriptions>
   </Card>
 
@@ -97,7 +106,7 @@ const shipBayVal = Form.useWatch("shipBayNo", formProps.form);
     </Form.Item>
 
     <Button  disabled={!shipBayVal}
-              style={{ display: "flex" }}
+              style={{ display: "flex", marginBottom: 16 }}
               onClick={async () => {
                 if (!id) return;
                 try {
@@ -119,6 +128,34 @@ const shipBayVal = Form.useWatch("shipBayNo", formProps.form);
               }}
             >
               βγαλτο απ το καραβι
+            </Button>
+
+            <Button  disabled={!shipBayVal}
+              style={{ display: "flex" }}
+              onClick={async () => {
+                if (!id) return;
+                try {
+                  // validate only the field we need for this action
+                  await formProps.form?.validateFields(["shipBayNo"]);
+                  const shipBayNo = formProps.form?.getFieldValue("shipBayNo") as number | undefined;
+                  if (shipBayNo == null) {
+                    message.error("Επιλέξτε αμπάρι");
+                    return;
+                  }
+                  console.log(shipBayNo)
+                  if (!isUnloaded){
+                    await updateCoilStatus(id, [7,8], shipBayNo); // <-- pass shipBayNo (MANDATORY)
+                  }
+                  await loadToShipCoil(id, [7,8], shipBayNo); // <-- pass shipBayNo (MANDATORY)
+                } catch (e) {
+                  // if it's a validation error, the form will already show messages
+                  if (!(e as any)?.errorFields) {
+                    message.error("Αποτυχία ενημέρωσης status");
+                  }
+                }
+              }}
+            >
+              φορτωσέ το στο καράβι
             </Button>
   </Form>
 </Edit>

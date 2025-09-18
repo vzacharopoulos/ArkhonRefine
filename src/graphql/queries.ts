@@ -373,6 +373,8 @@ query GetCoil($id: Int!) {
     currWeight
     widthCoil
     shipBayNo
+    isUnloaded
+    isLoaded
   }
 }`
 
@@ -663,6 +665,16 @@ shipBayNo
 }
 `;
 
+export const LOAD_TO_SHIP_COIL = gql`
+mutation loadToShipCoil($id:Int!,$statusIds:[Int!]!,$shipBayNo:Int!) {
+  loadToShipCoil(id:$id , statusIds:$statusIds shipBayNo:$shipBayNo) {
+    id
+    coilno
+    status { id name nameGrp }
+shipBayNo
+  }
+}
+`;
 
     export const GET_DAILY_WORKING_HOURS = gql`
   query GetDailyWorkingHours($date:String!) {

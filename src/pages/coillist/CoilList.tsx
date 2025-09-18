@@ -105,6 +105,8 @@ return (
         options={[
           { label: 'Αποφορτωμένα ', value: 'unloaded' },
           { label: 'Μη αποφορτωμένα ', value: 'not_unloaded' },
+          { label: 'Φορτωμένα ', value: 'loaded' },
+
           { label: 'Όλα (χωρίς φίλτρο)', value: 'all' },
         ]}
         onChange={(val) => {
@@ -121,6 +123,12 @@ return (
               return [
                 ...others,
                 { field: 'isUnloaded', operator: 'eq', value: false },
+              ];
+            }
+            if (val === 'loaded') {
+              return [
+                ...others,
+                { field: 'isLoaded', operator: 'eq', value: true },
               ];
             }
             // all -> clear only the isUnloaded/isLoaded constraints, keep others
