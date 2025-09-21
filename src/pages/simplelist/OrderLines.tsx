@@ -9,10 +9,29 @@ import { ArrowDownOutlined, ArrowUpOutlined, DownOutlined, RightOutlined } from 
 const { Text, Title } = Typography;
 
     
-export const OrderLines: React.FC<{ order: PPOrder }> = ({ order }) => {
+interface OrderLinesProps {
+  order: PPOrder;
+  expandedLineId?: number | null;
+  onLineExpand?: (lineId: number | null) => void;
+  groupOrders?: PPOrderLine[]; // Optional: orders from a specific group
+}
+
+export const OrderLines: React.FC<OrderLinesProps> = ({
+  order,
+  expandedLineId: externalExpandedLineId,
+  onLineExpand,
+  groupOrders
+}) => {
   const { data, isLoading } = usePporderLines(order.pporderno ?? null);
-  const lines = data?.data ?? [];
-  const [expandedLineId, setExpandedLineId] = useState<number | null>(null);
+  const allLines = data?.data ?? [];
+
+  // Use group orders if provided, otherwise use all lines
+  const lines = groupOrders ?? allLines;
+
+  // Use internal state if no external control is provided
+  const [internalExpandedLineId, setInternalExpandedLineId] = useState<number | null>(null);
+  const expandedLineId = externalExpandedLineId !== undefined ? externalExpandedLineId : internalExpandedLineId;
+  const handleLineExpand = onLineExpand || setInternalExpandedLineId;
 
   return (
     <Spin spinning={isLoading}>
@@ -31,7 +50,7 @@ export const OrderLines: React.FC<{ order: PPOrder }> = ({ order }) => {
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                setExpandedLineId(expandedLineId === line.id ? null : line.id);
+                handleLineExpand(expandedLineId === line.id ? null : line.id);
               }}
               title={
                 <span>

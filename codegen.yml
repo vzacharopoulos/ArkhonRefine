@@ -1,5 +1,5 @@
 # codegen.yml
-schema: "http://192.168.200.10:4000/graphql"
+schema: "http://192.168.11.65:4000/graphql"
 
 documents:
   - src/**/*.{ts,tsx,graphql}

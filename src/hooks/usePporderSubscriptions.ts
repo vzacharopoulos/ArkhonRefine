@@ -299,7 +299,7 @@ export const usePporderSubscriptions = ({
             });
 
             for (const [orderIdStr, addMinutes] of Object.entries(byOrder)) {
-              await adjustOrderDuration(Number(orderIdStr), addMinutes);
+              //await adjustOrderDuration(Number(orderIdStr), addMinutes);
             }
           } catch (err) {
             console.error("Failed handling pporderlineCreated:", err);
@@ -336,7 +336,7 @@ export const usePporderSubscriptions = ({
             });
 
             for (const [orderIdStr, subMinutes] of Object.entries(byOrder)) {
-              await adjustOrderDuration(Number(orderIdStr), -Number(subMinutes));
+              //await adjustOrderDuration(Number(orderIdStr), -Number(subMinutes));
             }
           } catch (err) {
             console.error("Failed handling pporderlineDeleted:", err);

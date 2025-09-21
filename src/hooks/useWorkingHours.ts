@@ -46,3 +46,17 @@ export const useUpdateDailyWorkingHours = () => {
 
   return { updateDailyWorkingHours };
 };
+
+// Shared default working hours map (Mon-Sun)
+export const DEFAULT_WORKING_HOURS: Record<number, WorkingHoursConfig> = {
+  1: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+  2: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+  3: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+  4: { startHour: 6, startMinute: 0, endHour: 22, endMinute: 0, isWorkingDay: true },
+  5: { startHour: 6, startMinute: 0, endHour: 23, endMinute: 59, isWorkingDay: true },
+  6: { startHour: 0, startMinute: 1, endHour: 15, endMinute: 0, isWorkingDay: true },
+  0: { startHour: 0, startMinute: 0, endHour: 23, endMinute: 59, isWorkingDay: false },
+};
+
+// Optional hook wrapper for consistency with other APIs
+export const useDefaultWorkingHours = () => DEFAULT_WORKING_HOURS;

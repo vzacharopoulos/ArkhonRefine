@@ -84,12 +84,9 @@ export const OrderList: React.FC<OrderListProps> = ({
       </EventTooltip>
 
       <Text>{order.panelcode}</Text>
-      {order.id === selectedOrderId && (
-        <Text strong style={{ marginLeft: 4 }}>
-          {orderLinesLoading ? "Άγνωστο":` ${orderTotalTime}`  }
-          
-        </Text>
-      )}
+      <Text strong style={{ marginLeft: 4 }}>
+        {orderLinesLoading && order.id === selectedOrderId ? "Άγνωστο" : ` ${orderTotalTime}`}
+      </Text>
     </div>
 
     <div style={{ marginLeft: "auto" }}>

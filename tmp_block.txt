@@ -1,0 +1,81 @@
+
+  const handleUnschedulePporder = async (
+    id?: string,
+    extraValues?: Partial<PPOrder>
+  ) => {
+    const allPartsId = String(id).split('-')[0];
+    const numerified = Number(allPartsId);
+
+    const deletedOrder = orders.find(order => order.id === numerified);
+    if (!deletedOrder) return;
+
+    // Find the next order in the chain
+    const nextOrder = orders.find(order => order.previd === numerified);
+    if (nextOrder && deletedOrder) {
+      nextOrder.estStartDate = deletedOrder.estStartDate;
+    }
+
+
+    try {
+      // 1. Clear current order
+      await updatePporder(numerified, {
+        estStartDate: null,
+        estFinishDate: null,
+        status: 1,
+        offtimeduration: null,
+        offtimestartdate: null,
+        offtimeenddate: null,
+        previd: null,
+        prevpanelcode: null,
+        ...extraValues,
+      });
+
+      // 2. If there's a next order, transfer offtime data to it
+      if (nextOrder) {
+        const previousCode = deletedOrder.prevpanelcode?.replace(/-001$/, "");
+        const currentCode = nextOrder.panelcode?.replace(/-001$/, "");
+        const offtimeduration = offTimeMap?.[previousCode ?? 0]?.[currentCode ?? 0] ?? 30;
+        const offtimeenddate = addWorkingMinutesDynamic(dayjs(deletedOrder.offtimestartdate), offtimeduration, dailyWorkingHours, defaultWorkingHours)
+
+        await updatePporder(nextOrder.id, {
+          offtimeduration: offtimeduration ?? null,
+          estStartDate: offtimeenddate,
+          estFinishDate: addWorkingMinutesDynamic(offtimeenddate, totalTimeByOrderId[nextOrder.id].totalMinutes ?? 0, dailyWorkingHours, defaultWorkingHours),
+          offtimestartdate: deletedOrder.offtimestartdate ?? null,
+          offtimeenddate: offtimeenddate ?? null,
+          previd: deletedOrder.previd ?? null,
+          prevpanelcode: deletedOrder.prevpanelcode ?? null,
+        });
+      }
+
+      // Filter out the deleted order and its parts from the currentEvents
+      const updatedEvents = currentEvents.filter(ev => {
+        const evId = ev.id?.toString();
+        return !evId?.startsWith(String(numerified));
+      });
+
+      // Optional: filter out incomplete events (without start or end)
+      const validEvents = updatedEvents.filter(ev => ev.start && ev.end);
+      console.log("valid events", validEvents)
+      // Chain remaining events
+      const chainedEvents = chainEventsSequentially(validEvents, dailyWorkingHours, defaultWorkingHours);
+
+      console.log("Chained events after unscheduling:", chainedEvents);
+      // Update the DB and state
+      await handleUpdateAllEvents({
+        events: chainedEvents,
+        dailyWorkingHours,
+        defaultWorkingHours,
+        updatePporder: handleUpdatePporder,
+        updatePause: handleUpdatePause,
+      });
+
+      setCurrentEvents(chainedEvents);
+      message.success(`Η εντολή ${deletedOrder.pporderno} ακυρώθηκε επιτυχώς.`);
+      // console.log(currentEvents)
+    } catch (error) {
+      console.error("Η εντολή δεν ενημερώθηκε:", error);
+    }
+  };
+
+

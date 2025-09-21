@@ -16,6 +16,7 @@ export type Scalars = {
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
   Date: { input: any; output: any; }
+  DateTime: { input: any; output: any; }
 };
 
 export type Abcparams = {
@@ -4509,8 +4510,12 @@ export type Mutation = {
   deleteMachinePause: Scalars['Boolean']['output'];
   /** Delete a production order */
   deletePporder: Scalars['Boolean']['output'];
+  finishOrder?: Maybe<Pporders>;
   login: LoginResponse;
+  removeOrderFromPlan?: Maybe<Pporders>;
   removeRecipe: Scalars['Boolean']['output'];
+  startOrder?: Maybe<Pporders>;
+  testRescheduleFrom: Array<Pporders>;
   updateCoilStatus: Coil;
   updateOneCoil: Coil;
   updatePauseDetails: PanelMachinePauses;
@@ -4546,13 +4551,36 @@ export type MutationDeletePporderArgs = {
 };
 
 
+export type MutationFinishOrderArgs = {
+  finishTime?: InputMaybe<Scalars['DateTime']['input']>;
+  pporderno: Scalars['String']['input'];
+};
+
+
 export type MutationLoginArgs = {
   loginInput: LoginInput;
 };
 
 
+export type MutationRemoveOrderFromPlanArgs = {
+  pporderno: Scalars['String']['input'];
+};
+
+
 export type MutationRemoveRecipeArgs = {
   id: Scalars['String']['input'];
+};
+
+
+export type MutationStartOrderArgs = {
+  pporderno: Scalars['String']['input'];
+  startTime?: InputMaybe<Scalars['DateTime']['input']>;
+};
+
+
+export type MutationTestRescheduleFromArgs = {
+  prevPanelCode?: InputMaybe<Scalars['String']['input']>;
+  startFrom: Scalars['DateTime']['input'];
 };
 
 
@@ -4876,6 +4904,18 @@ export type OffsetPaging = {
   offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type OrderLineCompletion = {
+  custporderno?: Maybe<Scalars['String']['output']>;
+  id: Scalars['Int']['output'];
+  isFinished: Scalars['Boolean']['output'];
+  pporderno?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['Int']['output']>;
+  time?: Maybe<Scalars['Float']['output']>;
+  ttm?: Maybe<Scalars['Float']['output']>;
+  upDate?: Maybe<Scalars['Date']['output']>;
+  updatedAt?: Maybe<Scalars['Date']['output']>;
+};
+
 export type PPackages = {
   cin?: Maybe<Scalars['String']['output']>;
   classification?: Maybe<Scalars['String']['output']>;
@@ -5173,9 +5213,34 @@ export type Pporders = {
 };
 
 export type PpordersFilterInput = {
+  createDateFilter?: InputMaybe<DateFilter>;
+  estFinishDateFilter?: InputMaybe<DateFilter>;
+  estStartDateFilter?: InputMaybe<DateFilter>;
+  id?: InputMaybe<IntFilter>;
+  isActiveFilter?: InputMaybe<BooleanFilter>;
   lastDays?: InputMaybe<Scalars['Int']['input']>;
+  panelcodeFilter?: InputMaybe<StringFilter>;
   pporderno?: InputMaybe<Scalars['String']['input']>;
+  ppordernoFilter?: InputMaybe<StringFilter>;
   status?: InputMaybe<Array<Scalars['Int']['input']>>;
+};
+
+export type PpordersSortField =
+  | 'createDate'
+  | 'estFinishDate'
+  | 'estStartDate'
+  | 'finishDateDatetime'
+  | 'id'
+  | 'pporderno'
+  | 'startDateDatetime'
+  | 'status';
+
+export type PpordersSortInput = {
+  direction?: InputMaybe<SortOrder>;
+  directionStr?: InputMaybe<Scalars['String']['input']>;
+  field: PpordersSortField;
+  order?: InputMaybe<SortOrder>;
+  orderStr?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Prdata = {
@@ -5453,6 +5518,7 @@ export type Query = {
   masterlength?: Maybe<Masterlength>;
   masterlengths: Array<Masterlength>;
   me: Users;
+  orderLinesCompletionSnapshot: Array<OrderLineCompletion>;
   panelProduction: ProdOrdersViewResponse;
   panelProductionByCount: Array<ProdOrdersView>;
   panelProductionOrdersExt2?: Maybe<ProdOrdersView>;
@@ -5465,6 +5531,7 @@ export type Query = {
   pporder: Pporders;
   pporderline2?: Maybe<Pporderlines2>;
   pporderlines2: Pporderlines2Response;
+  pporderlines2WithOrder: Array<Pporderlines2>;
   /** Get all production orders */
   pporders: Array<Pporders>;
   recipe: Recipe;
@@ -5567,6 +5634,11 @@ export type QueryMasterlengthsArgs = {
 };
 
 
+export type QueryOrderLinesCompletionSnapshotArgs = {
+  pporderno: Scalars['String']['input'];
+};
+
+
 export type QueryPanelProductionArgs = {
   filter?: InputMaybe<ProdOrdersViewFilterInput>;
   paging?: InputMaybe<OffsetPaging>;
@@ -5613,6 +5685,7 @@ export type QueryPporderlines2Args = {
 
 export type QueryPpordersArgs = {
   filter?: InputMaybe<PpordersFilterInput>;
+  sorting?: InputMaybe<Array<PpordersSortInput>>;
 };
 
 
@@ -8086,7 +8159,7 @@ export type GetPpOrdersListQueryVariables = Exact<{
 
 
 export type GetPpOrdersListQuery = { pporders: Array<(
-    Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'status' | 'startDateDatetime' | 'finishDateDatetime' | 'estDateOfProdDatetime' | 'createDate' | 'estStartDate' | 'estFinishDate' | 'previd' | 'prevpanelcode' | 'offtimeduration' | 'offtimestartdate' | 'offtimeenddate'>
+    Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'status' | 'startDateDatetime' | 'finishDateDatetime' | 'estDateOfProdDatetime' | 'createDate' | 'estStartDate' | 'estFinishDate' | 'previd' | 'prevpanelcode' | 'offtimeduration' | 'offtimestartdate' | 'offtimeenddate' | 'totalOrderTime' | 'totalTtm'>
     & { pauses?: Maybe<Array<Pick<PanelMachinePauses, 'id' | 'pausestartdate' | 'pauseenddate' | 'pauseduration' | 'pausecomment'>>>, groupIn?: Maybe<Array<(
       Pick<PporderGroupIn, 'cin' | 'thickin' | 'moldin' | 'cout' | 'thickout' | 'moldout' | 'totalTtm'>
       & { orders?: Maybe<Array<(
@@ -8281,12 +8354,35 @@ export type GetStatusesQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type GetStatusesQuery = { statuses: Array<Pick<StatusType, 'id' | 'name' | 'nameGrp'>> };
 
+export type RemoveOrderFromPlanMutationVariables = Exact<{
+  pporderno: Scalars['String']['input'];
+}>;
+
+
+export type RemoveOrderFromPlanMutation = { removeOrderFromPlan?: Maybe<Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'status' | 'startDateDatetime' | 'finishDateDatetime' | 'estStartDate' | 'estFinishDate'>> };
+
 export type FindExpectedQueryVariables = Exact<{
   filter?: InputMaybe<CoilsFilterInput>;
 }>;
 
 
 export type FindExpectedQuery = { expectedCoils: { nodes: Array<Pick<Coil, 'id'>> } };
+
+export type FinishOrderMutationVariables = Exact<{
+  pporderno: Scalars['String']['input'];
+  finishTime?: InputMaybe<Scalars['DateTime']['input']>;
+}>;
+
+
+export type FinishOrderMutation = { finishOrder?: Maybe<Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'status' | 'startDateDatetime' | 'finishDateDatetime' | 'estStartDate' | 'estFinishDate'>> };
+
+export type StartOrderMutationVariables = Exact<{
+  pporderno: Scalars['String']['input'];
+  startTime?: InputMaybe<Scalars['DateTime']['input']>;
+}>;
+
+
+export type StartOrderMutation = { startOrder?: Maybe<Pick<Pporders, 'id' | 'pporderno' | 'panelcode' | 'status' | 'startDateDatetime' | 'finishDateDatetime' | 'estStartDate' | 'estFinishDate'>> };
 
 
 export const PporderlineStatusChangedDocument = gql`
@@ -8619,6 +8715,8 @@ export const GetPpOrdersListDocument = gql`
     offtimeduration
     offtimestartdate
     offtimeenddate
+    totalOrderTime
+    totalTtm
     pauses {
       id
       pausestartdate
@@ -9815,6 +9913,46 @@ export type GetStatusesQueryHookResult = ReturnType<typeof useGetStatusesQuery>;
 export type GetStatusesLazyQueryHookResult = ReturnType<typeof useGetStatusesLazyQuery>;
 export type GetStatusesSuspenseQueryHookResult = ReturnType<typeof useGetStatusesSuspenseQuery>;
 export type GetStatusesQueryResult = Apollo.QueryResult<GetStatusesQuery, GetStatusesQueryVariables>;
+export const RemoveOrderFromPlanDocument = gql`
+    mutation RemoveOrderFromPlan($pporderno: String!) {
+  removeOrderFromPlan(pporderno: $pporderno) {
+    id
+    pporderno
+    panelcode
+    status
+    startDateDatetime
+    finishDateDatetime
+    estStartDate
+    estFinishDate
+  }
+}
+    `;
+export type RemoveOrderFromPlanMutationFn = Apollo.MutationFunction<RemoveOrderFromPlanMutation, RemoveOrderFromPlanMutationVariables>;
+
+/**
+ * __useRemoveOrderFromPlanMutation__
+ *
+ * To run a mutation, you first call `useRemoveOrderFromPlanMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRemoveOrderFromPlanMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [removeOrderFromPlanMutation, { data, loading, error }] = useRemoveOrderFromPlanMutation({
+ *   variables: {
+ *      pporderno: // value for 'pporderno'
+ *   },
+ * });
+ */
+export function useRemoveOrderFromPlanMutation(baseOptions?: Apollo.MutationHookOptions<RemoveOrderFromPlanMutation, RemoveOrderFromPlanMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RemoveOrderFromPlanMutation, RemoveOrderFromPlanMutationVariables>(RemoveOrderFromPlanDocument, options);
+      }
+export type RemoveOrderFromPlanMutationHookResult = ReturnType<typeof useRemoveOrderFromPlanMutation>;
+export type RemoveOrderFromPlanMutationResult = Apollo.MutationResult<RemoveOrderFromPlanMutation>;
+export type RemoveOrderFromPlanMutationOptions = Apollo.BaseMutationOptions<RemoveOrderFromPlanMutation, RemoveOrderFromPlanMutationVariables>;
 export const FindExpectedDocument = gql`
     query FindExpected($filter: CoilsFilterInput) {
   expectedCoils(filter: $filter) {
@@ -9857,3 +9995,85 @@ export type FindExpectedQueryHookResult = ReturnType<typeof useFindExpectedQuery
 export type FindExpectedLazyQueryHookResult = ReturnType<typeof useFindExpectedLazyQuery>;
 export type FindExpectedSuspenseQueryHookResult = ReturnType<typeof useFindExpectedSuspenseQuery>;
 export type FindExpectedQueryResult = Apollo.QueryResult<FindExpectedQuery, FindExpectedQueryVariables>;
+export const FinishOrderDocument = gql`
+    mutation FinishOrder($pporderno: String!, $finishTime: DateTime) {
+  finishOrder(pporderno: $pporderno, finishTime: $finishTime) {
+    id
+    pporderno
+    panelcode
+    status
+    startDateDatetime
+    finishDateDatetime
+    estStartDate
+    estFinishDate
+  }
+}
+    `;
+export type FinishOrderMutationFn = Apollo.MutationFunction<FinishOrderMutation, FinishOrderMutationVariables>;
+
+/**
+ * __useFinishOrderMutation__
+ *
+ * To run a mutation, you first call `useFinishOrderMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useFinishOrderMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [finishOrderMutation, { data, loading, error }] = useFinishOrderMutation({
+ *   variables: {
+ *      pporderno: // value for 'pporderno'
+ *      finishTime: // value for 'finishTime'
+ *   },
+ * });
+ */
+export function useFinishOrderMutation(baseOptions?: Apollo.MutationHookOptions<FinishOrderMutation, FinishOrderMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<FinishOrderMutation, FinishOrderMutationVariables>(FinishOrderDocument, options);
+      }
+export type FinishOrderMutationHookResult = ReturnType<typeof useFinishOrderMutation>;
+export type FinishOrderMutationResult = Apollo.MutationResult<FinishOrderMutation>;
+export type FinishOrderMutationOptions = Apollo.BaseMutationOptions<FinishOrderMutation, FinishOrderMutationVariables>;
+export const StartOrderDocument = gql`
+    mutation StartOrder($pporderno: String!, $startTime: DateTime) {
+  startOrder(pporderno: $pporderno, startTime: $startTime) {
+    id
+    pporderno
+    panelcode
+    status
+    startDateDatetime
+    finishDateDatetime
+    estStartDate
+    estFinishDate
+  }
+}
+    `;
+export type StartOrderMutationFn = Apollo.MutationFunction<StartOrderMutation, StartOrderMutationVariables>;
+
+/**
+ * __useStartOrderMutation__
+ *
+ * To run a mutation, you first call `useStartOrderMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStartOrderMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [startOrderMutation, { data, loading, error }] = useStartOrderMutation({
+ *   variables: {
+ *      pporderno: // value for 'pporderno'
+ *      startTime: // value for 'startTime'
+ *   },
+ * });
+ */
+export function useStartOrderMutation(baseOptions?: Apollo.MutationHookOptions<StartOrderMutation, StartOrderMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<StartOrderMutation, StartOrderMutationVariables>(StartOrderDocument, options);
+      }
+export type StartOrderMutationHookResult = ReturnType<typeof useStartOrderMutation>;
+export type StartOrderMutationResult = Apollo.MutationResult<StartOrderMutation>;
+export type StartOrderMutationOptions = Apollo.BaseMutationOptions<StartOrderMutation, StartOrderMutationVariables>;

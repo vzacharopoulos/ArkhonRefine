@@ -129,6 +129,23 @@ pausecomment}
 
 }`
 
+export const RESCHEDULE_ALL_ORDERS_MUTATION = gql`
+mutation rescheduleAllScheduledOrders {
+  rescheduleAllScheduledOrders {
+    id
+    pporderno
+    status
+    estStartDate
+    estFinishDate
+    startDateDatetime
+    finishDateDatetime
+    offtimestartdate
+    offtimeenddate
+    offtimeduration
+  }
+}
+`;
+
 // export const UPDATE_PPORDERLINE_PRIORITY = gql`
 // mutation updatePporderlinePriority($input: UpdatePporderlinePriorityInput!) {
 //   updatePporderlinePriority(input: $input) {
@@ -141,8 +158,8 @@ pausecomment}
 //   }
 // }`
 export const GET_PPORDERS_LIST = gql`
-query GetPpOrdersList($filter: PpordersFilterInput) {
-  pporders(filter: $filter) {
+query GetPpOrdersList($filter: PpordersFilterInput, $sorting: [PpordersSortInput!]) {
+  pporders(filter: $filter, sorting: $sorting) {
     id
     pporderno
     panelcode
@@ -158,6 +175,8 @@ query GetPpOrdersList($filter: PpordersFilterInput) {
     offtimeduration
     offtimestartdate
     offtimeenddate
+    totalOrderTime
+    totalTtm
     pauses {
       id
       pausestartdate
@@ -212,8 +231,8 @@ export const GET_PPORDERS_TIMES = gql`
 `;
 
 export const GET_PPORDERS = gql`
-query GetPpOrders($filter: PpordersFilterInput) {
-  pporders(filter: $filter) {
+query GetPpOrders($filter: PpordersFilterInput, $sorting: [PpordersSortInput!]) {
+  pporders(filter: $filter, sorting: $sorting) {
     id
     pporderno
     panelcode
